@@ -1,8 +1,6 @@
-cat > ~/projects/token-economy-intel/engine/connectors/base_connector.py << 'PYBASE'
 """Base class for all data connectors."""
 from abc import ABC, abstractmethod
 from datetime import date
-from typing import Optional
 
 from engine.models import FinancialRecord, Provider
 

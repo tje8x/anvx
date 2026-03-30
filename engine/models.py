@@ -2,7 +2,6 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel, Field
 
 class SpendCategory(str, Enum):
@@ -29,13 +28,13 @@ class FinancialRecord(BaseModel):
 	amount: Decimal = Field(description="Negative = cost, positive = revenue")
 	currency: str = "USD"
 	category: SpendCategory
-	subcategory: Optional[str] = None
+	subcategory: str | None = None
 	provider: Provider
-	model: Optional[str] = None
-	tokens_input: Optional[int] = None
-	tokens_output: Optional[int] = None
+	model: str | None = None
+	tokens_input: int | None = None
+	tokens_output: int | None = None
 	source: str
-	raw_description: Optional[str] = None
+	raw_description: str | None = None
 	confidenc: float = 1.0
 
 class Anomaly(BaseModel):
@@ -51,7 +50,7 @@ class Recommendation(BaseModel):
 	"""A cost optimization recommendation."""
 	rec_type: str
 	description: str
-	estimated_monthly_savings: Optional[Decimal] = None
+	estimated_monthly_savings: Decimal | None = None
 	confidence: str = "medium"
 	action_required: str
 	category: SpendCategory
@@ -62,8 +61,8 @@ class FinancialSummary(BaseModel):
 	total_monthly_spend: Decimal = Decimal("0")
 	spend_by_category: dict[str, Decimal] = {}
 	spend_by_provider: dict[str, Decimal] = {}
-	revenue_monthly: Optional[Decimal] = None
-	crypto_holdings_usd: Optional[Decimal] = None
+	revenue_monthly: Decimal | None = None
+	crypto_holdings_usd: Decimal | None = None
 	anomalies: list[Anomaly] = []
 	recommendations: list[Recommendation] = []
 	connected_accounts: list[str] = []
