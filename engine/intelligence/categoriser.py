@@ -21,6 +21,9 @@ Valid categories:
 - cloud_infrastructure: AWS, GCP, Azure, hosting, storage, CDN
 - saas_subscription: Software subscriptions (Slack, GitHub, Figma, etc.)
 - payment_processing: Stripe fees, PayPal fees, processing costs
+- communication: Twilio, SendGrid, SMS, voice, email sending
+- monitoring: Datadog, LangSmith, APM, logging, tracing, observability
+- search_data: Pinecone, Tavily, vector databases, search APIs, retrieval
 - crypto_holdings: Cryptocurrency balances or transfers
 - revenue: Incoming payments, subscription revenue, sales
 - other: Cannot be determined
@@ -42,6 +45,12 @@ _KEYWORD_RULES: list[tuple[list[str], SpendCategory, float]] = [
      SpendCategory.SAAS_SUBSCRIPTION, 0.8),
     (["stripe fee", "processing fee", "paypal fee", "payment processing"],
      SpendCategory.PAYMENT_PROCESSING, 0.9),
+    (["twilio", "sendgrid", "sms", "voice call", "email send", "messaging"],
+     SpendCategory.COMMUNICATION, 0.85),
+    (["datadog", "langsmith", "monitoring", "observability", "tracing", "traces", "apm", "logging"],
+     SpendCategory.MONITORING, 0.85),
+    (["pinecone", "tavily", "search", "vector", "embedding index", "retrieval"],
+     SpendCategory.SEARCH_DATA, 0.85),
     (["eth", "btc", "sol", "usdc", "crypto", "wallet", "bitcoin", "ethereum"],
      SpendCategory.CRYPTO_HOLDINGS, 0.85),
     (["charge", "payment received", "invoice paid", "revenue", "subscription revenue", "sale"],
