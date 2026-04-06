@@ -170,13 +170,19 @@ class AnthropicBillingConnector(BaseConnector):
     ) -> list[FinancialRecord]:
         """Generate realistic Anthropic billing data.
 
+        Persona: Customer support bot using claude-sonnet as the main model.
+
         Profile: ~$250/month total, growing ~6%/month
-          - claude-sonnet: ~$180/month (low variance input tokens — triggers caching estimator)
-          - claude-haiku: ~$70/month
-        Per-request records with consistent input sizes (simulates system prompt reuse).
+          - claude-sonnet: ~$180/month — 50 requests/day with ~8000 input
+            tokens each (system prompt 3K + customer history 3K + RAG 2K).
+            LOW variance (CV ≈ 0.025) → triggers caching estimator.
+            50 req/day * 30 * 8000 = 12M tokens/month. At $3/M cached
+            pricing (90% discount), caching saves ~$32/month.
+          - claude-haiku: ~$70/month — 20/day per-request, varied tokens
+            (200-3000 input). HIGH variance → caching won't trigger.
         """
         rng = random.Random(99)
-        monthly_growth = 1.06  # 6% month-over-month growth
+        monthly_growth = 1.06
 
         records: list[FinancialRecord] = []
         current = start_date
@@ -186,55 +192,46 @@ class AnthropicBillingConnector(BaseConnector):
             months_elapsed = (current - start_date).days / 30.0
             growth = Decimal(str(round(monthly_growth ** months_elapsed, 4)))
 
-            # ── claude-sonnet: per-request with LOW variance input ──
-            # Simulates a system prompt (~1800 tokens) + small user query
-            # CV target < 0.3 → input tokens very consistent
+            # ── claude-sonnet: 50 requests/day, ~8000 input tokens ─
+            # Customer support bot handles ~50 interactions/day.
+            # System prompt (3K) + customer history (3K) + RAG docs (2K)
+            # = ~8000 tokens per call, highly consistent template.
+            # Low variance: 8000 ±4% (CV ≈ 0.025).
+            n_sonnet = int(50 * weekend_factor)
             sonnet_daily_budget = 180.0 / 30 * weekend_factor
-            n_sonnet_requests = 3
-            for _ in range(n_sonnet_requests):
-                req_budget = sonnet_daily_budget / n_sonnet_requests * rng.uniform(0.85, 1.15)
+            for _ in range(n_sonnet):
+                req_budget = sonnet_daily_budget / max(n_sonnet, 1) * rng.uniform(0.9, 1.1)
                 cost_dec = (Decimal(str(round(req_budget, 4))) * growth).quantize(Decimal("0.01"))
-
-                # Low variance: base 1800 ±5% (CV ≈ 0.03)
-                input_tokens = int(1800 * rng.uniform(0.95, 1.05))
-                output_tokens = rng.randint(200, 600)
-
-                records.append(
-                    FinancialRecord(
-                        record_date=current,
-                        amount=-cost_dec,
-                        category=SpendCategory.AI_INFERENCE,
-                        provider=Provider.ANTHROPIC,
-                        model="claude-sonnet",
-                        tokens_input=input_tokens,
-                        tokens_output=output_tokens,
-                        source="synthetic",
-                        raw_description="Synthetic Anthropic claude-sonnet request",
-                    )
-                )
-
-            # ── claude-haiku: daily aggregate ──────────────────────
-            haiku_cost = 70.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
-            haiku_dec = (Decimal(str(round(haiku_cost, 2))) * growth).quantize(Decimal("0.01"))
-            pricing = _MODEL_PRICING["claude-haiku"]
-            input_cost = haiku_dec * Decimal("0.4")
-            output_cost = haiku_dec * Decimal("0.6")
-            haiku_input = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
-            haiku_output = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
-
-            records.append(
-                FinancialRecord(
-                    record_date=current,
-                    amount=-haiku_dec,
+                input_tokens = int(8000 * rng.uniform(0.96, 1.04))
+                output_tokens = rng.randint(800, 1500)
+                records.append(FinancialRecord(
+                    record_date=current, amount=-cost_dec,
                     category=SpendCategory.AI_INFERENCE,
-                    provider=Provider.ANTHROPIC,
-                    model="claude-haiku",
-                    tokens_input=haiku_input,
-                    tokens_output=haiku_output,
+                    provider=Provider.ANTHROPIC, model="claude-sonnet",
+                    tokens_input=input_tokens, tokens_output=output_tokens,
                     source="synthetic",
-                    raw_description="Synthetic Anthropic claude-haiku usage",
-                )
-            )
+                    raw_description="Synthetic Anthropic claude-sonnet request",
+                ))
+
+            # ── claude-haiku: 20 per-request records/day ───────────
+            # Quick ticket triage / classification. Varied input lengths
+            # (different ticket types). HIGH variance (CV > 0.5) means
+            # caching won't trigger — correct, since haiku is already cheap.
+            n_haiku = int(20 * weekend_factor)
+            haiku_daily_budget = 70.0 / 30 * weekend_factor
+            for _ in range(n_haiku):
+                req_cost = haiku_daily_budget / max(n_haiku, 1) * rng.uniform(0.6, 1.4)
+                cost_dec = (Decimal(str(round(req_cost, 4))) * growth).quantize(Decimal("0.01"))
+                input_tokens = rng.randint(200, 3000)
+                output_tokens = rng.randint(30, 300)
+                records.append(FinancialRecord(
+                    record_date=current, amount=-cost_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.ANTHROPIC, model="claude-haiku",
+                    tokens_input=input_tokens, tokens_output=output_tokens,
+                    source="synthetic",
+                    raw_description="Synthetic Anthropic claude-haiku request",
+                ))
 
             current += timedelta(days=1)
 

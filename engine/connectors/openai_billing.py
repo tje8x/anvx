@@ -166,103 +166,111 @@ class OpenAIBillingConnector(BaseConnector):
     ) -> list[FinancialRecord]:
         """Generate 90-day realistic OpenAI billing data.
 
+        Persona: Solo dev defaulting to GPT-4o for everything, running an
+        AI customer support SaaS with 45 customers.
+
         Profile: ~$400/month total, growing ~8%/month
-          - gpt-4o: ~$250/month (per-request records, 80% short tasks <500 input tokens)
-          - gpt-4o-mini: ~$50/month (daily aggregate)
+          - gpt-4o: ~$250/month — TWO distinct usage patterns:
+
+            1. "Pipeline" requests (15/day): Automated cron jobs — nightly
+               reports, scheduled classification runs, RAG-powered analysis.
+               Each call has ~8000 input tokens (system prompt + RAG context),
+               highly consistent (CV < 0.03). Triggers CACHING on gpt-4o.
+
+            2. "Ad-hoc" requests (300/day weekdays, 180 weekends): Developer
+               routing ALL simple tasks to gpt-4o — classification,
+               extraction, formatting, validation. 500-2000 input tokens,
+               200-800 output. ~8,000/month. Triggers MODEL ROUTING
+               since these don't need frontier intelligence.
+
+          - gpt-4o-mini: ~$50/month (15/day per-request, varied tokens)
           - text-embedding-3-small: ~$100/month (daily aggregate)
-        Consistent daily volumes (triggers batch detector).
-        Growth trend (triggers spend forecast).
-        80% short gpt-4o requests (triggers model routing).
+
+        Consistent daily request count → triggers batch detector.
+        Growth trend → triggers spend forecast.
         """
-        rng = random.Random(42)  # deterministic for reproducibility
-        monthly_growth = 1.08  # 8% month-over-month growth
+        rng = random.Random(42)
+        monthly_growth = 1.08
 
         records: list[FinancialRecord] = []
         current = start_date
         while current <= end_date:
             is_weekend = current.weekday() >= 5
             weekend_factor = 0.6 if is_weekend else 1.0
-
-            # Growth factor based on how many months from start
             months_elapsed = (current - start_date).days / 30.0
             growth = Decimal(str(round(monthly_growth ** months_elapsed, 4)))
 
-            # ── gpt-4o: per-request records (25/day, 80% short) ────
-            # 25 requests per day gives enough volume for token-level
-            # savings to be meaningful in model routing analysis.
-            gpt4o_daily_budget = 250.0 / 30 * weekend_factor
-            n_requests = 25
-            n_short = 20  # 80% short
-            for req_idx in range(n_requests):
-                is_short = req_idx < n_short
-                req_budget = gpt4o_daily_budget / n_requests * rng.uniform(0.7, 1.3)
-                cost_dec = (Decimal(str(round(req_budget, 4))) * growth).quantize(Decimal("0.01"))
-
-                if is_short:
-                    # Short task: <500 input tokens, <200 output
-                    input_tokens = rng.randint(100, 480)
-                    output_tokens = rng.randint(40, 190)
-                else:
-                    # Long task: 3000-10000 input tokens
-                    input_tokens = rng.randint(3000, 10000)
-                    output_tokens = rng.randint(800, 3000)
-
-                records.append(
-                    FinancialRecord(
-                        record_date=current,
-                        amount=-cost_dec,
-                        category=SpendCategory.AI_INFERENCE,
-                        provider=Provider.OPENAI,
-                        model="gpt-4o",
-                        tokens_input=input_tokens,
-                        tokens_output=output_tokens,
-                        source="synthetic",
-                        raw_description=f"Synthetic OpenAI gpt-4o request",
-                    )
-                )
-
-            # ── gpt-4o-mini: daily aggregate ───────────────────────
-            mini_cost = 50.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
-            mini_dec = (Decimal(str(round(mini_cost, 2))) * growth).quantize(Decimal("0.01"))
-            pricing = _MODEL_PRICING["gpt-4o-mini"]
-            input_cost = mini_dec * Decimal("0.4")
-            output_cost = mini_dec * Decimal("0.6")
-            mini_input = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
-            mini_output = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
-
-            records.append(
-                FinancialRecord(
-                    record_date=current,
-                    amount=-mini_dec,
+            # ── gpt-4o "pipeline": 15 requests/day, ~8000 input ───
+            # Automated cron: nightly reports, hourly classification,
+            # scheduled RAG analysis. System prompt + context is ~8000
+            # tokens every time. LOW variance → triggers caching.
+            pipeline_budget = 100.0 / 30 * weekend_factor
+            for _ in range(15):
+                req_cost = pipeline_budget / 15 * rng.uniform(0.9, 1.1)
+                cost_dec = (Decimal(str(round(req_cost, 4))) * growth).quantize(Decimal("0.01"))
+                input_tokens = int(8000 * rng.uniform(0.97, 1.03))
+                output_tokens = rng.randint(1500, 2500)
+                records.append(FinancialRecord(
+                    record_date=current, amount=-cost_dec,
                     category=SpendCategory.AI_INFERENCE,
-                    provider=Provider.OPENAI,
-                    model="gpt-4o-mini",
-                    tokens_input=mini_input,
-                    tokens_output=mini_output,
+                    provider=Provider.OPENAI, model="gpt-4o",
+                    tokens_input=input_tokens, tokens_output=output_tokens,
                     source="synthetic",
-                    raw_description="Synthetic OpenAI gpt-4o-mini usage",
-                )
-            )
+                    raw_description="Synthetic OpenAI gpt-4o pipeline request",
+                ))
+
+            # ── gpt-4o "ad-hoc": 300/day weekdays, 180 weekends ───
+            # Developer using gpt-4o for tasks that don't need frontier:
+            # classification, extraction, formatting, validation.
+            # ~8000 requests/month. Tokens 500-2000 input, 200-800 output.
+            # Triggers MODEL ROUTING — material savings by routing to mini.
+            n_adhoc = int(300 * weekend_factor)
+            adhoc_budget = 150.0 / 30 * weekend_factor
+            for _ in range(n_adhoc):
+                req_cost = adhoc_budget / max(n_adhoc, 1) * rng.uniform(0.6, 1.4)
+                cost_dec = (Decimal(str(round(req_cost, 4))) * growth).quantize(Decimal("0.01"))
+                input_tokens = rng.randint(500, 2000)
+                output_tokens = rng.randint(200, 800)
+                records.append(FinancialRecord(
+                    record_date=current, amount=-cost_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.OPENAI, model="gpt-4o",
+                    tokens_input=input_tokens, tokens_output=output_tokens,
+                    source="synthetic",
+                    raw_description="Synthetic OpenAI gpt-4o ad-hoc request",
+                ))
+
+            # ── gpt-4o-mini: 15 per-request records/day ───────────
+            # The developer DOES use mini for some things. Mixed token
+            # sizes with high variance — won't trigger caching.
+            mini_daily_budget = 50.0 / 30 * weekend_factor
+            for _ in range(15):
+                req_cost = mini_daily_budget / 15 * rng.uniform(0.7, 1.3)
+                cost_dec = (Decimal(str(round(req_cost, 4))) * growth).quantize(Decimal("0.01"))
+                input_tokens = rng.randint(200, 5000)
+                output_tokens = rng.randint(50, 1000)
+                records.append(FinancialRecord(
+                    record_date=current, amount=-cost_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.OPENAI, model="gpt-4o-mini",
+                    tokens_input=input_tokens, tokens_output=output_tokens,
+                    source="synthetic",
+                    raw_description="Synthetic OpenAI gpt-4o-mini request",
+                ))
 
             # ── text-embedding-3-small: daily aggregate ────────────
             embed_cost = 100.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
             embed_dec = (Decimal(str(round(embed_cost, 2))) * growth).quantize(Decimal("0.01"))
             embed_pricing = _MODEL_PRICING["text-embedding-3-small"]
             embed_input = int(embed_dec / embed_pricing["input"] * 1_000_000) if embed_pricing["input"] else 0
-
-            records.append(
-                FinancialRecord(
-                    record_date=current,
-                    amount=-embed_dec,
-                    category=SpendCategory.AI_INFERENCE,
-                    provider=Provider.OPENAI,
-                    model="text-embedding-3-small",
-                    tokens_input=embed_input,
-                    tokens_output=0,
-                    source="synthetic",
-                    raw_description="Synthetic OpenAI text-embedding-3-small usage",
-                )
-            )
+            records.append(FinancialRecord(
+                record_date=current, amount=-embed_dec,
+                category=SpendCategory.AI_INFERENCE,
+                provider=Provider.OPENAI, model="text-embedding-3-small",
+                tokens_input=embed_input, tokens_output=0,
+                source="synthetic",
+                raw_description="Synthetic OpenAI text-embedding-3-small usage",
+            ))
 
             current += timedelta(days=1)
 
