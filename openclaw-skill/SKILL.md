@@ -26,7 +26,11 @@ This will:
 2. Walk the user through connecting accounts. Ask about each category and skip any the user doesn't use:
    - **LLM billing**: OpenAI API key, Anthropic API key
    - **Payments**: Stripe API key
-   - **Crypto**: Ethereum wallet addresses, exchange API keys
+   - **Crypto**: When user selects crypto, ask: "Do you have on-chain wallets, exchange accounts, or both?"
+     - On-chain wallets: chain + public address pairs (Ethereum, Solana, Base, Arbitrum, Polygon)
+     - Coinbase: read-only API key + secret
+     - Binance: read-only API key + secret
+     - Always explain: "We only need read-only access. Never share private keys or seed phrases."
    - **Infrastructure**: AWS access key + secret, GCP service account JSON, Vercel API token, Cloudflare API token
    - **Communication**: Twilio Account SID + Auth Token, SendGrid API key
    - **Monitoring**: Datadog API key + App key, LangSmith API key
@@ -94,9 +98,9 @@ When showing recommendations, always:
 
 ## Crypto Disclaimer
 
-Always show this disclaimer when displaying crypto data:
+Always show this disclaimer when displaying crypto data (wallets, Coinbase, or Binance):
 
-> Crypto balances shown for informational purposes only. This tool does not execute transactions, provide investment advice, or manage wallets.
+> Crypto balances are informational only. Not financial advice. This tool does not execute transactions.
 
 ## Analytics
 

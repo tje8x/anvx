@@ -2,7 +2,9 @@
 from engine.connectors.openai_billing import OpenAIBillingConnector
 from engine.connectors.anthropic_billing import AnthropicBillingConnector
 from engine.connectors.stripe_connector import StripeConnector
-from engine.connectors.crypto_reader import CryptoReader
+from engine.connectors.crypto_wallet import CryptoWalletConnector
+from engine.connectors.coinbase_exchange import CoinbaseExchangeConnector
+from engine.connectors.binance_exchange import BinanceExchangeConnector
 from engine.connectors.aws_costs import AWSCostsConnector
 from engine.connectors.gcp_costs import GCPCostsConnector
 from engine.connectors.vercel_costs import VercelCostsConnector
@@ -14,11 +16,17 @@ from engine.connectors.langsmith_costs import LangSmithCostsConnector
 from engine.connectors.pinecone_costs import PineconeCostsConnector
 from engine.connectors.tavily_costs import TavilyCostsConnector
 
+# Backwards compatibility alias
+CryptoReader = CryptoWalletConnector
+
 __all__ = [
     "OpenAIBillingConnector",
     "AnthropicBillingConnector",
     "StripeConnector",
-    "CryptoReader",
+    "CryptoWalletConnector",
+    "CoinbaseExchangeConnector",
+    "BinanceExchangeConnector",
+    "CryptoReader",  # backwards compat alias
     "AWSCostsConnector",
     "GCPCostsConnector",
     "VercelCostsConnector",

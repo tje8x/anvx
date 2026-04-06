@@ -9,8 +9,10 @@ from decimal import Decimal
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -29,7 +31,9 @@ CONNECTOR_PROFILES: list[dict] = [
     {"name": "OpenAI",      "cls": OpenAIBillingConnector,      "monthly_est": 400},
     {"name": "Anthropic",   "cls": AnthropicBillingConnector,   "monthly_est": 250},
     {"name": "Stripe",      "cls": StripeConnector,             "monthly_est": -1800},  # revenue (positive amounts)
-    {"name": "Crypto",      "cls": CryptoReader,                "monthly_est": 0},      # holdings, not spend
+    {"name": "Crypto Wallet","cls": CryptoWalletConnector,       "monthly_est": 0},      # holdings, not spend
+    {"name": "Coinbase",    "cls": CoinbaseExchangeConnector,   "monthly_est": 0},      # holdings
+    {"name": "Binance",     "cls": BinanceExchangeConnector,    "monthly_est": 0},      # holdings
     {"name": "AWS",         "cls": AWSCostsConnector,           "monthly_est": 200},
     {"name": "GCP",         "cls": GCPCostsConnector,           "monthly_est": 150},
     {"name": "Vercel",      "cls": VercelCostsConnector,        "monthly_est": 20},

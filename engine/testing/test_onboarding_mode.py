@@ -12,8 +12,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -42,7 +44,12 @@ _CONNECTORS = [
     ("langsmith", LangSmithCostsConnector, {"api_key": "test-ls-key-12345"}),
     ("pinecone", PineconeCostsConnector, {"api_key": "test-pc-key-12345"}),
     ("tavily", TavilyCostsConnector, {"api_key": "tvly-test-12345"}),
-    ("crypto", CryptoReader, {"wallet_addresses": ["0xTEST1234567890abcdef"]}),
+    ("crypto_wallet", CryptoWalletConnector, {"wallets": [
+        {"chain": "ethereum", "address": "0xTEST1234567890abcdef"},
+        {"chain": "solana", "address": "TESTso1ana1234567890"},
+    ]}),
+    ("coinbase", CoinbaseExchangeConnector, {"api_key": "test-coinbase-key-12345", "api_secret": "test-coinbase-secret-12345"}),
+    ("binance", BinanceExchangeConnector, {"api_key": "test-binance-key-12345", "api_secret": "test-binance-secret-12345"}),
 ]
 
 
@@ -72,8 +79,8 @@ async def main() -> None:
     assert not bad.is_connected, "bad credentials: is_connected should be False"
     print(f"  openai (bad creds): correctly rejected")
 
-    assert passed == 14, f"Only {passed}/14 connectors passed"
-    print(f"\nAll 14 connectors: PASS")
+    assert passed == 16, f"Only {passed}/16 connectors passed"
+    print(f"\nAll 16 connectors: PASS")
 
 
 if __name__ == "__main__":

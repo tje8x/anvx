@@ -9,8 +9,10 @@ from engine.analytics import EventTracker
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -38,9 +40,17 @@ _PROVIDERS = {
         "cls": StripeConnector,
         "fields": [("api_key", "Stripe secret key (sk_...)")],
     },
-    "crypto": {
-        "cls": CryptoReader,
-        "fields": [("wallet_addresses", "Wallet address(es), comma-separated")],
+    "crypto_wallet": {
+        "cls": CryptoWalletConnector,
+        "fields": [("wallet_addresses", "Wallet address(es), comma-separated (public addresses only)")],
+    },
+    "coinbase": {
+        "cls": CoinbaseExchangeConnector,
+        "fields": [("api_key", "Coinbase API key (read-only)"), ("api_secret", "Coinbase API secret")],
+    },
+    "binance": {
+        "cls": BinanceExchangeConnector,
+        "fields": [("api_key", "Binance API key (read-only)"), ("api_secret", "Binance API secret")],
     },
     "aws": {
         "cls": AWSCostsConnector,

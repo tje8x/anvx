@@ -19,10 +19,6 @@ class BaseConnector(ABC):
 		from engine.utils import TEST_CREDENTIALS
 
 		provider_key = self.provider.value
-		# Both crypto provider variants map to the same test credentials
-		if provider_key in ("crypto_wallet", "crypto_exchange"):
-			provider_key = "crypto"
-
 		test_creds = TEST_CREDENTIALS.get(provider_key)
 		if test_creds is None:
 			return False

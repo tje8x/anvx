@@ -51,7 +51,7 @@ _KEYWORD_RULES: list[tuple[list[str], SpendCategory, float]] = [
      SpendCategory.MONITORING, 0.85),
     (["pinecone", "tavily", "search", "vector", "embedding index", "retrieval"],
      SpendCategory.SEARCH_DATA, 0.85),
-    (["eth", "btc", "sol", "usdc", "crypto", "wallet", "bitcoin", "ethereum"],
+    (["eth", "btc", "sol", "usdc", "crypto", "wallet", "bitcoin", "ethereum", "coinbase", "binance"],
      SpendCategory.CRYPTO_HOLDINGS, 0.85),
     (["charge", "payment received", "invoice paid", "revenue", "subscription revenue", "sale"],
      SpendCategory.REVENUE, 0.8),

@@ -393,8 +393,9 @@ def generate_full_profile(
         start_date = end_date - timedelta(days=90)
 
     from engine.connectors import (
-        AWSCostsConnector, AnthropicBillingConnector, CloudflareCostsConnector,
-        CryptoReader, DatadogCostsConnector, GCPCostsConnector,
+        AWSCostsConnector, AnthropicBillingConnector, BinanceExchangeConnector,
+        CloudflareCostsConnector, CoinbaseExchangeConnector,
+        CryptoWalletConnector, DatadogCostsConnector, GCPCostsConnector,
         LangSmithCostsConnector, OpenAIBillingConnector, PineconeCostsConnector,
         SendGridCostsConnector, StripeConnector, TavilyCostsConnector,
         TwilioCostsConnector, VercelCostsConnector,
@@ -404,7 +405,9 @@ def generate_full_profile(
         ("openai", OpenAIBillingConnector),
         ("anthropic", AnthropicBillingConnector),
         ("stripe", StripeConnector),
-        ("crypto", CryptoReader),
+        ("crypto_wallet", CryptoWalletConnector),
+        ("coinbase", CoinbaseExchangeConnector),
+        ("binance", BinanceExchangeConnector),
         ("aws", AWSCostsConnector),
         ("gcp", GCPCostsConnector),
         ("vercel", VercelCostsConnector),

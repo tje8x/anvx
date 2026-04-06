@@ -46,10 +46,19 @@ TEST_CREDENTIALS: dict[str, Any] = {
 	"langsmith": ["test-ls-key-12345"],
 	"pinecone": ["test-pc-key-12345"],
 	"tavily": ["tvly-test-12345"],
-	"crypto": {
-		"wallet_addresses": [
+	"crypto_wallet": {
+		"_test_addresses": [
 			"0xTEST1234567890abcdef",
+			"TESTso1ana1234567890",
 		],
+	},
+	"coinbase": {
+		"api_key": "test-coinbase-key-12345",
+		"api_secret": "test-coinbase-secret-12345",
+	},
+	"binance": {
+		"api_key": "test-binance-key-12345",
+		"api_secret": "test-binance-secret-12345",
 	},
 }
 

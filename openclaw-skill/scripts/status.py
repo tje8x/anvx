@@ -91,8 +91,9 @@ def main() -> None:
 def _refresh_synthetic(model: FinancialModelManager) -> None:
     """Reload synthetic data for all connectors."""
     from engine.connectors import (
-        AWSCostsConnector, AnthropicBillingConnector, CloudflareCostsConnector,
-        CryptoReader, DatadogCostsConnector, GCPCostsConnector,
+        AWSCostsConnector, AnthropicBillingConnector, BinanceExchangeConnector,
+        CloudflareCostsConnector, CoinbaseExchangeConnector,
+        CryptoWalletConnector, DatadogCostsConnector, GCPCostsConnector,
         LangSmithCostsConnector, OpenAIBillingConnector, PineconeCostsConnector,
         SendGridCostsConnector, StripeConnector, TavilyCostsConnector,
         TwilioCostsConnector, VercelCostsConnector,
@@ -100,7 +101,8 @@ def _refresh_synthetic(model: FinancialModelManager) -> None:
 
     connectors = [
         ("openai", OpenAIBillingConnector), ("anthropic", AnthropicBillingConnector),
-        ("stripe", StripeConnector), ("crypto", CryptoReader),
+        ("stripe", StripeConnector), ("crypto_wallet", CryptoWalletConnector),
+        ("coinbase", CoinbaseExchangeConnector), ("binance", BinanceExchangeConnector),
         ("aws", AWSCostsConnector), ("gcp", GCPCostsConnector),
         ("vercel", VercelCostsConnector), ("cloudflare", CloudflareCostsConnector),
         ("twilio", TwilioCostsConnector), ("sendgrid", SendGridCostsConnector),

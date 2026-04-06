@@ -57,13 +57,13 @@ def main() -> None:
 
     # ── 2. Verify all 14 providers present ─────────────────────────
     expected_providers = {
-        "openai", "anthropic", "stripe", "crypto", "aws", "gcp",
-        "vercel", "cloudflare", "twilio", "sendgrid", "datadog",
-        "langsmith", "pinecone", "tavily",
+        "openai", "anthropic", "stripe", "crypto_wallet", "coinbase",
+        "binance", "aws", "gcp", "vercel", "cloudflare", "twilio",
+        "sendgrid", "datadog", "langsmith", "pinecone", "tavily",
     }
     actual = set(by_provider.keys())
     assert actual == expected_providers, f"Missing providers: {expected_providers - actual}"
-    print("  [PASS] All 14 providers present")
+    print("  [PASS] All 16 providers present")
 
     # ── 3. Verify each provider has records ────────────────────────
     for name in expected_providers:

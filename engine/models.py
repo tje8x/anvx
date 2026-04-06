@@ -32,7 +32,8 @@ class Provider(str, Enum):
 	PINECONE = "pinecone"
 	TAVILY = "tavily"
 	CRYPTO_WALLET = "crypto_wallet"
-	CRYPTO_EXCHANGE = "crypto_exchange"
+	COINBASE = "coinbase"
+	BINANCE = "binance"
 	OTHER = "other"
 
 class FinancialRecord(BaseModel):

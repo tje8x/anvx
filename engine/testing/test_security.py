@@ -16,8 +16,10 @@ from engine.analytics.tracker import EventTracker
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -39,7 +41,9 @@ _ALL_CONNECTOR_CLASSES = [
     OpenAIBillingConnector,
     AnthropicBillingConnector,
     StripeConnector,
-    CryptoReader,
+    CryptoWalletConnector,
+    CoinbaseExchangeConnector,
+    BinanceExchangeConnector,
     AWSCostsConnector,
     GCPCostsConnector,
     VercelCostsConnector,
@@ -88,15 +92,18 @@ class TestNoWriteMethods:
                 for prefix in self._FORBIDDEN_PREFIXES
             ), f"{cls.__name__}.{method_name} looks like a write method"
 
-    def test_crypto_reader_zero_write_methods(self):
-        """CryptoReader specifically must have zero write capability."""
+    @pytest.mark.parametrize("cls", [CryptoWalletConnector, CoinbaseExchangeConnector, BinanceExchangeConnector],
+                             ids=["CryptoWallet", "Coinbase", "Binance"])
+    def test_crypto_connectors_zero_write_methods(self, cls):
+        """All crypto connectors must have zero write capability."""
         public_methods = [
-            name for name in dir(CryptoReader)
-            if not name.startswith("_") and callable(getattr(CryptoReader, name))
+            name for name in dir(cls)
+            if not name.startswith("_") and callable(getattr(cls, name))
         ]
-        allowed = {"connect", "fetch_records", "get_summary", "get_synthetic_records"}
+        allowed = {"connect", "fetch_records", "get_summary", "get_synthetic_records",
+                    "validate_test_credentials"}
         assert set(public_methods) == allowed, (
-            f"CryptoReader has unexpected methods: {set(public_methods) - allowed}"
+            f"{cls.__name__} has unexpected methods: {set(public_methods) - allowed}"
         )
 
 

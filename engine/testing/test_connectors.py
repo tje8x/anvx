@@ -8,8 +8,10 @@ import pytest
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -32,7 +34,9 @@ _ALL_CONNECTORS = [
     ("OpenAI", OpenAIBillingConnector, Provider.OPENAI, SpendCategory.AI_INFERENCE),
     ("Anthropic", AnthropicBillingConnector, Provider.ANTHROPIC, SpendCategory.AI_INFERENCE),
     ("Stripe", StripeConnector, Provider.STRIPE, None),  # mixed categories
-    ("Crypto", CryptoReader, Provider.CRYPTO_WALLET, SpendCategory.CRYPTO_HOLDINGS),
+    ("CryptoWallet", CryptoWalletConnector, Provider.CRYPTO_WALLET, SpendCategory.CRYPTO_HOLDINGS),
+    ("Coinbase", CoinbaseExchangeConnector, Provider.COINBASE, SpendCategory.CRYPTO_HOLDINGS),
+    ("Binance", BinanceExchangeConnector, Provider.BINANCE, SpendCategory.CRYPTO_HOLDINGS),
     ("AWS", AWSCostsConnector, Provider.AWS, SpendCategory.CLOUD_INFRASTRUCTURE),
     ("GCP", GCPCostsConnector, Provider.GCP, SpendCategory.CLOUD_INFRASTRUCTURE),
     ("Vercel", VercelCostsConnector, Provider.VERCEL, SpendCategory.CLOUD_INFRASTRUCTURE),

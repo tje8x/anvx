@@ -12,8 +12,10 @@ from engine.analytics import EventTracker
 from engine.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
+    BinanceExchangeConnector,
     CloudflareCostsConnector,
-    CryptoReader,
+    CoinbaseExchangeConnector,
+    CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
     LangSmithCostsConnector,
@@ -51,8 +53,12 @@ _ACCOUNT_GROUPS = [
     {
         "group": "Crypto",
         "accounts": [
-            {"name": "crypto", "label": "Crypto Wallet", "cls": CryptoReader,
-             "fields": [("wallet_addresses", "Ethereum wallet address(es), comma-separated")]},
+            {"name": "crypto_wallet", "label": "Crypto Wallet", "cls": CryptoWalletConnector,
+             "fields": [("wallet_addresses", "Wallet address(es), comma-separated (we only need public addresses — never share private keys)")]},
+            {"name": "coinbase", "label": "Coinbase", "cls": CoinbaseExchangeConnector,
+             "fields": [("api_key", "Coinbase API key (read-only)"), ("api_secret", "Coinbase API secret")]},
+            {"name": "binance", "label": "Binance", "cls": BinanceExchangeConnector,
+             "fields": [("api_key", "Binance API key (read-only)"), ("api_secret", "Binance API secret")]},
         ],
     },
     {
