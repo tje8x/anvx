@@ -27,6 +27,21 @@ class GCPCostsConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to GCP Cloud Billing...")
+                await asyncio.sleep(1)
+                print("Authenticated with GCP service account (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Invalid GCP service account JSON")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         service_account_json = credentials.get("service_account_json", "")
         if not service_account_json:
             logger.error("Missing GCP service_account_json")
@@ -102,6 +117,10 @@ class GCPCostsConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 

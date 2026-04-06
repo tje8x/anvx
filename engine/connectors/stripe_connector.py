@@ -26,6 +26,21 @@ class StripeConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to Stripe...")
+                await asyncio.sleep(1)
+                print("Authenticated with Stripe API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Invalid API key format")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         api_key = credentials.get("api_key", "")
         if not api_key or not api_key.startswith("sk_"):
             logger.error("Invalid Stripe API key format")
@@ -62,6 +77,10 @@ class StripeConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
         start_ts = int(datetime.combine(start_date, datetime.min.time()).timestamp())

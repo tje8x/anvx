@@ -32,6 +32,21 @@ class AnthropicBillingConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to Anthropic...")
+                await asyncio.sleep(1)
+                print("Authenticated with Anthropic API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Authentication failed")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         api_key = credentials.get("api_key", "")
         if not api_key:
             logger.error("Missing Anthropic API key")
@@ -72,6 +87,10 @@ class AnthropicBillingConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 
@@ -151,41 +170,34 @@ class AnthropicBillingConnector(BaseConnector):
     ) -> list[FinancialRecord]:
         """Generate realistic Anthropic billing data.
 
-        Profile: ~$250/month total
-          - claude-sonnet: ~$180/month
+        Profile: ~$250/month total, growing ~6%/month
+          - claude-sonnet: ~$180/month (low variance input tokens — triggers caching estimator)
           - claude-haiku: ~$70/month
-        Includes weekday/weekend variance and one anomaly week at 3x.
+        Per-request records with consistent input sizes (simulates system prompt reuse).
         """
         rng = random.Random(99)
-
-        model_daily: dict[str, float] = {
-            "claude-sonnet": 180.0 / 30,
-            "claude-haiku": 70.0 / 30,
-        }
-
-        total_days = (end_date - start_date).days
-        anomaly_start = start_date + timedelta(days=max(30, total_days // 2))
-        anomaly_end = anomaly_start + timedelta(days=7)
+        monthly_growth = 1.06  # 6% month-over-month growth
 
         records: list[FinancialRecord] = []
         current = start_date
         while current <= end_date:
             is_weekend = current.weekday() >= 5
-            is_anomaly = anomaly_start <= current < anomaly_end
+            weekend_factor = 0.6 if is_weekend else 1.0
+            months_elapsed = (current - start_date).days / 30.0
+            growth = Decimal(str(round(monthly_growth ** months_elapsed, 4)))
 
-            for model_name, daily_target in model_daily.items():
-                base = daily_target * (0.6 if is_weekend else 1.0)
-                if is_anomaly:
-                    base *= 3.0
-                cost = base * rng.uniform(0.8, 1.2)
-                cost_dec = Decimal(str(round(cost, 2)))
+            # ── claude-sonnet: per-request with LOW variance input ──
+            # Simulates a system prompt (~1800 tokens) + small user query
+            # CV target < 0.3 → input tokens very consistent
+            sonnet_daily_budget = 180.0 / 30 * weekend_factor
+            n_sonnet_requests = 3
+            for _ in range(n_sonnet_requests):
+                req_budget = sonnet_daily_budget / n_sonnet_requests * rng.uniform(0.85, 1.15)
+                cost_dec = (Decimal(str(round(req_budget, 4))) * growth).quantize(Decimal("0.01"))
 
-                pricing = _MODEL_PRICING[model_name]
-                # Assume 3:1 input:output ratio by token count
-                input_cost = cost_dec * Decimal("0.4")
-                output_cost = cost_dec * Decimal("0.6")
-                input_tokens = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
-                output_tokens = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
+                # Low variance: base 1800 ±5% (CV ≈ 0.03)
+                input_tokens = int(1800 * rng.uniform(0.95, 1.05))
+                output_tokens = rng.randint(200, 600)
 
                 records.append(
                     FinancialRecord(
@@ -193,13 +205,36 @@ class AnthropicBillingConnector(BaseConnector):
                         amount=-cost_dec,
                         category=SpendCategory.AI_INFERENCE,
                         provider=Provider.ANTHROPIC,
-                        model=model_name,
+                        model="claude-sonnet",
                         tokens_input=input_tokens,
                         tokens_output=output_tokens,
                         source="synthetic",
-                        raw_description=f"Synthetic Anthropic {model_name} usage",
+                        raw_description="Synthetic Anthropic claude-sonnet request",
                     )
                 )
+
+            # ── claude-haiku: daily aggregate ──────────────────────
+            haiku_cost = 70.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
+            haiku_dec = (Decimal(str(round(haiku_cost, 2))) * growth).quantize(Decimal("0.01"))
+            pricing = _MODEL_PRICING["claude-haiku"]
+            input_cost = haiku_dec * Decimal("0.4")
+            output_cost = haiku_dec * Decimal("0.6")
+            haiku_input = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
+            haiku_output = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
+
+            records.append(
+                FinancialRecord(
+                    record_date=current,
+                    amount=-haiku_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.ANTHROPIC,
+                    model="claude-haiku",
+                    tokens_input=haiku_input,
+                    tokens_output=haiku_output,
+                    source="synthetic",
+                    raw_description="Synthetic Anthropic claude-haiku usage",
+                )
+            )
 
             current += timedelta(days=1)
 

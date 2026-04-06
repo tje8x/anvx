@@ -33,6 +33,21 @@ class OpenAIBillingConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to OpenAI...")
+                await asyncio.sleep(1)
+                print("Authenticated with OpenAI API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Invalid API key format")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         api_key = credentials.get("api_key", "")
         if not api_key or not api_key.startswith("sk-"):
             logger.error("Invalid OpenAI API key format")
@@ -69,6 +84,10 @@ class OpenAIBillingConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 
@@ -147,53 +166,46 @@ class OpenAIBillingConnector(BaseConnector):
     ) -> list[FinancialRecord]:
         """Generate 90-day realistic OpenAI billing data.
 
-        Profile: ~$400/month total
-          - gpt-4o: ~$250/month
-          - gpt-4o-mini: ~$50/month
-          - text-embedding-3-small: ~$100/month
-        Includes weekday/weekend variance and one anomaly week at 3x.
+        Profile: ~$400/month total, growing ~8%/month
+          - gpt-4o: ~$250/month (per-request records, 80% short tasks <500 input tokens)
+          - gpt-4o-mini: ~$50/month (daily aggregate)
+          - text-embedding-3-small: ~$100/month (daily aggregate)
+        Consistent daily volumes (triggers batch detector).
+        Growth trend (triggers spend forecast).
+        80% short gpt-4o requests (triggers model routing).
         """
         rng = random.Random(42)  # deterministic for reproducibility
-
-        # Daily targets (monthly / 30)
-        model_daily: dict[str, float] = {
-            "gpt-4o": 250.0 / 30,
-            "gpt-4o-mini": 50.0 / 30,
-            "text-embedding-3-small": 100.0 / 30,
-        }
-
-        # Pick an anomaly week start (roughly middle of range)
-        total_days = (end_date - start_date).days
-        anomaly_start = start_date + timedelta(days=max(30, total_days // 2))
-        anomaly_end = anomaly_start + timedelta(days=7)
+        monthly_growth = 1.08  # 8% month-over-month growth
 
         records: list[FinancialRecord] = []
         current = start_date
         while current <= end_date:
             is_weekend = current.weekday() >= 5
-            is_anomaly = anomaly_start <= current < anomaly_end
+            weekend_factor = 0.6 if is_weekend else 1.0
 
-            for model_name, daily_target in model_daily.items():
-                # Weekend traffic drops ~40%
-                base = daily_target * (0.6 if is_weekend else 1.0)
-                # Anomaly week: 3x
-                if is_anomaly:
-                    base *= 3.0
-                # Add ±20% daily noise
-                cost = base * rng.uniform(0.8, 1.2)
-                cost_dec = Decimal(str(round(cost, 2)))
+            # Growth factor based on how many months from start
+            months_elapsed = (current - start_date).days / 30.0
+            growth = Decimal(str(round(monthly_growth ** months_elapsed, 4)))
 
-                # Estimate tokens from cost
-                pricing = _MODEL_PRICING[model_name]
-                if model_name == "text-embedding-3-small":
-                    input_tokens = int(cost_dec / pricing["input"] * 1_000_000) if pricing["input"] else 0
-                    output_tokens = 0
+            # ── gpt-4o: per-request records (25/day, 80% short) ────
+            # 25 requests per day gives enough volume for token-level
+            # savings to be meaningful in model routing analysis.
+            gpt4o_daily_budget = 250.0 / 30 * weekend_factor
+            n_requests = 25
+            n_short = 20  # 80% short
+            for req_idx in range(n_requests):
+                is_short = req_idx < n_short
+                req_budget = gpt4o_daily_budget / n_requests * rng.uniform(0.7, 1.3)
+                cost_dec = (Decimal(str(round(req_budget, 4))) * growth).quantize(Decimal("0.01"))
+
+                if is_short:
+                    # Short task: <500 input tokens, <200 output
+                    input_tokens = rng.randint(100, 480)
+                    output_tokens = rng.randint(40, 190)
                 else:
-                    # Assume 3:1 input:output ratio by token count
-                    input_cost = cost_dec * Decimal("0.4")
-                    output_cost = cost_dec * Decimal("0.6")
-                    input_tokens = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
-                    output_tokens = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
+                    # Long task: 3000-10000 input tokens
+                    input_tokens = rng.randint(3000, 10000)
+                    output_tokens = rng.randint(800, 3000)
 
                 records.append(
                     FinancialRecord(
@@ -201,13 +213,56 @@ class OpenAIBillingConnector(BaseConnector):
                         amount=-cost_dec,
                         category=SpendCategory.AI_INFERENCE,
                         provider=Provider.OPENAI,
-                        model=model_name,
+                        model="gpt-4o",
                         tokens_input=input_tokens,
                         tokens_output=output_tokens,
                         source="synthetic",
-                        raw_description=f"Synthetic OpenAI {model_name} usage",
+                        raw_description=f"Synthetic OpenAI gpt-4o request",
                     )
                 )
+
+            # ── gpt-4o-mini: daily aggregate ───────────────────────
+            mini_cost = 50.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
+            mini_dec = (Decimal(str(round(mini_cost, 2))) * growth).quantize(Decimal("0.01"))
+            pricing = _MODEL_PRICING["gpt-4o-mini"]
+            input_cost = mini_dec * Decimal("0.4")
+            output_cost = mini_dec * Decimal("0.6")
+            mini_input = int(input_cost / pricing["input"] * 1_000_000) if pricing["input"] else 0
+            mini_output = int(output_cost / pricing["output"] * 1_000_000) if pricing["output"] else 0
+
+            records.append(
+                FinancialRecord(
+                    record_date=current,
+                    amount=-mini_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.OPENAI,
+                    model="gpt-4o-mini",
+                    tokens_input=mini_input,
+                    tokens_output=mini_output,
+                    source="synthetic",
+                    raw_description="Synthetic OpenAI gpt-4o-mini usage",
+                )
+            )
+
+            # ── text-embedding-3-small: daily aggregate ────────────
+            embed_cost = 100.0 / 30 * weekend_factor * rng.uniform(0.8, 1.2)
+            embed_dec = (Decimal(str(round(embed_cost, 2))) * growth).quantize(Decimal("0.01"))
+            embed_pricing = _MODEL_PRICING["text-embedding-3-small"]
+            embed_input = int(embed_dec / embed_pricing["input"] * 1_000_000) if embed_pricing["input"] else 0
+
+            records.append(
+                FinancialRecord(
+                    record_date=current,
+                    amount=-embed_dec,
+                    category=SpendCategory.AI_INFERENCE,
+                    provider=Provider.OPENAI,
+                    model="text-embedding-3-small",
+                    tokens_input=embed_input,
+                    tokens_output=0,
+                    source="synthetic",
+                    raw_description="Synthetic OpenAI text-embedding-3-small usage",
+                )
+            )
 
             current += timedelta(days=1)
 

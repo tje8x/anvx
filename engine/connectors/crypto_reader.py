@@ -62,6 +62,21 @@ class CryptoReader(BaseConnector):
         or:
           {"exchange": "coinbase", "api_key": "...", "api_secret": "..."}
         """
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to blockchain explorer...")
+                await asyncio.sleep(1)
+                print("Wallet address verified (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Invalid wallet address format")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         wallet_addresses = credentials.get("wallet_addresses", [])
         exchange = credentials.get("exchange")
 
@@ -154,6 +169,10 @@ class CryptoReader(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 

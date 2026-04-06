@@ -286,9 +286,12 @@ def _print_recommendations(recs: list) -> None:
 
     for i, r in enumerate(recs, 1):
         savings = format_currency(r.estimated_monthly_savings) + "/mo" if r.estimated_monthly_savings else "N/A"
-        print(f"  {i}. [{r.rec_type}] (confidence: {r.confidence})")
+        source = f" via {r.source_module}" if r.source_module else ""
+        print(f"  {i}. [{r.rec_type}]{source} (confidence: {r.confidence})")
         print(f"     {r.description}")
         print(f"     Estimated savings: {savings}")
+        if r.methodology:
+            print(f"     Methodology: {r.methodology}")
         print(f"     Action: {r.action_required}")
         print()
 

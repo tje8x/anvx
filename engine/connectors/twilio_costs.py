@@ -31,6 +31,21 @@ class TwilioCostsConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to Twilio...")
+                await asyncio.sleep(1)
+                print("Authenticated with Twilio API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Authentication failed — invalid Twilio credentials")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         account_sid = credentials.get("account_sid", "")
         auth_token = credentials.get("auth_token", "")
 
@@ -71,6 +86,10 @@ class TwilioCostsConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 

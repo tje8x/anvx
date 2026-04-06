@@ -1,43 +1,46 @@
-"""Cross-bucket recommendation engine for token economy optimisation."""
+"""Cross-bucket recommendation engine for token economy optimisation.
+
+Uses a modular system: each OptimizationModule analyses records independently
+and produces recommendations with specific dollar savings and methodology.
+Real-time pricing is fetched via PricingFetcher (cached daily).
+"""
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
-from engine.models import FinancialRecord, Recommendation, SpendCategory
+from engine.intelligence.pricing_fetcher import PricingFetcher
+from engine.intelligence.optimization import ALL_MODULES
+from engine.models import (
+    FinancialRecord,
+    FinancialSummary,
+    Recommendation,
+    SpendCategory,
+)
 
 logger = logging.getLogger(__name__)
 
-# Thresholds
-_SHORT_IO_INPUT_TOKENS = 500
-_SHORT_IO_OUTPUT_TOKENS = 200
-_EXPENSIVE_MODELS = {"gpt-4o", "claude-sonnet", "claude-opus"}
-_CHEAP_ALTERNATIVES = {
-    "gpt-4o": "gpt-4o-mini",
-    "claude-sonnet": "claude-haiku",
-    "claude-opus": "claude-sonnet",
-}
 _INACTIVE_DAYS = 30
-_AI_REVENUE_RATIO_WARNING = Decimal("0.30")  # 30%
+_MAX_RECOMMENDATIONS = 10
 
 
 def generate_recommendations(
     records: list[FinancialRecord],
     as_of: date | None = None,
+    summary: FinancialSummary | None = None,
 ) -> list[Recommendation]:
     """Analyse records across all buckets and generate optimisation recommendations.
 
-    Checks:
-      1. Model routing — expensive models used for short input/output tasks
-      2. Unused subscriptions — SaaS with no records in 30+ days
-      3. Cross-bucket — AI costs as % of revenue (if Stripe data present)
+    Runs all optimization modules plus legacy checks. Each recommendation
+    includes its source module, estimated savings, and calculation methodology.
 
     Args:
         records: All financial records across all connectors.
-        as_of: Reference date for "inactive" checks. Defaults to today.
+        as_of: Reference date for calculations. Defaults to today.
+        summary: Pre-computed summary. Built from records if not provided.
 
     Returns:
-        List of Recommendation objects sorted by estimated savings (highest first).
+        Top recommendations sorted by estimated savings (highest first).
     """
     if not records:
         return []
@@ -45,83 +48,78 @@ def generate_recommendations(
     if as_of is None:
         as_of = date.today()
 
+    # Build summary if not provided
+    if summary is None:
+        summary = _build_quick_summary(records, as_of)
+
+    # Initialize pricing fetcher (uses cache if available)
+    pricing = PricingFetcher()
+    pricing.load()
+
     recommendations: list[Recommendation] = []
 
-    recommendations.extend(_check_model_routing(records))
+    # Run each optimization module
+    for module_cls in ALL_MODULES:
+        module = module_cls()
+        try:
+            module_recs = module.analyse(records, summary, pricing)
+            recommendations.extend(module_recs)
+            if module_recs:
+                logger.info(
+                    "Module %s produced %d recommendations",
+                    module.name, len(module_recs),
+                )
+        except Exception as exc:
+            logger.warning("Module %s failed: %s", module.name, exc)
+
+    # Legacy check: unused subscriptions (no pricing needed)
     recommendations.extend(_check_unused_subscriptions(records, as_of))
-    recommendations.extend(_check_ai_revenue_ratio(records, as_of))
 
     # Sort by estimated savings descending (None last)
     recommendations.sort(
         key=lambda r: r.estimated_monthly_savings or Decimal("0"),
         reverse=True,
     )
-    return recommendations
+
+    return recommendations[:_MAX_RECOMMENDATIONS]
 
 
-def _check_model_routing(records: list[FinancialRecord]) -> list[Recommendation]:
-    """Flag expensive model usage on short-context tasks."""
-    recs: list[Recommendation] = []
+def _build_quick_summary(
+    records: list[FinancialRecord], as_of: date
+) -> FinancialSummary:
+    """Build a minimal FinancialSummary from records for module use."""
+    from datetime import datetime
 
-    # Group AI inference records by model
-    by_model: dict[str, list[FinancialRecord]] = defaultdict(list)
-    for r in records:
-        if r.category == SpendCategory.AI_INFERENCE and r.model:
-            by_model[r.model].append(r)
+    thirty_days_ago = as_of - timedelta(days=30)
+    recent = [r for r in records if r.record_date >= thirty_days_ago]
 
-    for model_name, model_records in by_model.items():
-        if model_name not in _EXPENSIVE_MODELS:
-            continue
+    spend_by_cat: dict[str, Decimal] = defaultdict(Decimal)
+    spend_by_prov: dict[str, Decimal] = defaultdict(Decimal)
+    revenue = Decimal("0")
+    crypto = Decimal("0")
 
-        # Count records with short I/O (likely simple tasks)
-        short_io_records = [
-            r for r in model_records
-            if r.tokens_input is not None
-            and r.tokens_output is not None
-            and r.tokens_input < _SHORT_IO_INPUT_TOKENS
-            and r.tokens_output < _SHORT_IO_OUTPUT_TOKENS
-        ]
+    for r in recent:
+        if r.category == SpendCategory.REVENUE:
+            revenue += r.amount
+        elif r.category == SpendCategory.CRYPTO_HOLDINGS:
+            crypto += r.amount
+        else:
+            spend_by_cat[r.category.value] += abs(r.amount)
+            spend_by_prov[r.provider.value] += abs(r.amount)
 
-        if not short_io_records:
-            continue
+    dates = [r.record_date for r in records]
+    coverage = (max(dates) - min(dates)).days + 1 if dates else 0
 
-        short_ratio = len(short_io_records) / len(model_records)
-        if short_ratio < 0.1:
-            continue
-
-        short_io_cost = sum(abs(r.amount) for r in short_io_records)
-        # Cheaper model is roughly 10-20x less expensive for short tasks
-        estimated_savings = (short_io_cost * Decimal("0.85")).quantize(Decimal("0.01"))
-        # Scale to monthly estimate (use 30-day window from records)
-        if model_records:
-            date_range = (
-                max(r.record_date for r in model_records)
-                - min(r.record_date for r in model_records)
-            ).days or 1
-            monthly_factor = Decimal("30") / Decimal(str(date_range))
-            estimated_savings = (estimated_savings * monthly_factor).quantize(Decimal("0.01"))
-
-        cheap_alt = _CHEAP_ALTERNATIVES.get(model_name, "a cheaper model")
-
-        recs.append(
-            Recommendation(
-                rec_type="model_routing",
-                description=(
-                    f"{len(short_io_records)} calls to {model_name} "
-                    f"({short_ratio:.0%} of usage) had short input/output, "
-                    f"suggesting simple tasks that could use {cheap_alt}"
-                ),
-                estimated_monthly_savings=estimated_savings,
-                confidence="high" if short_ratio > 0.3 else "medium",
-                action_required=(
-                    f"Route simple requests (short context) to {cheap_alt} "
-                    f"instead of {model_name}"
-                ),
-                category=SpendCategory.AI_INFERENCE,
-            )
-        )
-
-    return recs
+    return FinancialSummary(
+        last_updated=datetime.now(),
+        total_monthly_spend=sum(spend_by_cat.values()),
+        spend_by_category=dict(spend_by_cat),
+        spend_by_provider=dict(spend_by_prov),
+        revenue_monthly=revenue if revenue > 0 else None,
+        crypto_holdings_usd=crypto if crypto > 0 else None,
+        data_coverage_days=coverage,
+        record_count=len(records),
+    )
 
 
 def _check_unused_subscriptions(
@@ -130,7 +128,6 @@ def _check_unused_subscriptions(
     """Flag SaaS subscriptions with no activity in 30+ days."""
     recs: list[Recommendation] = []
 
-    # Group SaaS records by subcategory/source
     saas_records: dict[str, list[FinancialRecord]] = defaultdict(list)
     for r in records:
         if r.category == SpendCategory.SAAS_SUBSCRIPTION:
@@ -145,15 +142,14 @@ def _check_unused_subscriptions(
             continue
 
         days_inactive = (as_of - last_record).days
-        # Estimate monthly cost from available records
         total_cost = sum(abs(r.amount) for r in service_records)
         date_span = (
             max(r.record_date for r in service_records)
             - min(r.record_date for r in service_records)
         ).days or 1
-        monthly_cost = (total_cost * Decimal("30") / Decimal(str(date_span))).quantize(
-            Decimal("0.01")
-        )
+        monthly_cost = (
+            total_cost * Decimal("30") / Decimal(str(date_span))
+        ).quantize(Decimal("0.01"))
 
         recs.append(
             Recommendation(
@@ -169,59 +165,12 @@ def _check_unused_subscriptions(
                     f"Cancel or downgrade if unused."
                 ),
                 category=SpendCategory.SAAS_SUBSCRIPTION,
-            )
-        )
-
-    return recs
-
-
-def _check_ai_revenue_ratio(
-    records: list[FinancialRecord], as_of: date
-) -> list[Recommendation]:
-    """Flag if AI inference costs exceed a threshold of total revenue."""
-    recs: list[Recommendation] = []
-
-    # Use last 30 days for ratio calculation
-    period_start = as_of - timedelta(days=30)
-    recent = [r for r in records if r.record_date >= period_start]
-
-    ai_cost = sum(
-        abs(r.amount)
-        for r in recent
-        if r.category in (SpendCategory.AI_INFERENCE, SpendCategory.AI_TRAINING)
-    )
-    revenue = sum(
-        r.amount
-        for r in recent
-        if r.category == SpendCategory.REVENUE
-    )
-
-    if revenue <= 0 or ai_cost <= 0:
-        return recs
-
-    ratio = ai_cost / revenue
-
-    if ratio > _AI_REVENUE_RATIO_WARNING:
-        ratio_pct = f"{float(ratio) * 100:.1f}%"
-        recs.append(
-            Recommendation(
-                rec_type="ai_revenue_ratio",
-                description=(
-                    f"AI costs are {ratio_pct} of revenue "
-                    f"(${ai_cost:.2f} AI spend vs ${revenue:.2f} revenue "
-                    f"over last 30 days). Target is under "
-                    f"{float(_AI_REVENUE_RATIO_WARNING) * 100:.0f}%."
+                source_module="unused_subscriptions",
+                methodology=(
+                    f"Last activity: {last_record.isoformat()} ({days_inactive} days ago). "
+                    f"Monthly cost estimated from ${total_cost:.2f} over "
+                    f"{date_span} days of data."
                 ),
-                estimated_monthly_savings=(
-                    (ai_cost - revenue * _AI_REVENUE_RATIO_WARNING).quantize(Decimal("0.01"))
-                ),
-                confidence="high",
-                action_required=(
-                    "Review AI model usage patterns and consider: "
-                    "routing to cheaper models, caching frequent queries, "
-                    "or batching requests to reduce per-call overhead"
-                ),
-                category=SpendCategory.AI_INFERENCE,
             )
         )
 

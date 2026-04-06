@@ -26,7 +26,7 @@ from engine.connectors import (
     VercelCostsConnector,
 )
 from engine.intelligence import FinancialModelManager, categorise_records
-from engine.utils import format_currency, get_date_range, is_synthetic_mode
+from engine.utils import format_currency, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
 _DATA_DIR = Path.home() / ".token-economy-intel"
 _CREDENTIALS_FILE = _DATA_DIR / "credentials.json"
@@ -118,19 +118,147 @@ def main() -> None:
         print("Run scripts/status.py for current overview.")
         return
 
+    test_mode = is_onboarding_test_mode()
+
     if synthetic:
         print("Running in SYNTHETIC MODE — no real API keys needed.")
         print()
         _run_synthetic(model, tracker)
     else:
+        if test_mode:
+            print("Running in ONBOARDING TEST MODE — use test credentials.")
+            print()
         print("Let's connect your accounts. Skip any you don't use.")
         print()
         credentials = _collect_credentials()
         asyncio.run(_connect_and_fetch(model, credentials, tracker))
 
+        # Bank statement CSV upload — after all providers are connected
+        print()
+        answer = input("Would you like to upload a bank statement CSV for a fuller picture of your spending? (yes/no): ").strip().lower()
+        if answer in ("yes", "y"):
+            _prompt_csv_upload(model, test_mode)
+
     print()
-    tracker.track("setup_complete", "lifecycle", "openclaw",
-                  {"mode": "synthetic" if synthetic else "live"})
+    mode = "test" if test_mode else ("synthetic" if synthetic else "live")
+    tracker.track("setup_complete", "lifecycle", "openclaw", {"mode": mode})
+
+
+def _prompt_csv_upload(model: FinancialModelManager, test_mode: bool) -> None:
+    """Prompt for a bank CSV path, with test-mode shortcut."""
+    _SYNTHETIC_CSV = str(
+        Path(__file__).resolve().parents[2]
+        / "engine" / "testing" / "data" / "bank_statement.csv"
+    )
+
+    if test_mode:
+        print('  Send me a CSV file path, or type "test" to load the synthetic bank statement.')
+    else:
+        print("  Send me a CSV with columns: Date, Description, Amount, Balance")
+
+    while True:
+        csv_path = input("  File path: ").strip()
+        if not csv_path:
+            print("  Skipped bank CSV upload.")
+            return
+
+        # Handle "test" keyword
+        if csv_path.lower() == "test":
+            if test_mode:
+                csv_path = _SYNTHETIC_CSV
+                print(f"  Loading synthetic bank statement: {csv_path}")
+                break
+            else:
+                print('  Invalid file path. Please provide a path to a .csv file.')
+                continue
+
+        # Validate the path looks like a CSV
+        if not csv_path.endswith(".csv"):
+            print("  File must be a .csv file. Try again or press Enter to skip.")
+            continue
+
+        break
+
+    _parse_bank_csv(csv_path, model)
+
+
+def _parse_bank_csv(csv_path: str, model: FinancialModelManager) -> None:
+    """Parse a bank statement CSV, categorise, and add to the model."""
+    import csv
+    from collections import Counter
+    from decimal import Decimal
+    from datetime import date as date_cls
+
+    from engine.models import FinancialRecord, Provider, SpendCategory
+
+    try:
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            records: list[FinancialRecord] = []
+            vendor_counter: Counter[str] = Counter()
+            skipped = 0
+
+            for row_num, row in enumerate(reader, start=2):  # row 1 is header
+                try:
+                    description = row.get("description", "")
+                    amount = Decimal(row.get("amount", "0"))
+                    record_date = date_cls.fromisoformat(row.get("date", "").strip())
+                except (ValueError, ArithmeticError) as exc:
+                    print(f"  Warning: skipping row {row_num} — {exc}")
+                    skipped += 1
+                    continue
+
+                # Extract vendor name (first word or text before *)
+                vendor = description.split("*")[0].strip().split(" ")[0]
+                vendor_counter[vendor] += 1
+
+                category = SpendCategory.OTHER
+                desc_upper = description.upper()
+                if amount > 0:
+                    category = SpendCategory.REVENUE
+                elif any(kw in desc_upper for kw in ("OPENAI", "ANTHROPIC")):
+                    category = SpendCategory.AI_INFERENCE
+                elif any(kw in desc_upper for kw in ("AWS", "GOOGLE CLOUD", "VERCEL", "CLOUDFLARE", "DIGITALOCEAN")):
+                    category = SpendCategory.CLOUD_INFRASTRUCTURE
+                elif "STRIPE" in desc_upper and "FEE" in desc_upper:
+                    category = SpendCategory.PAYMENT_PROCESSING
+                elif any(kw in desc_upper for kw in ("TWILIO", "SENDGRID", "SLACK")):
+                    category = SpendCategory.COMMUNICATION
+                elif any(kw in desc_upper for kw in ("DATADOG", "LANGSMITH")):
+                    category = SpendCategory.MONITORING
+                elif any(kw in desc_upper for kw in ("PINECONE", "TAVILY")):
+                    category = SpendCategory.SEARCH_DATA
+
+                records.append(
+                    FinancialRecord(
+                        record_date=record_date,
+                        amount=amount,
+                        category=category,
+                        provider=Provider.OTHER,
+                        source="bank_csv",
+                        raw_description=description,
+                    )
+                )
+
+            if not records:
+                print("  No valid transactions found in CSV.")
+                return
+
+            n = model.add_records(records, "bank_csv")
+            categorised_count = sum(1 for r in records if r.category != SpendCategory.OTHER)
+            pct = round(categorised_count / len(records) * 100)
+            top_vendors = [v for v, _ in vendor_counter.most_common(5)]
+
+            print(f"  Parsed {len(records)} transactions. Categorised {pct}%. "
+                  f"Top vendors: {', '.join(top_vendors)}.")
+            if skipped:
+                print(f"  ({skipped} malformed rows skipped)")
+            print(f"  Added {n} bank records to model.")
+
+    except FileNotFoundError:
+        print(f"  File not found: {csv_path}")
+    except Exception as exc:
+        print(f"  Error parsing CSV: {exc}")
 
 
 def _run_synthetic(model: FinancialModelManager, tracker: EventTracker) -> None:
@@ -198,30 +326,41 @@ async def _connect_and_fetch(
                 continue
 
             connector = account["cls"]()
-            print(f"  Connecting {account['label']}...", end=" ")
 
             try:
                 connected = await connector.connect(credentials[name])
                 if not connected:
-                    print("FAILED (check credentials)")
+                    print(f"  {account['label']}: FAILED (check credentials)")
                     continue
 
                 records = await connector.fetch_records(start, end)
                 n = model.add_records(records, name)
                 total += n
-                print(f"OK — {n} records")
+
+                # Summary: days of data and distinct models/services
+                if records:
+                    days = (max(r.record_date for r in records)
+                            - min(r.record_date for r in records)).days + 1
+                    services = {
+                        r.model or r.subcategory or r.category.value
+                        for r in records
+                    }
+                    print(f"  Connected {account['label']}. "
+                          f"Found {days} days of data across "
+                          f"{len(services)} models/services.")
+                else:
+                    print(f"  Connected {account['label']}. No records in range.")
+
                 tracker.track("account_connected", "lifecycle", "openclaw",
                               {"provider": name})
             except Exception as exc:
-                print(f"ERROR — {exc}")
+                print(f"  {account['label']}: ERROR — {exc}")
 
     if total > 0:
         categorised = await categorise_records(model.records)
         model._state.records = categorised
         model.save()
         print(f"\nFetched {total:,} records. Model saved.")
-        print()
-        _print_overview(model)
     else:
         print("\nNo records fetched. Run setup again to connect accounts.")
 

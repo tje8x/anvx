@@ -36,6 +36,21 @@ class VercelCostsConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to Vercel...")
+                await asyncio.sleep(1)
+                print("Authenticated with Vercel API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Authentication failed — invalid Vercel token")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         api_token = credentials.get("api_token", "")
         if not api_token:
             logger.error("Missing Vercel api_token")
@@ -74,6 +89,10 @@ class VercelCostsConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
 

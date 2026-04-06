@@ -46,7 +46,7 @@ from engine.intelligence import (
     generate_recommendations,
 )
 from engine.models import Provider, SpendCategory
-from engine.utils import format_currency, format_percent, get_date_range, is_synthetic_mode
+from engine.utils import format_currency, format_percent, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
 # ── Server setup ────────────────────────────────────────────────
 
@@ -370,12 +370,150 @@ async def connect_account(provider: str, credentials: dict) -> str:
 
     _tracker.track("account_connected", "lifecycle", "mcp", {"provider": provider})
 
-    return json.dumps({
+    # Build rich connection summary
+    result: dict = {
         "provider": provider,
         "connected": True,
         "records_added": n,
         "total_records": model.get_summary().record_count,
-    }, indent=2)
+    }
+    if records:
+        days = (max(r.record_date for r in records)
+                - min(r.record_date for r in records)).days + 1
+        services = {
+            r.model or r.subcategory or r.category.value
+            for r in records
+        }
+        result["days_of_data"] = days
+        result["models_or_services"] = sorted(services)
+        result["message"] = (
+            f"Connected {entry['label']}. Found {days} days of data "
+            f"across {len(services)} models/services."
+        )
+    else:
+        result["message"] = f"Connected {entry['label']}. No records in range."
+
+    return json.dumps(result, indent=2)
+
+
+@server.tool()
+def upload_bank_csv(file_path: str) -> str:
+    """Upload a bank statement CSV for a fuller picture of spending.
+
+    Accepts a CSV with columns: date, description, amount, balance.
+    Parses transactions, auto-categorises them, and adds to the financial model.
+
+    In onboarding test mode, pass "test" as file_path to load the synthetic
+    bank statement. In production, "test" is rejected as an invalid path.
+
+    Args:
+        file_path: Path to a .csv bank statement, or "test" in test mode.
+    """
+    import csv as csv_mod
+    from collections import Counter
+    from decimal import Decimal
+    from pathlib import Path as P
+
+    from engine.models import FinancialRecord, Provider as Prov, SpendCategory
+
+    test_mode = is_onboarding_test_mode()
+
+    # Handle "test" keyword
+    if file_path.strip().lower() == "test":
+        if test_mode:
+            file_path = str(
+                P(__file__).resolve().parents[1]
+                / "engine" / "testing" / "data" / "bank_statement.csv"
+            )
+        else:
+            return json.dumps({
+                "error": "Invalid file path. Please provide a path to a .csv file.",
+            })
+
+    if not file_path.endswith(".csv"):
+        return json.dumps({"error": "File must be a .csv file."})
+
+    try:
+        records: list[FinancialRecord] = []
+        vendor_counter: Counter[str] = Counter()
+        skipped = 0
+
+        with open(file_path, newline="") as f:
+            reader = csv_mod.DictReader(f)
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    description = row.get("description", "")
+                    amount = Decimal(row.get("amount", "0"))
+                    record_date = date.fromisoformat(row.get("date", "").strip())
+                except (ValueError, ArithmeticError):
+                    skipped += 1
+                    continue
+
+                vendor = description.split("*")[0].strip().split(" ")[0]
+                vendor_counter[vendor] += 1
+
+                category = SpendCategory.OTHER
+                desc_upper = description.upper()
+                if amount > 0:
+                    category = SpendCategory.REVENUE
+                elif any(kw in desc_upper for kw in ("OPENAI", "ANTHROPIC")):
+                    category = SpendCategory.AI_INFERENCE
+                elif any(kw in desc_upper for kw in ("AWS", "GOOGLE CLOUD", "VERCEL", "CLOUDFLARE", "DIGITALOCEAN")):
+                    category = SpendCategory.CLOUD_INFRASTRUCTURE
+                elif "STRIPE" in desc_upper and "FEE" in desc_upper:
+                    category = SpendCategory.PAYMENT_PROCESSING
+                elif any(kw in desc_upper for kw in ("TWILIO", "SENDGRID", "SLACK")):
+                    category = SpendCategory.COMMUNICATION
+                elif any(kw in desc_upper for kw in ("DATADOG", "LANGSMITH")):
+                    category = SpendCategory.MONITORING
+                elif any(kw in desc_upper for kw in ("PINECONE", "TAVILY")):
+                    category = SpendCategory.SEARCH_DATA
+
+                records.append(
+                    FinancialRecord(
+                        record_date=record_date,
+                        amount=amount,
+                        category=category,
+                        provider=Prov.OTHER,
+                        source="bank_csv",
+                        raw_description=description,
+                    )
+                )
+
+        if not records:
+            return json.dumps({"error": "No valid transactions found in CSV."})
+
+        model = _load_model()
+        n = model.add_records(records, "bank_csv")
+        model.save()
+
+        categorised_count = sum(1 for r in records if r.category != SpendCategory.OTHER)
+        pct = round(categorised_count / len(records) * 100)
+        top_vendors = [v for v, _ in vendor_counter.most_common(5)]
+
+        _tracker.track("bank_csv_uploaded", "lifecycle", "mcp",
+                       {"transactions": len(records)})
+
+        result: dict = {
+            "parsed_transactions": len(records),
+            "categorised_percent": pct,
+            "top_vendors": top_vendors,
+            "records_added": n,
+            "total_records": model.get_summary().record_count,
+            "message": (
+                f"Parsed {len(records)} transactions. Categorised {pct}%. "
+                f"Top vendors: {', '.join(top_vendors)}."
+            ),
+        }
+        if skipped:
+            result["skipped_rows"] = skipped
+
+        return json.dumps(result, indent=2)
+
+    except FileNotFoundError:
+        return json.dumps({"error": f"File not found: {file_path}"})
+    except Exception as exc:
+        return json.dumps({"error": f"Error parsing CSV: {exc}"})
 
 
 @server.tool()

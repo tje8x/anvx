@@ -67,6 +67,8 @@ class Recommendation(BaseModel):
 	confidence: str = "medium"
 	action_required: str
 	category: SpendCategory
+	source_module: str | None = None
+	methodology: str | None = None
 
 class FinancialSummary(BaseModel):
 	"""The current state of the user's financial model."""

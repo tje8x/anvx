@@ -34,6 +34,21 @@ class AWSCostsConnector(BaseConnector):
         self._cache_date: date | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to AWS Cost Explorer...")
+                await asyncio.sleep(1)
+                print("Authenticated with AWS (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Authentication failed — invalid AWS credentials")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         access_key_id = credentials.get("access_key_id", "")
         secret_access_key = credentials.get("secret_access_key", "")
         region = credentials.get("region", "us-east-1")
@@ -75,6 +90,10 @@ class AWSCostsConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         # Cache: only refresh once per day
         cache_key = f"{start_date}:{end_date}"

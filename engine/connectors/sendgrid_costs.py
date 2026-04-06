@@ -39,6 +39,21 @@ class SendGridCostsConnector(BaseConnector):
         self._client: httpx.AsyncClient | None = None
 
     async def connect(self, credentials: dict[str, Any]) -> bool:
+        # ── Onboarding test mode ───────────────────────────────
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            if self.validate_test_credentials(credentials):
+                import asyncio
+                print("Connecting to SendGrid...")
+                await asyncio.sleep(1)
+                print("Authenticated with SendGrid API (test mode)")
+                self._client = httpx.AsyncClient()
+                self.is_connected = True
+                return True
+            logger.error("Authentication failed — invalid SendGrid API key")
+            return False
+
+        # ── Normal mode ────────────────────────────────────────
         api_key = credentials.get("api_key", "")
         if not api_key:
             logger.error("Missing SendGrid api_key")
@@ -79,6 +94,10 @@ class SendGridCostsConnector(BaseConnector):
         if not self.is_connected or self._client is None:
             logger.error("Not connected — call connect() first")
             return []
+
+        from engine.utils import is_onboarding_test_mode
+        if is_onboarding_test_mode():
+            return self.get_synthetic_records(start_date, end_date)
 
         records: list[FinancialRecord] = []
         plan_info = _PLAN_PRICING.get(self._plan, _PLAN_PRICING["free"])

@@ -31,8 +31,20 @@ This will:
    - **Communication**: Twilio Account SID + Auth Token, SendGrid API key
    - **Monitoring**: Datadog API key + App key, LangSmith API key
    - **Search/Data**: Pinecone API key, Tavily API key
-3. Run the initial data fetch and categorisation
-4. Show the first financial overview across ALL connected buckets
+3. For each provider the user connects, show: "Connected [provider]. Found [X] days of data across [Y] models/services."
+4. After all providers are connected, ask: "Would you like to upload a bank statement CSV for a fuller picture of your spending? (yes/no)"
+   - If yes: prompt for a file path. Accept a CSV with columns: Date, Description, Amount, Balance. Parse it, categorise transactions, and show: "Parsed X transactions. Categorised Y%. Top vendors: [list]."
+   - If no: skip and proceed
+5. Run final categorisation and show the first financial overview across ALL connected buckets
+
+### Onboarding Test Mode
+
+When `ONBOARDING_TEST_MODE=true`, the full onboarding UX runs exactly as above but:
+- Credential validation uses built-in test credentials instead of real APIs (e.g. `sk-test-openai-12345`)
+- Each connect step shows "Connecting to [provider]..." with a 1-second pause, then loads synthetic data
+- After connecting, the result message is the same as production: "Connected [provider]. Found [X] days of data across [Y] models/services."
+- For bank CSV upload: if the user types "test", load the synthetic CSV from `engine/testing/data/bank_statement.csv`. Any other `.csv` path is treated as a real file.
+- The keyword "test" ONLY loads synthetic CSV when `ONBOARDING_TEST_MODE=true`. In production, "test" is invalid input — re-prompt for a real file path.
 
 ## On Subsequent Use
 

@@ -1,0 +1,1 @@
+- [Use uv run python](feedback_uv_run.md) — never use bare python/python3, pyenv intercepts; use uv run python for 3.12
