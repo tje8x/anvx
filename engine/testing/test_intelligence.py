@@ -19,8 +19,11 @@ from engine.intelligence.anomaly_detector import detect_anomalies
 from engine.intelligence.categoriser import categorise_records
 from engine.intelligence.financial_model import FinancialModelManager
 from engine.intelligence.recommender import generate_recommendations
+from engine.intelligence.optimization.model_routing import ModelRoutingModule
+from engine.intelligence.pricing_fetcher import PricingFetcher
 from engine.models import (
     FinancialRecord,
+    FinancialSummary,
     Provider,
     SpendCategory,
 )
@@ -196,7 +199,7 @@ class TestAnomalyDetector:
 
 
 class TestRecommender:
-    def test_ai_revenue_ratio(self):
+    def test_unit_economics(self):
         """Detects when AI costs are too high relative to revenue."""
         records = (
             OpenAIBillingConnector().get_synthetic_records(_START, _END)
@@ -204,31 +207,66 @@ class TestRecommender:
             + StripeConnector().get_synthetic_records(_START, _END)
         )
         recs = generate_recommendations(records, as_of=_END)
-        ratio_recs = [r for r in recs if r.rec_type == "ai_revenue_ratio"]
-        assert len(ratio_recs) > 0, "Expected AI-revenue ratio recommendation"
-        assert ratio_recs[0].estimated_monthly_savings is not None
+        unit_recs = [r for r in recs if r.rec_type == "unit_economics"]
+        assert len(unit_recs) > 0, "Expected unit economics recommendation"
+        assert unit_recs[0].estimated_monthly_savings is not None
 
     def test_model_routing_with_short_io(self):
-        """Detects expensive models used for short I/O tasks."""
-        records = []
-        for i in range(50):
+        """Detects expensive models used for short I/O tasks.
+
+        Uses ModelRoutingModule.analyse() directly. Creates a mixed dataset
+        where gpt-4o short requests are clearly below the p25 threshold
+        set by other models' higher-token records.
+        """
+        records: list[FinancialRecord] = []
+        # 2000 short gpt-4o requests with varied low token counts.
+        # Need high volume because the price gap between gpt-4o and the
+        # cheapest same-tier model is narrow ($2.50 vs $2.00/M input).
+        for i in range(2000):
             d = _END - timedelta(days=i % 30)
-            records.append(
-                FinancialRecord(
-                    record_date=d,
-                    amount=Decimal("-0.50"),
-                    category=SpendCategory.AI_INFERENCE,
-                    provider=Provider.OPENAI,
-                    model="gpt-4o",
-                    tokens_input=100,  # very short
-                    tokens_output=50,  # very short
-                    source="test",
-                )
-            )
-        recs = generate_recommendations(records, as_of=_END)
+            records.append(FinancialRecord(
+                record_date=d, amount=Decimal("-0.50"),
+                category=SpendCategory.AI_INFERENCE,
+                provider=Provider.OPENAI, model="gpt-4o",
+                tokens_input=500 + (i % 500), tokens_output=200 + (i % 300),
+                source="test",
+            ))
+        # Higher-token records from other models to push p25 above gpt-4o range
+        for i in range(4000):
+            d = _END - timedelta(days=i % 30)
+            records.append(FinancialRecord(
+                record_date=d, amount=Decimal("-1.00"),
+                category=SpendCategory.AI_INFERENCE,
+                provider=Provider.ANTHROPIC, model="claude-sonnet",
+                tokens_input=8000, tokens_output=2000,
+                source="test",
+            ))
+        for i in range(2000):
+            d = _END - timedelta(days=i % 30)
+            records.append(FinancialRecord(
+                record_date=d, amount=Decimal("-0.10"),
+                category=SpendCategory.AI_INFERENCE,
+                provider=Provider.OPENAI, model="gpt-4o-mini",
+                tokens_input=3000, tokens_output=1000,
+                source="test",
+            ))
+
+        pricing = PricingFetcher()
+        pricing.load()
+        summary = FinancialSummary(
+            last_updated=_END, total_monthly_spend=Decimal("500"),
+            spend_by_category={}, spend_by_provider={},
+            data_coverage_days=30, record_count=len(records),
+        )
+
+        module = ModelRoutingModule()
+        recs = module.analyse(records, summary, pricing)
         routing_recs = [r for r in recs if r.rec_type == "model_routing"]
-        assert len(routing_recs) > 0, "Expected model routing recommendation"
-        assert "gpt-4o-mini" in routing_recs[0].action_required
+        assert len(routing_recs) > 0, (
+            "Expected model routing recommendation for short gpt-4o requests"
+        )
+        # Should target gpt-4o specifically
+        assert "gpt-4o" in routing_recs[0].description
 
     def test_no_recommendations_for_healthy_profile(self):
         """A low-spend profile with no revenue shouldn't trigger ratio alert."""
@@ -248,8 +286,8 @@ class TestRecommender:
                 )
             )
         recs = generate_recommendations(records, as_of=_END)
-        ratio_recs = [r for r in recs if r.rec_type == "ai_revenue_ratio"]
-        assert len(ratio_recs) == 0
+        unit_recs = [r for r in recs if r.rec_type == "unit_economics"]
+        assert len(unit_recs) == 0
 
 
 # ── Financial model tests ───────────────────────────────────────
@@ -324,10 +362,10 @@ class TestCrossBucketInsights:
         all_records = ai_records + stripe_records
 
         recs = generate_recommendations(all_records, as_of=_END)
-        # The ratio recommendation should reference revenue
-        ratio_recs = [r for r in recs if r.rec_type == "ai_revenue_ratio"]
-        if ratio_recs:
-            assert "revenue" in ratio_recs[0].description.lower()
+        # The unit_economics module should reference revenue
+        unit_recs = [r for r in recs if r.rec_type == "unit_economics"]
+        if unit_recs:
+            assert "revenue" in unit_recs[0].description.lower()
 
 
 # ── Helpers ─────────────────────────────────────────────────────

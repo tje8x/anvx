@@ -33,14 +33,17 @@ CACHED_TOKEN_DISCOUNTS: dict[str, Decimal] = {
 }
 
 # Tier thresholds (per million input tokens)
-_FRONTIER_THRESHOLD = Decimal("10.00")
-_MIDTIER_THRESHOLD = Decimal("1.00")
+# Flagship: gpt-4o ($2.50), claude-sonnet ($3), gemini-pro, etc.
+# Mid-tier: gpt-4o-mini ($0.15), claude-haiku ($0.25), gemini-flash, etc.
+# Efficient: very cheap/free models
+_FLAGSHIP_THRESHOLD = Decimal("2.00")
+_MIDTIER_THRESHOLD = Decimal("0.10")
 
 
 def _classify_tier(input_per_million: Decimal) -> str:
     """Classify a model into a pricing tier."""
-    if input_per_million >= _FRONTIER_THRESHOLD:
-        return "frontier"
+    if input_per_million >= _FLAGSHIP_THRESHOLD:
+        return "flagship"
     if input_per_million >= _MIDTIER_THRESHOLD:
         return "mid-tier"
     return "efficient"
@@ -157,10 +160,11 @@ class PricingFetcher:
         }
 
     def get_comparable_models(self, model_name: str) -> list[dict[str, Any]]:
-        """Return models in the same pricing tier and one tier below.
+        """Return models in the same pricing tier only.
 
-        Only compares within tiers — never suggests an efficient model
-        as replacement for a frontier-tier task.
+        Flagship models (gpt-4o, claude-sonnet) only compare against other
+        flagships. Mid-tier (gpt-4o-mini, claude-haiku) only against mid-tier.
+        Never suggests a small/efficient model as replacement for flagship.
         """
         self.load()
         price = self.get_price(model_name)
@@ -169,12 +173,8 @@ class PricingFetcher:
 
         source_tier = _classify_tier(price["input_per_million"])
 
-        # Collect tier below (for downgrade suggestions)
+        # Only compare within the same tier — no cross-tier downgrades
         tiers_to_include = {source_tier}
-        if source_tier == "frontier":
-            tiers_to_include.add("mid-tier")
-        elif source_tier == "mid-tier":
-            tiers_to_include.add("efficient")
 
         normalized = self._normalize_name(model_name)
         results = []

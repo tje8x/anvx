@@ -101,9 +101,9 @@ class TestSyntheticData:
         for r1, r2 in zip(records1, records2):
             assert r1.amount == r2.amount, f"{name}: amounts differ across runs"
 
-    def test_all_14_connectors_present(self):
-        """Verify we have exactly 14 connectors in the registry."""
-        assert len(_ALL_CONNECTORS) == 14
+    def test_all_16_connectors_present(self):
+        """Verify we have exactly 16 connectors in the registry."""
+        assert len(_ALL_CONNECTORS) == 16
 
 
 # ── Error handling tests ────────────────────────────────────────
@@ -145,7 +145,7 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_crypto_no_addresses(self):
-        c = CryptoReader()
+        c = CryptoWalletConnector()
         result = await c.connect({})
         assert result is False
 

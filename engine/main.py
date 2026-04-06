@@ -76,6 +76,7 @@ def main() -> None:
     parser.add_argument("--status", action="store_true", help="Show financial status overview")
     parser.add_argument("--query", type=str, help="Ask a question about your finances")
     parser.add_argument("--recommend", action="store_true", help="Get cost optimisation recommendations")
+    parser.add_argument("--verbose", action="store_true", help="Show full methodology details (with --recommend)")
     parser.add_argument("--anomalies", action="store_true", help="Detect spending anomalies")
     parser.add_argument("--providers", action="store_true", help="List all connectors and their status")
     parser.add_argument("--days", type=int, default=90, help="Days of history (default: 90)")
@@ -151,7 +152,7 @@ async def _run(args: argparse.Namespace) -> None:
 
     if args.recommend:
         recs = generate_recommendations(model.records, as_of=end_date)
-        _print_recommendations(recs)
+        _print_recommendations(recs, verbose=args.verbose)
         tracker.track("recommendations_viewed", "ui", "cli", {"count": len(recs)})
 
     if args.query:
@@ -277,16 +278,62 @@ def _print_anomalies(anomalies: list) -> None:
         print()
 
 
-def _print_recommendations(recs: list) -> None:
+def _print_recommendations(recs: list, verbose: bool = False) -> None:
     print()
-    print("=" * 60)
-    print("  COST OPTIMISATION RECOMMENDATIONS")
-    print("=" * 60)
 
     if not recs:
         print("  No recommendations at this time.")
         print()
         return
+
+    if verbose:
+        _print_recommendations_verbose(recs)
+    else:
+        _print_recommendations_concise(recs)
+
+
+def _print_recommendations_concise(recs: list) -> None:
+    """Top 5 recommendations, one line each + total savings."""
+    top = recs[:5]
+    total_savings = sum(
+        r.estimated_monthly_savings for r in recs
+        if r.estimated_monthly_savings
+    )
+
+    print("=" * 60)
+    print("  TOP 5 COST OPTIMISATIONS")
+    print("=" * 60)
+    print()
+
+    for i, r in enumerate(top, 1):
+        savings = format_currency(r.estimated_monthly_savings) if r.estimated_monthly_savings else "N/A"
+        # Build a short description from rec_type
+        label = r.rec_type.replace("_", " ").title()
+        # Truncate description to first sentence
+        short_desc = r.description.split(". ")[0]
+        if len(short_desc) > 70:
+            short_desc = short_desc[:67] + "..."
+        action = r.action_required.split(". ")[0]
+        if len(action) > 50:
+            action = action[:47] + "..."
+
+        print(f"  {i}. {label}: {short_desc}")
+        print(f"     -> {savings}/mo | Action: {action}")
+        print()
+
+    print(f"  Total potential savings: {format_currency(total_savings)}/mo")
+    if len(recs) > 5:
+        print(f"  ({len(recs) - 5} more recommendations available)")
+    print("  Run with --verbose for full methodology.")
+    print()
+
+
+def _print_recommendations_verbose(recs: list) -> None:
+    """Full details for all recommendations."""
+    print("=" * 60)
+    print("  COST OPTIMISATION RECOMMENDATIONS (VERBOSE)")
+    print("=" * 60)
+    print()
 
     for i, r in enumerate(recs, 1):
         savings = format_currency(r.estimated_monthly_savings) + "/mo" if r.estimated_monthly_savings else "N/A"
