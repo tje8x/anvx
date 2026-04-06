@@ -322,6 +322,9 @@ class PricingFetcher:
         except (KeyError, ValueError) as exc:
             logger.warning("OpenRouter parse error: %s", exc)
             return False
+        except Exception as exc:
+            logger.warning("OpenRouter unavailable: %s", exc)
+            return False
 
     def _fetch_litellm(self) -> bool:
         """Fetch pricing from LiteLLM GitHub database."""
@@ -368,4 +371,7 @@ class PricingFetcher:
             return False
         except (KeyError, ValueError) as exc:
             logger.warning("LiteLLM parse error: %s", exc)
+            return False
+        except Exception as exc:
+            logger.warning("LiteLLM unavailable: %s", exc)
             return False
