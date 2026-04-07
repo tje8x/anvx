@@ -12,3 +12,6 @@ Development:
 - Run tests: uv run python -m pytest engine/testing/ -v
 
 License: MIT-0
+
+
+<!-- mcp-name: io.github.tje8x/anvx -->

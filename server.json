@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.tje8x/anvx",
+  "description": "Track and optimize AI API spending across 16 providers with live pricing.",
+  "version": "0.1.0",
+  "websiteUrl": "https://anvx.io",
+  "repository": {
+    "url": "https://github.com/tje8x/anvx",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "token-economy-intel",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
