@@ -64,23 +64,126 @@ server = FastMCP(
 _tracker = EventTracker()
 
 _CONNECTOR_REGISTRY: list[dict] = [
-    {"name": "openai",      "label": "OpenAI",      "group": "LLM",         "cls": OpenAIBillingConnector},
-    {"name": "anthropic",   "label": "Anthropic",   "group": "LLM",         "cls": AnthropicBillingConnector},
-    {"name": "stripe",      "label": "Stripe",      "group": "Payments",    "cls": StripeConnector},
-    {"name": "crypto_wallet","label": "Crypto Wallet","group": "Crypto",      "cls": CryptoWalletConnector},
-    {"name": "coinbase",    "label": "Coinbase",    "group": "Crypto",      "cls": CoinbaseExchangeConnector},
-    {"name": "binance",     "label": "Binance",     "group": "Crypto",      "cls": BinanceExchangeConnector},
-    {"name": "aws",         "label": "AWS",         "group": "Infra",       "cls": AWSCostsConnector},
-    {"name": "gcp",         "label": "GCP",         "group": "Infra",       "cls": GCPCostsConnector},
-    {"name": "vercel",      "label": "Vercel",      "group": "Infra",       "cls": VercelCostsConnector},
-    {"name": "cloudflare",  "label": "Cloudflare",  "group": "Infra",       "cls": CloudflareCostsConnector},
-    {"name": "twilio",      "label": "Twilio",      "group": "Comms",       "cls": TwilioCostsConnector},
-    {"name": "sendgrid",    "label": "SendGrid",    "group": "Comms",       "cls": SendGridCostsConnector},
-    {"name": "datadog",     "label": "Datadog",     "group": "Monitoring",  "cls": DatadogCostsConnector},
-    {"name": "langsmith",   "label": "LangSmith",   "group": "Monitoring",  "cls": LangSmithCostsConnector},
-    {"name": "pinecone",    "label": "Pinecone",    "group": "Search/Data", "cls": PineconeCostsConnector},
-    {"name": "tavily",      "label": "Tavily",      "group": "Search/Data", "cls": TavilyCostsConnector},
+    {
+        "name": "openai", "label": "OpenAI", "group": "AI",
+        "cls": OpenAIBillingConnector,
+        "credentials": [{"key": "api_key", "label": "OpenAI API key (sk-...)"}],
+        "where_to_find": "https://platform.openai.com/api-keys → 'Create new secret key'. Needs read access to usage data.",
+    },
+    {
+        "name": "anthropic", "label": "Anthropic", "group": "AI",
+        "cls": AnthropicBillingConnector,
+        "credentials": [{"key": "api_key", "label": "Anthropic Admin API key"}],
+        "where_to_find": "https://console.anthropic.com/settings/admin-keys → 'Create Admin Key' (separate from regular API keys).",
+    },
+    {
+        "name": "stripe", "label": "Stripe", "group": "Payments",
+        "cls": StripeConnector,
+        "credentials": [{"key": "api_key", "label": "Stripe restricted key (rk_...) or secret key (sk_...)"}],
+        "where_to_find": "https://dashboard.stripe.com/apikeys → 'Create restricted key' with read permissions on Charges, Balance, Payouts.",
+    },
+    {
+        "name": "crypto_wallet", "label": "Crypto Wallet (on-chain)", "group": "Crypto",
+        "cls": CryptoWalletConnector,
+        "credentials": [{"key": "wallets", "label": "List of {chain, address} pairs (Ethereum, Solana, Base, Arbitrum, Polygon)"}],
+        "where_to_find": "Public wallet addresses only. NEVER share private keys or seed phrases. Read-only via block explorer APIs.",
+    },
+    {
+        "name": "coinbase", "label": "Coinbase", "group": "Crypto",
+        "cls": CoinbaseExchangeConnector,
+        "credentials": [
+            {"key": "api_key", "label": "Coinbase API key"},
+            {"key": "api_secret", "label": "Coinbase API secret"},
+        ],
+        "where_to_find": "https://www.coinbase.com/settings/api → 'New API Key'. Grant ONLY 'wallet:accounts:read' — no trade or withdraw permissions.",
+    },
+    {
+        "name": "binance", "label": "Binance", "group": "Crypto",
+        "cls": BinanceExchangeConnector,
+        "credentials": [
+            {"key": "api_key", "label": "Binance API key"},
+            {"key": "api_secret", "label": "Binance API secret"},
+        ],
+        "where_to_find": "https://www.binance.com/en/my/settings/api-management → 'Create API'. Enable ONLY 'Read Info' — disable trading and withdrawals.",
+    },
+    {
+        "name": "aws", "label": "AWS", "group": "Cloud",
+        "cls": AWSCostsConnector,
+        "credentials": [
+            {"key": "access_key_id", "label": "AWS Access Key ID"},
+            {"key": "secret_access_key", "label": "AWS Secret Access Key"},
+            {"key": "region", "label": "AWS region (default: us-east-1)"},
+        ],
+        "where_to_find": "AWS Console → IAM → Users → Create user with 'ce:GetCostAndUsage' policy → Security credentials → Create access key.",
+    },
+    {
+        "name": "gcp", "label": "Google Cloud", "group": "Cloud",
+        "cls": GCPCostsConnector,
+        "credentials": [{"key": "service_account_json", "label": "Service account JSON (full file contents)"}],
+        "where_to_find": "GCP Console → IAM & Admin → Service Accounts → Create with 'Billing Account Viewer' role → Keys → Add JSON key.",
+    },
+    {
+        "name": "vercel", "label": "Vercel", "group": "Cloud",
+        "cls": VercelCostsConnector,
+        "credentials": [{"key": "api_token", "label": "Vercel API token"}],
+        "where_to_find": "https://vercel.com/account/tokens → 'Create Token' with read scope on your team.",
+    },
+    {
+        "name": "cloudflare", "label": "Cloudflare", "group": "Cloud",
+        "cls": CloudflareCostsConnector,
+        "credentials": [{"key": "api_token", "label": "Cloudflare API token"}],
+        "where_to_find": "https://dash.cloudflare.com/profile/api-tokens → 'Create Token' with 'Account Analytics Read' and 'Workers R2 Storage Read' permissions.",
+    },
+    {
+        "name": "twilio", "label": "Twilio", "group": "Communication",
+        "cls": TwilioCostsConnector,
+        "credentials": [
+            {"key": "account_sid", "label": "Twilio Account SID"},
+            {"key": "auth_token", "label": "Twilio Auth Token"},
+        ],
+        "where_to_find": "https://console.twilio.com → Account → API keys & tokens. The Account SID and Auth Token are on the dashboard.",
+    },
+    {
+        "name": "sendgrid", "label": "SendGrid", "group": "Communication",
+        "cls": SendGridCostsConnector,
+        "credentials": [{"key": "api_key", "label": "SendGrid API key"}],
+        "where_to_find": "https://app.sendgrid.com/settings/api_keys → 'Create API Key' with 'Read Access' on Stats and Account.",
+    },
+    {
+        "name": "datadog", "label": "Datadog", "group": "Monitoring",
+        "cls": DatadogCostsConnector,
+        "credentials": [
+            {"key": "api_key", "label": "Datadog API key"},
+            {"key": "app_key", "label": "Datadog Application key"},
+        ],
+        "where_to_find": "https://app.datadoghq.com/organization-settings/api-keys for the API key, /application-keys for the App key. Requires Pro or Enterprise plan.",
+    },
+    {
+        "name": "langsmith", "label": "LangSmith", "group": "Monitoring",
+        "cls": LangSmithCostsConnector,
+        "credentials": [{"key": "api_key", "label": "LangSmith API key"}],
+        "where_to_find": "https://smith.langchain.com/settings → API keys → 'Create API Key'.",
+    },
+    {
+        "name": "pinecone", "label": "Pinecone", "group": "Search/Data",
+        "cls": PineconeCostsConnector,
+        "credentials": [{"key": "api_key", "label": "Pinecone API key"}],
+        "where_to_find": "https://app.pinecone.io → API Keys → 'Create API Key'.",
+    },
+    {
+        "name": "tavily", "label": "Tavily", "group": "Search/Data",
+        "cls": TavilyCostsConnector,
+        "credentials": [{"key": "api_key", "label": "Tavily API key (tvly-...)"}],
+        "where_to_find": "https://app.tavily.com → API Keys.",
+    },
 ]
+
+_PRIVACY_NOTE = (
+    "All credentials and financial data are stored locally on your machine "
+    "(~/.token-economy-intel/). Nothing is sent to external services except "
+    "the provider APIs you connect. This tool is read-only — it cannot "
+    "execute transactions, trades, or modify any account state."
+)
 
 _CATEGORY_KEYWORDS: list[tuple[list[str], SpendCategory]] = [
     (["ai inference", "ai spend", "llm", "model cost", "gpt", "claude"], SpendCategory.AI_INFERENCE),
@@ -554,35 +657,124 @@ def detect_spending_anomalies() -> str:
 
 @server.tool()
 def list_providers() -> str:
-    """List all 14 supported providers with their connection status."""
-    model = _load_model()
-    _ensure_data(model)
+    """List all 16 supported providers grouped by category, with credential
+    instructions for each. Use this when a user first asks about tracking
+    spending — present the categories so they can choose which to connect.
 
-    connected_accounts = set(model.get_summary().connected_accounts)
+    Returns providers grouped by category (AI, Cloud, Payments, Communication,
+    Monitoring, Search/Data, Crypto), each with the credentials needed and
+    where to find them. Includes a privacy note about local-only storage.
+    """
+    model = _load_model()
+    connected = set(model.get_summary().connected_accounts)
     synthetic = is_synthetic_mode()
 
-    providers = []
+    # Group providers by category
+    by_group: dict[str, list[dict]] = {}
     for entry in _CONNECTOR_REGISTRY:
         name = entry["name"]
-        if name in connected_accounts:
+        if name in connected:
             status = "synthetic" if synthetic else "connected"
         else:
             status = "disconnected"
 
-        providers.append({
+        provider_info = {
             "name": name,
             "label": entry["label"],
-            "group": entry["group"],
             "status": status,
-        })
+            "credentials": entry["credentials"],
+            "where_to_find": entry["where_to_find"],
+        }
+        by_group.setdefault(entry["group"], []).append(provider_info)
+
+    # Preserve a sensible group order
+    group_order = ["AI", "Cloud", "Payments", "Communication",
+                   "Monitoring", "Search/Data", "Crypto"]
+    categories = {
+        g: by_group[g] for g in group_order if g in by_group
+    }
 
     result = {
-        "total": len(providers),
-        "connected": sum(1 for p in providers if p["status"] != "disconnected"),
-        "providers": providers,
+        "total_providers": len(_CONNECTOR_REGISTRY),
+        "connected_count": sum(
+            1 for entries in by_group.values()
+            for p in entries if p["status"] != "disconnected"
+        ),
+        "categories": categories,
+        "privacy_note": _PRIVACY_NOTE,
+        "next_step": (
+            "Ask the user which categories/providers they use. For each one "
+            "they select, use the `where_to_find` text to explain how to get "
+            "the credential, then call `connect_account` with the provider "
+            "name and credentials dict."
+        ),
     }
 
     _tracker.track("providers_listed", "ui", "mcp")
+    return json.dumps(result, indent=2)
+
+
+@server.tool()
+def get_setup_status() -> str:
+    """Check which providers are already connected and which are missing.
+
+    Use this on subsequent interactions to skip providers the user has
+    already set up. Returns connected providers (with last update time
+    and record count) and a list of providers still available to connect.
+    """
+    model = _load_model()
+    summary = model.get_summary()
+    connected_accounts = set(summary.connected_accounts)
+    synthetic = is_synthetic_mode()
+
+    # Per-provider record counts
+    record_counts: dict[str, int] = {}
+    last_dates: dict[str, str] = {}
+    for r in model.records:
+        prov = r.provider.value
+        record_counts[prov] = record_counts.get(prov, 0) + 1
+        d = r.record_date.isoformat()
+        if prov not in last_dates or d > last_dates[prov]:
+            last_dates[prov] = d
+
+    connected = []
+    missing = []
+    for entry in _CONNECTOR_REGISTRY:
+        name = entry["name"]
+        info = {
+            "name": name,
+            "label": entry["label"],
+            "group": entry["group"],
+        }
+        if name in connected_accounts:
+            info["status"] = "synthetic" if synthetic else "connected"
+            info["records"] = record_counts.get(name, 0)
+            info["last_record_date"] = last_dates.get(name)
+            connected.append(info)
+        else:
+            missing.append(info)
+
+    is_first_use = len(connected) == 0
+    result = {
+        "is_first_use": is_first_use,
+        "total_providers": len(_CONNECTOR_REGISTRY),
+        "connected_count": len(connected),
+        "missing_count": len(missing),
+        "connected": connected,
+        "missing": missing,
+        "last_updated": (
+            summary.last_updated.isoformat()
+            if summary.last_updated.year > 2000 else None
+        ),
+        "next_step": (
+            "Call list_providers to show available categories." if is_first_use
+            else "Skip already-connected providers. Ask the user if they want "
+                 "to add any from the 'missing' list, or proceed with current data."
+        ),
+    }
+
+    _tracker.track("setup_status_checked", "ui", "mcp",
+                   {"connected": len(connected)})
     return json.dumps(result, indent=2)
 
 

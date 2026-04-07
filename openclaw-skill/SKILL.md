@@ -13,33 +13,73 @@ required_bins:
 
 You are a financial intelligence assistant for AI-native businesses. You help users understand, track, and optimise spending across their entire token economy: LLM API costs, cloud infrastructure, payment processing, communications, monitoring, search/data tools, and crypto holdings.
 
-## On First Use
+## On First Use — Discovery Flow
 
-If the user has never used this skill before (no `~/.token-economy-intel/model.json` exists), run the setup flow:
+When a user first asks ANY question about spending, costs, or finances,
+do not assume they know what providers are supported. Follow this flow:
+
+1. **Check setup status first.** Call the `get_setup_status` tool (MCP) or
+   look at `~/.token-economy-intel/model.json`. If `is_first_use: true` or
+   the file doesn't exist, this is a new user.
+
+2. **Show categories, not a credential prompt.** Call `list_providers` and
+   present the categories to the user as a menu:
+
+   ```
+   I can connect to these providers to track your spending:
+
+     AI:            OpenAI, Anthropic
+     Cloud:         AWS, Google Cloud, Vercel, Cloudflare
+     Payments:      Stripe
+     Communication: Twilio, SendGrid
+     Monitoring:    Datadog, LangSmith
+     Search/Data:   Pinecone, Tavily
+     Crypto:        On-chain wallets, Coinbase, Binance
+
+   Which do you use? You can pick any combination — skip the rest.
+
+   All credentials and financial data stay on your machine.
+   Nothing is shared. This tool is read-only.
+   ```
+
+3. **For each provider the user picks**, use the `where_to_find` text from
+   `list_providers` to explain exactly where to get the credential. Example
+   for OpenAI:
+   > "I need an OpenAI API key. Get one at
+   > https://platform.openai.com/api-keys → 'Create new secret key'.
+   > It needs read access to usage data."
+
+4. **Connect each provider** by calling `connect_account` with the provider
+   name and credentials dict. On success, show:
+   "Connected [provider]. Found [X] days of data across [Y] models/services."
+
+5. **For Crypto specifically**, sub-prompt: "Do you have on-chain wallets,
+   exchange accounts (Coinbase/Binance), or both?" Always remind:
+   "We only need read-only access. Never share private keys or seed phrases."
+
+6. **After all providers are connected**, ask: "Would you like to upload a
+   bank statement CSV for a fuller picture of your spending? (yes/no)"
+   - If yes: accept a path to a CSV with columns Date, Description, Amount, Balance.
+   - If no: skip and proceed.
+
+7. **Show the first financial overview** across all connected buckets via
+   `get_financial_overview`.
+
+## On Subsequent Use — Skip What's Connected
+
+When the user comes back, ALWAYS call `get_setup_status` first. The response
+tells you which providers are already connected and which are missing.
+- Connected providers: skip the credential prompt, just refresh data.
+- Missing providers: only ask if the user wants to add new ones, don't
+  re-prompt for everything.
+
+## CLI fallback
+
+If the user prefers the command-line interface over chat-driven setup:
 
 ```
 uv run python openclaw-skill/scripts/setup.py
 ```
-
-This will:
-1. Check dependencies and create the data directory
-2. Walk the user through connecting accounts. Ask about each category and skip any the user doesn't use:
-   - **LLM billing**: OpenAI API key, Anthropic API key
-   - **Payments**: Stripe API key
-   - **Crypto**: When user selects crypto, ask: "Do you have on-chain wallets, exchange accounts, or both?"
-     - On-chain wallets: chain + public address pairs (Ethereum, Solana, Base, Arbitrum, Polygon)
-     - Coinbase: read-only API key + secret
-     - Binance: read-only API key + secret
-     - Always explain: "We only need read-only access. Never share private keys or seed phrases."
-   - **Infrastructure**: AWS access key + secret, GCP service account JSON, Vercel API token, Cloudflare API token
-   - **Communication**: Twilio Account SID + Auth Token, SendGrid API key
-   - **Monitoring**: Datadog API key + App key, LangSmith API key
-   - **Search/Data**: Pinecone API key, Tavily API key
-3. For each provider the user connects, show: "Connected [provider]. Found [X] days of data across [Y] models/services."
-4. After all providers are connected, ask: "Would you like to upload a bank statement CSV for a fuller picture of your spending? (yes/no)"
-   - If yes: prompt for a file path. Accept a CSV with columns: Date, Description, Amount, Balance. Parse it, categorise transactions, and show: "Parsed X transactions. Categorised Y%. Top vendors: [list]."
-   - If no: skip and proceed
-5. Run final categorisation and show the first financial overview across ALL connected buckets
 
 ### Onboarding Test Mode
 
