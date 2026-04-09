@@ -1,16 +1,11 @@
 ---
-name: token-economy-intel
-description: "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view. Spending insights, anomaly alerts, and optimisation recommendations."
-version: 1.0.0
+name: ANVX - Token Economy Intel
+version: 1.2.2
+description: "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view."
 permissions: read-only
-required_env:
+required_env_vars:
   - ANTHROPIC_API_KEY
-optional_env:
-  - SYNTHETIC_MODE              # "true" to use synthetic test data
-  - ONBOARDING_TEST_MODE        # "true" for onboarding UX testing
-  - ANALYTICS_ENABLED           # "true" to enable anonymous event telemetry
-  - ANALYTICS_ENDPOINT          # URL for analytics backend (if enabled)
-  # Provider credentials (alternative to keyring — any subset):
+optional_env_vars:
   - OPENAI_API_KEY
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
@@ -29,53 +24,44 @@ optional_env:
   - COINBASE_API_SECRET
   - BINANCE_API_KEY
   - BINANCE_API_SECRET
-required_bins:
+  - SYNTHETIC_MODE
+  - ONBOARDING_TEST_MODE
+  - ANALYTICS_ENABLED
+  - ANALYTICS_ENDPOINT
+required_binaries:
   - python3
   - uv
 network_access:
-  # Provider APIs (read-only billing/usage endpoints):
-  - api.openai.com           # OpenAI usage data
-  - api.anthropic.com        # Anthropic usage data
-  - api.stripe.com           # Stripe charges, balance, payouts
-  - ce.*.amazonaws.com       # AWS Cost Explorer
-  - cloudbilling.googleapis.com  # GCP Cloud Billing
-  - oauth2.googleapis.com    # GCP OAuth token exchange
-  - api.vercel.com           # Vercel usage
-  - api.cloudflare.com       # Cloudflare Workers/R2 analytics
-  - api.twilio.com           # Twilio usage records
-  - api.sendgrid.com         # SendGrid email stats
-  - api.datadoghq.com        # Datadog usage metering
-  - api.smith.langchain.com  # LangSmith trace usage
-  - api.pinecone.io          # Pinecone index stats
-  - api.tavily.com           # Tavily credit usage
-  # Crypto (read-only balance lookups — no transaction capability):
-  - api.etherscan.io         # Ethereum balance lookups
-  - api.basescan.org         # Base balance lookups
-  - api.arbiscan.io          # Arbitrum balance lookups
-  - api.polygonscan.com      # Polygon balance lookups
-  - api.mainnet-beta.solana.com  # Solana RPC balance lookups
-  - api.coingecko.com        # USD price conversion (free, no key)
-  - api.coinbase.com         # Coinbase read-only portfolio
-  - api.binance.com          # Binance read-only portfolio
-  # Pricing data:
-  - openrouter.ai            # LLM pricing database (free, no key)
-  - raw.githubusercontent.com  # LiteLLM pricing fallback
+  - api.openai.com
+  - api.anthropic.com
+  - api.stripe.com
+  - ce.us-east-1.amazonaws.com
+  - cloudbilling.googleapis.com
+  - oauth2.googleapis.com
+  - api.vercel.com
+  - api.cloudflare.com
+  - api.twilio.com
+  - api.sendgrid.com
+  - api.datadoghq.com
+  - api.smith.langchain.com
+  - api.pinecone.io
+  - api.tavily.com
+  - api.etherscan.io
+  - api.basescan.org
+  - api.arbiscan.io
+  - api.polygonscan.com
+  - api.mainnet-beta.solana.com
+  - api.coingecko.com
+  - api.coinbase.com
+  - api.binance.com
+  - openrouter.ai
+  - raw.githubusercontent.com
 local_storage:
-  - ~/.token-economy-intel/model.json        # Financial model (all records)
-  - ~/.token-economy-intel/pricing_cache.json # LLM pricing cache (24h TTL)
-  - ~/.token-economy-intel/events.jsonl      # Local analytics log (append-only)
-  - system keyring (macOS Keychain / gnome-keyring / Windows Credential Vault)
-telemetry:
-  # Anonymous event tracking — disabled by default (ANALYTICS_ENABLED=false).
-  # When enabled, sends ONLY these event types to ANALYTICS_ENDPOINT:
-  #   setup_complete, query, recommendation_viewed, recommendation_accepted,
-  #   account_connected, status_viewed, anomaly_alerted, session_started,
-  #   providers_listed, bank_csv_uploaded, setup_status_checked
-  # Each event contains: event_type, event_category, surface, session_id, timestamp.
-  # Metadata is limited to structural counts (e.g. {"count": 5, "provider": "openai"}).
-  # NEVER includes: financial amounts, balances, API keys, addresses, PII.
-  # Forbidden metadata keys are stripped automatically before send.
-  # Fallback: events logged locally to ~/.token-economy-intel/events.jsonl
+  - ~/.token-economy-intel/model.json
+  - ~/.token-economy-intel/pricing_cache.json
+  - ~/.token-economy-intel/events.jsonl
+credential_storage: system-keyring
+telemetry_default: disabled
 ---
 
 # Token Economy Intelligence

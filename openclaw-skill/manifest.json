@@ -1,6 +1,6 @@
 {
-  "name": "token-economy-intel",
-  "version": "1.0.0",
+  "name": "ANVX - Token Economy Intel",
+  "version": "1.2.2",
   "description": "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view.",
   "permissions": "read-only",
   "required_env": [
