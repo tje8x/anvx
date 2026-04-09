@@ -1,0 +1,100 @@
+{
+  "name": "token-economy-intel",
+  "version": "1.0.0",
+  "description": "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view.",
+  "permissions": "read-only",
+  "required_env": [
+    "ANTHROPIC_API_KEY"
+  ],
+  "optional_env": [
+    "SYNTHETIC_MODE",
+    "ONBOARDING_TEST_MODE",
+    "ANALYTICS_ENABLED",
+    "ANALYTICS_ENDPOINT",
+    "OPENAI_API_KEY",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "STRIPE_API_KEY",
+    "VERCEL_TOKEN",
+    "CLOUDFLARE_API_TOKEN",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "SENDGRID_API_KEY",
+    "DD_API_KEY",
+    "DD_APP_KEY",
+    "LANGSMITH_API_KEY",
+    "PINECONE_API_KEY",
+    "TAVILY_API_KEY",
+    "COINBASE_API_KEY",
+    "COINBASE_API_SECRET",
+    "BINANCE_API_KEY",
+    "BINANCE_API_SECRET"
+  ],
+  "required_bins": [
+    "python3",
+    "uv"
+  ],
+  "network_access": [
+    "api.openai.com",
+    "api.anthropic.com",
+    "api.stripe.com",
+    "ce.us-east-1.amazonaws.com",
+    "cloudbilling.googleapis.com",
+    "oauth2.googleapis.com",
+    "api.vercel.com",
+    "api.cloudflare.com",
+    "api.twilio.com",
+    "api.sendgrid.com",
+    "api.datadoghq.com",
+    "api.smith.langchain.com",
+    "api.pinecone.io",
+    "api.tavily.com",
+    "api.etherscan.io",
+    "api.basescan.org",
+    "api.arbiscan.io",
+    "api.polygonscan.com",
+    "api.mainnet-beta.solana.com",
+    "api.coingecko.com",
+    "api.coinbase.com",
+    "api.binance.com",
+    "openrouter.ai",
+    "raw.githubusercontent.com"
+  ],
+  "local_storage": [
+    "~/.token-economy-intel/model.json",
+    "~/.token-economy-intel/pricing_cache.json",
+    "~/.token-economy-intel/events.jsonl"
+  ],
+  "credential_storage": "system-keyring",
+  "telemetry": {
+    "enabled_by_default": false,
+    "requires_env": "ANALYTICS_ENABLED=true",
+    "events_sent": [
+      "setup_complete",
+      "query",
+      "recommendation_viewed",
+      "recommendation_accepted",
+      "account_connected",
+      "status_viewed",
+      "anomaly_alerted",
+      "session_started"
+    ],
+    "never_includes": [
+      "financial_amounts",
+      "api_keys",
+      "wallet_addresses",
+      "pii"
+    ]
+  },
+  "security": {
+    "read_only": true,
+    "no_transactions": true,
+    "no_private_keys": true,
+    "credentials_in_keyring_only": true
+  },
+  "includes": [
+    "SKILL.md",
+    "scripts/",
+    "engine/"
+  ]
+}

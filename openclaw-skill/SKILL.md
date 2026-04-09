@@ -118,20 +118,17 @@ How would you like to set up?
 A) Run the secure setup script (recommended)
    Keys stored in your system keychain, never visible in chat.
    Run this in your terminal:
-   uv run python -m engine.setup
+     uv run python -m engine.setup
+   Say 'ready' when done.
 
-B) Paste keys in this chat
-   Quick but keys will be visible in your chat history.
-   Use read-only keys only.
-
-C) Use the MCP server in Claude or ChatGPT Desktop
+B) Use the MCP server in Claude or ChatGPT Desktop
    Keys stay in your local config file.
    See: github.com/anthropics/token-economy-intel/README.md#mcp-setup
 ```
 
 ---
 
-### Option A — Setup Script
+### Option A — Setup Script (recommended)
 
 The user runs `uv run python -m engine.setup` in their terminal.
 
@@ -140,81 +137,12 @@ The user runs `uv run python -m engine.setup` in their terminal.
    - Read from `engine.credentials.CredentialStore.get_manifest()` to see which providers are connected.
    - Show: "Found [N] providers connected: [list]. Let me fetch your financial data..."
    - Run the initial data fetch for each connected provider.
+   - Ask: "Do you have a bank statement CSV to upload? This helps catch charges from providers you haven't connected directly. (y/n)"
    - Show first financial overview + top 3 recommendations.
 
 ---
 
-### Option B — Paste in Chat
-
-**Step 1: Batch provider selection (ONE message, ONE response)**
-
-Show this compact selection list:
-
-```
-Which providers do you want to connect?
-Reply with numbers (e.g., 1, 2, 8):
-
-  AI:         1.OpenAI  2.Anthropic
-  Cloud:      3.AWS  4.GCP  5.Vercel  6.Cloudflare
-  Payments:   7.Stripe
-  Comms:      8.Twilio  9.SendGrid
-  Monitoring: 10.Datadog  11.LangSmith
-  Search:     12.Pinecone  13.Tavily
-  Crypto:     14.Wallets  15.Coinbase  16.Binance
-
-You can add more anytime.
-```
-
-Parse the user's number selection into a list of providers to connect.
-
-**Step 2: Credential collection (ONE message per provider)**
-
-For each selected provider, send ONE message:
-
-```
-[Provider Name]
-Keys visible in chat — use read-only keys.
-
-[Provider-specific help text: where to find keys]
-Send each key on a separate line. Type 'done' when finished.
-```
-
-For providers needing multiple fields (AWS, Twilio, Datadog, Coinbase, Binance), ask for all fields in ONE message:
-
-```
-AWS requires two values:
-1. Access Key ID
-2. Secret Access Key
-Send them on separate lines.
-```
-
-**Multi-key handling:**
-- First key from user → label "default" automatically.
-- If user sends additional keys: ask ONE follow-up: "Label for key #2? (e.g., 'production', 'staging')"
-- Do NOT ask for labels one at a time.
-
-**After each provider**, validate immediately by calling `connect_account`:
-- Success: "Connected [provider] — [X] days of data across [Y] models/services."
-- Failure: "Failed: [error]. Try again or type 'skip'."
-
-**Store credentials** using `engine.credentials.CredentialStore` (keyring) so they persist across sessions. If keyring is unavailable (headless Linux), warn the user and fall back to env vars.
-
-**Step 3: Bank CSV (after ALL providers)**
-
-```
-Do you have a bank statement CSV to upload?
-This helps catch charges from providers you haven't connected directly. (y/n)
-```
-
-If yes: accept file path, parse, show "Parsed X transactions. Categorised Y%. Top vendors: [list]."
-
-**Step 4: First overview**
-
-Show financial overview + top 3 recommendations from the optimization modules.
-
----
-
-### Option C — MCP Server
+### Option B — MCP Server
 
 Provide the Claude Desktop config snippet:
 
@@ -234,9 +162,21 @@ Then say: "Once the MCP server is running, I'll use the `list_providers` and `co
 
 ---
 
+### If a user pastes a key in chat
+
+**Do NOT store or use the key.** Respond with:
+
+"I see you've pasted what looks like an API key. For your security, keys pasted in chat may be visible in your chat history. Please use the setup script instead — it stores keys securely in your system keychain:
+
+  uv run python -m engine.setup
+
+If you've already run the setup script, just say 'ready' and I'll read your credentials from the keychain."
+
+---
+
 ### Adding providers mid-conversation
 
-If a user says "connect my Datadog" or "add AWS" at any point during a normal conversation, start the single-provider credential flow immediately — don't re-show the full setup menu. Use the same ONE-message-per-provider pattern from Option B.
+If a user says "connect my Datadog" or "add AWS" at any point during a normal conversation, direct them to the setup script: "Run `uv run python -m engine.setup` to add Datadog securely. Say 'ready' when done."
 
 ---
 
@@ -276,10 +216,9 @@ uv run python openclaw-skill/scripts/connect_account.py "<provider_name>"
 ## Onboarding Test Mode
 
 When `ONBOARDING_TEST_MODE=true`, the full onboarding UX runs exactly as above but:
-- All three options (A/B/C) work. Credential validation uses built-in `TEST_CREDENTIALS` instead of real APIs.
+- Credential validation uses built-in `TEST_CREDENTIALS` instead of real APIs.
 - Option A: setup script accepts test credentials (e.g., `sk-test-openai-12345`).
-- Option B: paste test credentials in chat — they validate against `TEST_CREDENTIALS`.
-- Option C: MCP server with test env vars.
+- Option B: MCP server with test env vars.
 - For bank CSV upload: the keyword "test" loads the synthetic CSV from `engine/testing/data/bank_statement.csv`. This ONLY works when `ONBOARDING_TEST_MODE=true`. In production, "test" is invalid input.
 
 ## Proactive Behaviour
@@ -315,6 +254,23 @@ uv run python openclaw-skill/scripts/analytics.py "<event_type>" "<event_categor
 ```
 
 Event types: `setup_complete`, `query`, `recommendation_viewed`, `recommendation_accepted`, `account_connected`, `status_viewed`, `anomaly_alerted`, `session_started`
+
+## Transparency
+
+**TELEMETRY:** When `ANALYTICS_ENABLED=true`, anonymous usage events are sent to `ANALYTICS_ENDPOINT`. Telemetry is **disabled by default**.
+
+Events include:
+- Event type (e.g., `setup_complete`, `query`, `recommendation_viewed`)
+- Surface (`openclaw` or `mcp`)
+- Session ID (random UUID, not linked to any account)
+- Timestamp
+- Structural metadata only (e.g., `{"count": 5, "provider": "openai"}`)
+
+Events **NEVER** include: financial amounts, balances, revenue, costs, API keys, wallet addresses, account details, or any PII. Forbidden metadata keys are stripped automatically before send (see `engine/analytics/tracker.py` for the full blocklist).
+
+When telemetry is disabled or the endpoint is unreachable, events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only, never sent anywhere).
+
+**SOURCE CODE:** The complete engine source (connectors, analytics, intelligence modules, credential store) is included in this skill bundle under `engine/`. The scanner can verify all read-only claims, telemetry behavior, and credential handling by inspecting the source directly.
 
 ## Response Style
 
