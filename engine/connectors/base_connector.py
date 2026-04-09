@@ -50,6 +50,18 @@ class BaseConnector(ABC):
 
 		return False
 
+	def _resolve_credentials(self, credentials: dict[str, Any] | None) -> dict[str, Any]:
+		"""Resolve credentials from keyring/env if not explicitly provided.
+
+		Lookup order: explicit credentials → CredentialStore (keyring/env/test).
+		"""
+		if credentials:
+			return credentials
+		from engine.credentials import CredentialStore
+		provider_key = self.provider.value
+		creds = CredentialStore.get_all_credentials(provider_key)
+		return creds
+
 	@abstractmethod
 	async def connect(self, credentials: dict) -> bool:
 		"""Validate credentials and establish connection."""

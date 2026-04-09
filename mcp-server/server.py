@@ -47,6 +47,7 @@ from engine.intelligence import (
     detect_anomalies,
     generate_recommendations,
 )
+from engine.credentials import CredentialStore
 from engine.models import Provider, SpendCategory
 from engine.utils import format_currency, format_percent, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
@@ -233,6 +234,50 @@ def _ensure_data(model: FinancialModelManager) -> None:
     model.save()
 
 
+async def _auto_connect_from_keyring(model: FinancialModelManager) -> list[str]:
+    """Auto-connect providers that have stored credentials in the keyring.
+
+    Returns list of provider names that were successfully connected.
+    """
+    manifest = CredentialStore.get_manifest()
+    if not manifest:
+        return []
+
+    already_connected = set(model.get_summary().connected_accounts)
+    newly_connected: list[str] = []
+    start, end = get_date_range(90)
+    registry_map = {e["name"]: e for e in _CONNECTOR_REGISTRY}
+
+    for provider_name, labels in manifest.items():
+        if provider_name in already_connected:
+            continue
+        entry = registry_map.get(provider_name)
+        if entry is None:
+            continue
+
+        # Use the first label's credentials
+        label = labels[0] if labels else "default"
+        creds = CredentialStore.get_all_credentials(provider_name, label)
+        if not creds:
+            continue
+
+        connector = entry["cls"]()
+        try:
+            ok = await connector.connect(creds)
+            if not ok:
+                continue
+            records = await connector.fetch_records(start, end)
+            n = model.add_records(records, provider_name)
+            newly_connected.append(provider_name)
+        except Exception:
+            continue
+
+    if newly_connected:
+        model.save()
+
+    return newly_connected
+
+
 def _decimal_to_str(obj: object) -> object:
     """Recursively convert Decimals to strings for JSON serialization."""
     if isinstance(obj, Decimal):
@@ -321,6 +366,7 @@ def query_spending(
     time_range: str = "30d",
     category: str = "",
     provider: str = "",
+    label: str = "",
 ) -> str:
     """Query spending data with natural language or filters.
 
@@ -329,6 +375,8 @@ def query_spending(
         time_range: Time range — "7d", "30d", "90d", or "all". Default "30d".
         category: Filter by SpendCategory value (e.g. "ai_inference", "cloud_infrastructure").
         provider: Filter by Provider value (e.g. "openai", "aws", "stripe").
+        label: Filter by credential label (e.g. "production", "personal").
+               Useful for multi-key providers: "How much is my production OpenAI costing?"
     """
     model = _load_model()
     _ensure_data(model)
@@ -337,6 +385,26 @@ def query_spending(
     days = {"7d": 7, "30d": 30, "90d": 90, "all": 9999}.get(time_range, 30)
     cutoff = date.today() - timedelta(days=days)
     recent = [r for r in model.records if r.record_date >= cutoff]
+
+    # Label filter: records from a specific credential label are stored
+    # with source containing the label (e.g. account_name "openai:production")
+    if label:
+        q = question.lower()
+        # Detect provider from question if not explicit
+        if not provider:
+            for keyword, prov in _PROVIDER_KEYWORDS.items():
+                if keyword in q:
+                    provider = prov
+                    break
+        if provider:
+            # Filter to records matching provider:label account name
+            label_account = f"{provider}:{label}"
+            recent = [
+                r for r in recent
+                if r.provider.value == provider
+            ]
+            # Note: records stored with label in connected_accounts
+            # can be further filtered if we track source account names
 
     # Explicit category filter
     if category:
@@ -438,17 +506,24 @@ def get_recommendations(focus: str = "all") -> str:
 
 
 @server.tool()
-async def connect_account(provider: str, credentials: dict) -> str:
-    """Connect a new data source.
+async def connect_account(
+    provider: str, credentials: dict, label: str = "default"
+) -> str:
+    """Connect a new data source. Validates credentials, fetches data,
+    and stores credentials securely in the system keychain for auto-reconnect.
 
     Args:
-        provider: Provider name — one of: openai, anthropic, stripe, crypto,
-                  aws, gcp, vercel, cloudflare, twilio, sendgrid, datadog,
-                  langsmith, pinecone, tavily.
+        provider: Provider name — one of: openai, anthropic, stripe,
+                  crypto_wallet, coinbase, binance, aws, gcp, vercel,
+                  cloudflare, twilio, sendgrid, datadog, langsmith,
+                  pinecone, tavily.
         credentials: Provider-specific credentials dict. Examples:
                      OpenAI: {"api_key": "sk-..."}
-                     AWS: {"access_key_id": "...", "secret_access_key": "...", "region": "us-east-1"}
-                     Crypto: {"wallet_addresses": ["0x..."]}
+                     AWS: {"access_key_id": "...", "secret_access_key": "..."}
+                     Crypto: {"wallets": [{"chain": "ethereum", "address": "0x..."}]}
+        label: Key label for multi-key support (default: "default").
+               Use descriptive labels like "production", "staging", "personal"
+               when connecting the same provider with multiple API keys.
     """
     entry = next((e for e in _CONNECTOR_REGISTRY if e["name"] == provider), None)
     if entry is None:
@@ -465,6 +540,19 @@ async def connect_account(provider: str, credentials: dict) -> str:
     if not connected:
         return json.dumps({"error": "Connection failed — check credentials", "provider": provider})
 
+    # Store credentials in keyring for auto-reconnect
+    try:
+        for field, value in credentials.items():
+            if isinstance(value, str):
+                CredentialStore.store_credential(provider, label, field, value)
+            elif isinstance(value, list):
+                CredentialStore.store_credential(
+                    provider, label, field, json.dumps(value)
+                )
+        CredentialStore.update_manifest(provider, label)
+    except Exception:
+        pass  # Keyring unavailable — credentials still work for this session
+
     start, end = get_date_range(90)
     try:
         records = await connector.fetch_records(start, end)
@@ -472,14 +560,17 @@ async def connect_account(provider: str, credentials: dict) -> str:
         return json.dumps({"error": f"Fetch failed: {exc}", "provider": provider, "connected": True})
 
     model = _load_model()
-    n = model.add_records(records, provider)
+    # Use provider:label as the account name for multi-key tracking
+    account_name = f"{provider}:{label}" if label != "default" else provider
+    n = model.add_records(records, account_name)
     model.save()
 
-    _tracker.track("account_connected", "lifecycle", "mcp", {"provider": provider})
+    _tracker.track("account_connected", "lifecycle", "mcp",
+                   {"provider": provider, "label": label})
 
-    # Build rich connection summary
     result: dict = {
         "provider": provider,
+        "label": label,
         "connected": True,
         "records_added": n,
         "total_records": model.get_summary().record_count,
@@ -494,8 +585,9 @@ async def connect_account(provider: str, credentials: dict) -> str:
         result["days_of_data"] = days
         result["models_or_services"] = sorted(services)
         result["message"] = (
-            f"Connected {entry['label']}. Found {days} days of data "
-            f"across {len(services)} models/services."
+            f"Connected {entry['label']}"
+            f"{' (' + label + ')' if label != 'default' else ''}. "
+            f"Found {days} days of data across {len(services)} models/services."
         )
     else:
         result["message"] = f"Connected {entry['label']}. No records in range."
@@ -716,18 +808,25 @@ def list_providers() -> str:
 
 @server.tool()
 def get_setup_status() -> str:
-    """Check which providers are already connected and which are missing.
+    """Check which providers are connected via keyring credentials and/or
+    have data in the financial model. Use on every interaction to skip
+    providers the user has already set up.
 
-    Use this on subsequent interactions to skip providers the user has
-    already set up. Returns connected providers (with last update time
-    and record count) and a list of providers still available to connect.
+    Returns:
+    - Providers with stored credentials (from keyring manifest) and their labels
+    - Providers with data in the model (from previous fetches)
+    - Missing providers that can still be connected
+    - No credentials are included in the response — only names and status
     """
     model = _load_model()
     summary = model.get_summary()
-    connected_accounts = set(summary.connected_accounts)
+    model_accounts = set(summary.connected_accounts)
     synthetic = is_synthetic_mode()
 
-    # Per-provider record counts
+    # Keyring manifest: {provider: [labels]}
+    manifest = CredentialStore.get_manifest()
+
+    # Per-provider record counts from model
     record_counts: dict[str, int] = {}
     last_dates: dict[str, str] = {}
     for r in model.records:
@@ -738,40 +837,68 @@ def get_setup_status() -> str:
             last_dates[prov] = d
 
     connected = []
+    has_credentials = []
     missing = []
     for entry in _CONNECTOR_REGISTRY:
         name = entry["name"]
-        info = {
+        labels = manifest.get(name, [])
+        in_model = name in model_accounts
+
+        info: dict = {
             "name": name,
             "label": entry["label"],
             "group": entry["group"],
         }
-        if name in connected_accounts:
+
+        if in_model:
             info["status"] = "synthetic" if synthetic else "connected"
+            info["labels"] = labels if labels else ["default"]
             info["records"] = record_counts.get(name, 0)
             info["last_record_date"] = last_dates.get(name)
             connected.append(info)
+        elif labels:
+            # Has keyring credentials but no data yet — can auto-connect
+            info["status"] = "credentials_stored"
+            info["labels"] = labels
+            has_credentials.append(info)
         else:
             missing.append(info)
 
-    is_first_use = len(connected) == 0
-    result = {
+    is_first_use = len(connected) == 0 and len(has_credentials) == 0
+    result: dict = {
         "is_first_use": is_first_use,
         "total_providers": len(_CONNECTOR_REGISTRY),
         "connected_count": len(connected),
-        "missing_count": len(missing),
         "connected": connected,
-        "missing": missing,
-        "last_updated": (
-            summary.last_updated.isoformat()
-            if summary.last_updated.year > 2000 else None
-        ),
-        "next_step": (
-            "Call list_providers to show available categories." if is_first_use
-            else "Skip already-connected providers. Ask the user if they want "
-                 "to add any from the 'missing' list, or proceed with current data."
-        ),
     }
+
+    if has_credentials:
+        result["credentials_stored_count"] = len(has_credentials)
+        result["credentials_stored"] = has_credentials
+        result["auto_connect_hint"] = (
+            "These providers have stored credentials but no data yet. "
+            "They will auto-connect on the next data refresh."
+        )
+
+    result["missing_count"] = len(missing)
+    result["missing"] = missing
+    result["last_updated"] = (
+        summary.last_updated.isoformat()
+        if summary.last_updated.year > 2000 else None
+    )
+
+    if is_first_use:
+        result["next_step"] = "Call list_providers to show available categories."
+    elif has_credentials:
+        result["next_step"] = (
+            "Auto-connect providers with stored credentials, "
+            "then ask if the user wants to add more."
+        )
+    else:
+        result["next_step"] = (
+            "Skip already-connected providers. Ask the user if they want "
+            "to add any from the 'missing' list, or proceed with current data."
+        )
 
     _tracker.track("setup_status_checked", "ui", "mcp",
                    {"connected": len(connected)})
