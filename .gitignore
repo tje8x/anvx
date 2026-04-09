@@ -11,3 +11,6 @@ build/
 .vercel
 .env*.local
 .env
+.mcpregistry_github_token
+.env.example
+.env
