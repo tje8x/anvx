@@ -182,8 +182,8 @@ _CONNECTOR_REGISTRY: list[dict] = [
 _PRIVACY_NOTE = (
     "All credentials and financial data are stored locally on your machine "
     "(~/.token-economy-intel/). Nothing is sent to external services except "
-    "the provider APIs you connect. This tool is read-only — it cannot "
-    "execute transactions, trades, or modify any account state."
+    "the provider APIs you connect. This tool is strictly read-only — it "
+    "cannot move funds, trade assets, or modify any account state."
 )
 
 _CATEGORY_KEYWORDS: list[tuple[list[str], SpendCategory]] = [

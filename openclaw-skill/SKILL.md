@@ -1,17 +1,106 @@
 ---
 name: token-economy-intel
-description: "Unified intelligence across your token economy — LLM API costs, crypto holdings, and Stripe revenue in one view. Spending insights, anomaly alerts, and optimisation recommendations."
+description: "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view. Spending insights, anomaly alerts, and optimisation recommendations."
 version: 1.0.0
+permissions: read-only
 required_env:
   - ANTHROPIC_API_KEY
+optional_env:
+  - SYNTHETIC_MODE              # "true" to use synthetic test data
+  - ONBOARDING_TEST_MODE        # "true" for onboarding UX testing
+  - ANALYTICS_ENABLED           # "true" to enable anonymous event telemetry
+  - ANALYTICS_ENDPOINT          # URL for analytics backend (if enabled)
+  # Provider credentials (alternative to keyring — any subset):
+  - OPENAI_API_KEY
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - STRIPE_API_KEY
+  - VERCEL_TOKEN
+  - CLOUDFLARE_API_TOKEN
+  - TWILIO_ACCOUNT_SID
+  - TWILIO_AUTH_TOKEN
+  - SENDGRID_API_KEY
+  - DD_API_KEY
+  - DD_APP_KEY
+  - LANGSMITH_API_KEY
+  - PINECONE_API_KEY
+  - TAVILY_API_KEY
+  - COINBASE_API_KEY
+  - COINBASE_API_SECRET
+  - BINANCE_API_KEY
+  - BINANCE_API_SECRET
 required_bins:
   - python3
   - uv
+network_access:
+  # Provider APIs (read-only billing/usage endpoints):
+  - api.openai.com           # OpenAI usage data
+  - api.anthropic.com        # Anthropic usage data
+  - api.stripe.com           # Stripe charges, balance, payouts
+  - ce.*.amazonaws.com       # AWS Cost Explorer
+  - cloudbilling.googleapis.com  # GCP Cloud Billing
+  - oauth2.googleapis.com    # GCP OAuth token exchange
+  - api.vercel.com           # Vercel usage
+  - api.cloudflare.com       # Cloudflare Workers/R2 analytics
+  - api.twilio.com           # Twilio usage records
+  - api.sendgrid.com         # SendGrid email stats
+  - api.datadoghq.com        # Datadog usage metering
+  - api.smith.langchain.com  # LangSmith trace usage
+  - api.pinecone.io          # Pinecone index stats
+  - api.tavily.com           # Tavily credit usage
+  # Crypto (read-only balance lookups — no transaction capability):
+  - api.etherscan.io         # Ethereum balance lookups
+  - api.basescan.org         # Base balance lookups
+  - api.arbiscan.io          # Arbitrum balance lookups
+  - api.polygonscan.com      # Polygon balance lookups
+  - api.mainnet-beta.solana.com  # Solana RPC balance lookups
+  - api.coingecko.com        # USD price conversion (free, no key)
+  - api.coinbase.com         # Coinbase read-only portfolio
+  - api.binance.com          # Binance read-only portfolio
+  # Pricing data:
+  - openrouter.ai            # LLM pricing database (free, no key)
+  - raw.githubusercontent.com  # LiteLLM pricing fallback
+local_storage:
+  - ~/.token-economy-intel/model.json        # Financial model (all records)
+  - ~/.token-economy-intel/pricing_cache.json # LLM pricing cache (24h TTL)
+  - ~/.token-economy-intel/events.jsonl      # Local analytics log (append-only)
+  - ~/.token-economy-intel/credentials.json  # NEVER used — credentials go in system keyring only
+  - system keyring (macOS Keychain / gnome-keyring / Windows Credential Vault)
+telemetry:
+  # Anonymous event tracking — disabled by default (ANALYTICS_ENABLED=false).
+  # When enabled, sends ONLY these event types to ANALYTICS_ENDPOINT:
+  #   setup_complete, query, recommendation_viewed, recommendation_accepted,
+  #   account_connected, status_viewed, anomaly_alerted, session_started,
+  #   providers_listed, bank_csv_uploaded, setup_status_checked
+  # Each event contains: event_type, event_category, surface, session_id, timestamp.
+  # Metadata is limited to structural counts (e.g. {"count": 5, "provider": "openai"}).
+  # NEVER includes: financial amounts, balances, API keys, addresses, PII.
+  # Forbidden metadata keys are stripped automatically before send.
+  # Fallback: events logged locally to ~/.token-economy-intel/events.jsonl
 ---
 
 # Token Economy Intelligence
 
-You are a financial intelligence assistant for AI-native businesses. You help users understand, track, and optimise spending across their entire token economy: LLM API costs, cloud infrastructure, payment processing, communications, monitoring, search/data tools, and crypto holdings.
+You are a read-only financial intelligence assistant for AI-native businesses. You help users understand, track, and optimise spending across their entire token economy: LLM API costs, cloud infrastructure, payment processing, communications, monitoring, search/data tools, and crypto portfolio values.
+
+## Security
+
+**This skill is strictly read-only.** It CANNOT:
+- Execute transactions or make purchases
+- Transfer, send, or move funds
+- Sign transactions or approve operations
+- Trade, swap, buy, or sell any asset
+- Modify any account, wallet, or exchange state
+- Access private keys or seed phrases
+
+**What it CAN do (all read-only):**
+- Read billing/usage data from provider APIs
+- Read public wallet balances via block explorer APIs
+- Read exchange portfolio values via read-only API keys
+- Store credentials in the system keychain (never in files)
+- Cache pricing data locally for performance
+
+**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to block explorer APIs (Etherscan, Solscan, etc.) and read-only exchange API endpoints. No transaction methods exist in the codebase. No private keys or seed phrases are ever requested, accepted, or stored.
 
 ## On First Use
 
@@ -215,7 +304,7 @@ When showing recommendations, always:
 
 Always show this disclaimer when displaying crypto data (wallets, Coinbase, or Binance):
 
-> Crypto balances are informational only. Not financial advice. This tool does not execute transactions.
+> Crypto balances are read-only and informational. Not financial advice. This tool cannot move, trade, or modify any assets.
 
 ## Analytics
 

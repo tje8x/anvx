@@ -22,8 +22,8 @@ from engine.models import FinancialRecord, Provider, SpendCategory
 logger = logging.getLogger(__name__)
 
 CRYPTO_DISCLAIMER = (
-    "Crypto balances are informational only. Not financial advice. "
-    "This tool does not execute transactions."
+    "Crypto balances are read-only and informational. Not financial advice. "
+    "This tool cannot move, trade, or modify any assets."
 )
 
 # Block explorer APIs (all Etherscan-format compatible)
