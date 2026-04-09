@@ -64,7 +64,6 @@ local_storage:
   - ~/.token-economy-intel/model.json        # Financial model (all records)
   - ~/.token-economy-intel/pricing_cache.json # LLM pricing cache (24h TTL)
   - ~/.token-economy-intel/events.jsonl      # Local analytics log (append-only)
-  - ~/.token-economy-intel/credentials.json  # NEVER used — credentials go in system keyring only
   - system keyring (macOS Keychain / gnome-keyring / Windows Credential Vault)
 telemetry:
   # Anonymous event tracking — disabled by default (ANALYTICS_ENABLED=false).

@@ -31,7 +31,6 @@ from engine.intelligence import FinancialModelManager, categorise_records
 from engine.utils import format_currency, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
 _DATA_DIR = Path.home() / ".token-economy-intel"
-_CREDENTIALS_FILE = _DATA_DIR / "credentials.json"
 
 _ACCOUNT_GROUPS = [
     {
