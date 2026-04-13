@@ -1,22 +1,24 @@
 ---
 name: ANVX - Token Economy Intel
-version: 1.2.2
-description: "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view."
-permissions: read-only
+version: 1.3.0
+homepage: https://anvx.io
+source: https://github.com/tje8x/anvx
+type: bundled
 required_env_vars:
   - ANTHROPIC_API_KEY
 optional_env_vars:
   - OPENAI_API_KEY
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
+  - GCP_SERVICE_ACCOUNT_JSON
   - STRIPE_API_KEY
-  - VERCEL_TOKEN
+  - VERCEL_API_TOKEN
   - CLOUDFLARE_API_TOKEN
   - TWILIO_ACCOUNT_SID
   - TWILIO_AUTH_TOKEN
   - SENDGRID_API_KEY
-  - DD_API_KEY
-  - DD_APP_KEY
+  - DATADOG_API_KEY
+  - DATADOG_APP_KEY
   - LANGSMITH_API_KEY
   - PINECONE_API_KEY
   - TAVILY_API_KEY
@@ -24,52 +26,16 @@ optional_env_vars:
   - COINBASE_API_SECRET
   - BINANCE_API_KEY
   - BINANCE_API_SECRET
-  - GEMINI_API_KEY
   - GOOGLE_ADS_DEVELOPER_TOKEN
-  - GOOGLE_ADS_CUSTOMER_ID
-  - META_ACCESS_TOKEN
-  - META_AD_ACCOUNT_ID
-  - SYNTHETIC_MODE
-  - ONBOARDING_TEST_MODE
+  - GOOGLE_ADS_CLIENT_ID
+  - GOOGLE_ADS_CLIENT_SECRET
+  - META_ADS_ACCESS_TOKEN
   - ANALYTICS_ENABLED
   - ANALYTICS_ENDPOINT
 required_binaries:
   - python3
   - uv
-network_access:
-  - api.openai.com
-  - api.anthropic.com
-  - api.stripe.com
-  - ce.us-east-1.amazonaws.com
-  - cloudbilling.googleapis.com
-  - oauth2.googleapis.com
-  - api.vercel.com
-  - api.cloudflare.com
-  - api.twilio.com
-  - api.sendgrid.com
-  - api.datadoghq.com
-  - api.smith.langchain.com
-  - api.pinecone.io
-  - api.tavily.com
-  - generativelanguage.googleapis.com
-  - googleads.googleapis.com
-  - graph.facebook.com
-  - api.etherscan.io
-  - api.basescan.org
-  - api.arbiscan.io
-  - api.polygonscan.com
-  - api.mainnet-beta.solana.com
-  - api.coingecko.com
-  - api.coinbase.com
-  - api.binance.com
-  - openrouter.ai
-  - raw.githubusercontent.com
-local_storage:
-  - ~/.token-economy-intel/model.json
-  - ~/.token-economy-intel/pricing_cache.json
-  - ~/.token-economy-intel/events.jsonl
-credential_storage: system-keyring
-telemetry_default: disabled
+install: uv run python -m engine.setup
 ---
 
 # Token Economy Intelligence
