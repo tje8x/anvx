@@ -194,37 +194,41 @@ Always show this disclaimer when displaying crypto data (wallets, Coinbase, or B
 
 > Crypto balances are read-only and informational. Not financial advice. This tool cannot move, exchange, or modify any assets.
 
-## Analytics
+## Analytics (optional, off by default)
 
-Every user interaction must be logged via analytics (anonymised, no financial data):
+This skill includes an optional anonymous event tracker. It is **DISABLED by default**.
 
+When `ANALYTICS_ENABLED` is not set or set to `false` (the default), NO network requests are made to any analytics endpoint. Events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only) and never sent anywhere.
+
+**To enable:** set two environment variables:
+```
+ANALYTICS_ENABLED=true
+ANALYTICS_ENDPOINT=https://your-endpoint/api/events
+```
+
+**When enabled**, the tracker POSTs anonymized events containing:
+- Event type (e.g., `setup_complete`, `query`, `recommendation_viewed`, `account_connected`)
+- Surface (`openclaw` or `mcp`)
+- Session ID (random UUID, not linked to any identity)
+- Timestamp
+- Structural metadata only (e.g., `{"count": 5, "provider": "openai"}`)
+
+**Events NEVER include:**
+- Financial amounts or balances
+- API keys or credentials
+- Wallet addresses
+- Account details or PII
+
+The sanitizer strips all known secret patterns before any event is logged or sent. Blocked keys: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`.
+
+**To verify:** review `engine/analytics/tracker.py` — the `_FORBIDDEN_KEYS` set (lines 21-26) and the `analytics_enabled` property (line 54) which defaults to `false`.
+
+**Log events via CLI:**
 ```
 uv run python scripts/analytics.py "<event_type>" "<event_category>" --metadata '{"key": "value"}'
 ```
 
-Event types: `setup_complete`, `query`, `recommendation_viewed`, `recommendation_accepted`, `account_connected`, `status_viewed`, `anomaly_alerted`, `session_started`
-
-## Transparency
-
-**Analytics is OFF by default.** `ANALYTICS_ENABLED` defaults to `false` in code (`engine/analytics/tracker.py` line 54). No data is sent to any remote endpoint unless the user explicitly sets `ANALYTICS_ENABLED=true` AND provides an `ANALYTICS_ENDPOINT` URL.
-
-**When enabled**, each event contains exactly these fields:
-```json
-{
-  "event_type": "query",
-  "event_category": "intelligence",
-  "surface": "openclaw",
-  "session_id": "random-uuid-per-session",
-  "timestamp": "2026-04-13T12:00:00Z",
-  "metadata": {"count": 5, "provider": "openai"}
-}
-```
-
-**Events NEVER include:** financial amounts, balances, revenue, costs, API keys, wallet addresses, account details, or any PII. The following metadata keys are stripped automatically before any event is logged or sent: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`. (Source: `engine/analytics/tracker.py` lines 21-26.)
-
-**When disabled** (the default), events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only) and never sent anywhere.
-
-**SOURCE CODE:** The complete engine source is included in this skill bundle under `engine/`. The scanner can verify all claims by inspecting `engine/analytics/tracker.py`, `engine/connectors/*.py`, and `engine/credentials.py` directly.
+**Source code:** The complete engine source is included in this skill bundle under `engine/`.
 
 ## Response Style
 
