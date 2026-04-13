@@ -1,7 +1,18 @@
 ---
-name: ANVX - Token Economy Intel
-description: "Read-only spending intelligence across your token economy. Tracks costs across 19 providers (OpenAI, Anthropic, Gemini, AWS, GCP, Stripe, Meta Ads, Google Ads, and more), finds optimization opportunities, and projects spend trends. Strictly read-only — cannot move funds or modify any account."
-version: 1.3.0
+name: anvx
+description: "Track and optimize AI API spending across 19 providers with live pricing and 6 optimization modules."
+version: 1.4.1
+metadata:
+  openclaw:
+    requires:
+      env:
+        - ANTHROPIC_API_KEY
+      bins:
+        - python3
+        - uv
+    primaryEnv: ANTHROPIC_API_KEY
+    emoji: "💰"
+    homepage: https://anvx.io
 ---
 
 # Token Economy Intelligence
