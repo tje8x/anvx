@@ -70,9 +70,10 @@ A) Run the secure setup script (recommended)
      uv run python -m engine.setup
    Say 'ready' when done.
 
-B) Use the MCP server in Claude or ChatGPT Desktop
-   Keys stay in your local config file.
-   See: github.com/anthropics/token-economy-intel/README.md#mcp-setup
+B) Use as MCP server in Claude Desktop
+   Keys are configured in your Claude Desktop config and managed
+   by the MCP client — not stored by this skill.
+   See: github.com/tje8x/anvx/README.md#mcp-setup
 ```
 
 ---
