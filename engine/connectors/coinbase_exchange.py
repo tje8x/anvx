@@ -34,7 +34,7 @@ class CoinbaseExchangeConnector(BaseConnector):
     """READ-ONLY connector for Coinbase exchange balances.
 
     SECURITY: This class provides ZERO write methods. It cannot
-    transfer, withdraw, or modify any exchange state. Only read-only
+    transfer or modify any exchange state. Only read-only
     API permissions are used. All calls are GET requests.
     """
 

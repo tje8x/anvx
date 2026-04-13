@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 20
 
-_SYSTEM_PROMPT = """You are a financial transaction categoriser for an AI-native business.
+_SYSTEM_PROMPT = """You are a financial record categoriser for an AI-native business.
 Given a batch of financial records, classify each into exactly one category.
 
 Valid categories:

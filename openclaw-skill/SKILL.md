@@ -24,7 +24,7 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 - Store credentials in the system keychain (never in files)
 - Cache pricing data locally for performance
 
-**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange endpoints. No transaction-capable methods exist in the codebase. Secret keys and recovery phrases are never requested, accepted, or stored.
+**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange endpoints. No write or mutation methods exist in the codebase. Secret keys and recovery phrases are never requested, accepted, or stored.
 
 ## Requirements
 

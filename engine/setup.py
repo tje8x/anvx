@@ -65,7 +65,7 @@ _PROVIDERS: list[dict[str, Any]] = [
     # Crypto
     {"num": 14, "name": "crypto_wallet", "label": "On-chain wallets",    "group": "Crypto",
      "fields": [],  # special handling
-     "help": "Public wallet addresses only. NEVER share private keys or seed phrases."},
+     "help": "Public wallet addresses only. NEVER share secret keys or recovery phrases."},
     {"num": 15, "name": "coinbase",      "label": "Coinbase",            "group": "Crypto",
      "fields": [("api_key", "API key"), ("api_secret", "API secret")],
      "help": "coinbase.com/settings/api -> 'New API Key'. Grant ONLY 'wallet:accounts:read' — read-only, no other permissions."},

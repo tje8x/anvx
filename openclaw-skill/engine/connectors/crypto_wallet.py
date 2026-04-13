@@ -3,7 +3,7 @@
 Fetches token balances from public blockchain explorer APIs.
 This connector has ZERO execution capability — no transfers,
 no swaps, no approvals. Only reads public data via GET requests.
-Never accepts secret keys or seed phrases. Only public addresses.
+Never accepts secret keys or recovery phrases. Only public addresses.
 
 Supported chains: Ethereum, Solana, Base, Arbitrum, Polygon.
 USD prices from CoinGecko (free, no key needed, cached 5 min).
@@ -72,7 +72,7 @@ class CryptoWalletConnector(BaseConnector):
     SECURITY: This class provides ZERO methods to write, transfer, swap,
     approve, or modify any on-chain state. All API calls are GET requests
     to public block explorer endpoints. Never asks for secret keys or
-    seed phrases.
+    recovery phrases.
     """
 
     provider = Provider.CRYPTO_WALLET

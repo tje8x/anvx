@@ -99,7 +99,7 @@
   "security": {
     "read_only": true,
     "no_transactions": true,
-    "no_private_keys": true,
+    "no_secret_keys": true,
     "credentials_in_keyring_only": true
   },
   "includes": [

@@ -98,13 +98,13 @@ class UnitEconomicsModule(OptimizationModule):
             r for r in revenue_records
             if r.record_date.strftime("%Y-%m") == current_month
         ]
-        customer_transactions = len(recent_revenue)
-        if customer_transactions == 0:
+        charge_count = len(recent_revenue)
+        if charge_count == 0:
             return recs
 
-        revenue_per_transaction = current_revenue / Decimal(str(customer_transactions))
-        cost_per_transaction = current_costs / Decimal(str(customer_transactions))
-        ai_cost_per_transaction = current_ai_costs / Decimal(str(customer_transactions))
+        revenue_per_charge = current_revenue / Decimal(str(charge_count))
+        cost_per_charge = current_costs / Decimal(str(charge_count))
+        ai_cost_per_charge = current_ai_costs / Decimal(str(charge_count))
 
         # Calculate month-over-month growth rates from data
         cost_growth_rates: list[float] = []
@@ -187,10 +187,10 @@ class UnitEconomicsModule(OptimizationModule):
                     f"Current: revenue=${current_revenue:.2f}, "
                     f"total costs=${current_costs:.2f}, "
                     f"AI costs=${current_ai_costs:.2f} ({ai_cost_ratio:.1f}% of rev). "
-                    f"Per transaction ({customer_transactions} txns): "
-                    f"rev=${revenue_per_transaction:.2f}, "
-                    f"cost=${cost_per_transaction:.2f}, "
-                    f"AI=${ai_cost_per_transaction:.2f}. "
+                    f"Per charge ({charge_count} charges): "
+                    f"rev=${revenue_per_charge:.2f}, "
+                    f"cost=${cost_per_charge:.2f}, "
+                    f"AI=${ai_cost_per_charge:.2f}. "
                     f"Cost growth: {avg_cost_growth*100:+.1f}%/mo, "
                     f"revenue growth: {avg_revenue_growth*100:+.1f}%/mo "
                     f"(calculated from your billing data). "
