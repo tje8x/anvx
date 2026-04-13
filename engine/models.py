@@ -13,6 +13,7 @@ class SpendCategory(str, Enum):
 	COMMUNICATION = "communication"
 	MONITORING = "monitoring"
 	SEARCH_DATA = "search_data"
+	ADVERTISING = "advertising"
 	CRYPTO_HOLDINGS = "crypto_holdings"
 	REVENUE = "revenue"
 	OTHER = "other"
@@ -20,7 +21,10 @@ class SpendCategory(str, Enum):
 class Provider(str, Enum):
 	OPENAI = "openai"
 	ANTHROPIC = "anthropic"
+	GEMINI = "gemini"
+	GOOGLE_ADS = "google_ads"
 	STRIPE = "stripe"
+	META = "meta"
 	AWS = "aws"
 	GCP = "gcp"
 	VERCEL = "vercel"

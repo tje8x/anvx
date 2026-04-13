@@ -24,6 +24,11 @@ optional_env_vars:
   - COINBASE_API_SECRET
   - BINANCE_API_KEY
   - BINANCE_API_SECRET
+  - GEMINI_API_KEY
+  - GOOGLE_ADS_DEVELOPER_TOKEN
+  - GOOGLE_ADS_CUSTOMER_ID
+  - META_ACCESS_TOKEN
+  - META_AD_ACCOUNT_ID
   - SYNTHETIC_MODE
   - ONBOARDING_TEST_MODE
   - ANALYTICS_ENABLED
@@ -46,6 +51,9 @@ network_access:
   - api.smith.langchain.com
   - api.pinecone.io
   - api.tavily.com
+  - generativelanguage.googleapis.com
+  - googleads.googleapis.com
+  - graph.facebook.com
   - api.etherscan.io
   - api.basescan.org
   - api.arbiscan.io

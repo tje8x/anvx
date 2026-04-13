@@ -23,7 +23,10 @@ from engine.connectors import (
     CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
     LangSmithCostsConnector,
+    MetaAdsConnector,
     OpenAIBillingConnector,
     PineconeCostsConnector,
     SendGridCostsConnector,
@@ -55,6 +58,9 @@ _ALL_CONNECTOR_CLASSES = [
     LangSmithCostsConnector,
     PineconeCostsConnector,
     TavilyCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
+    MetaAdsConnector,
 ]
 
 # Patterns that should never appear in output

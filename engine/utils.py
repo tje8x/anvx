@@ -46,6 +46,15 @@ TEST_CREDENTIALS: dict[str, Any] = {
 	"langsmith": ["test-ls-key-12345"],
 	"pinecone": ["test-pc-key-12345"],
 	"tavily": ["tvly-test-12345"],
+	"gemini": ["test-gemini-key-12345"],
+	"google_ads": {
+		"developer_token": "test-gads-dev-token-12345",
+		"customer_id": "123-456-7890",
+	},
+	"meta": {
+		"access_token": "test-meta-token-12345",
+		"ad_account_id": "act_test12345",
+	},
 	"crypto_wallet": {
 		"_test_addresses": [
 			"0xTEST1234567890abcdef",

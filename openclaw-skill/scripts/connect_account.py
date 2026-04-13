@@ -15,7 +15,10 @@ from engine.connectors import (
     CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
     LangSmithCostsConnector,
+    MetaAdsConnector,
     OpenAIBillingConnector,
     PineconeCostsConnector,
     SendGridCostsConnector,
@@ -91,6 +94,18 @@ _PROVIDERS = {
     "tavily": {
         "cls": TavilyCostsConnector,
         "fields": [("api_key", "Tavily API key")],
+    },
+    "gemini": {
+        "cls": GeminiBillingConnector,
+        "fields": [("api_key", "Gemini API key")],
+    },
+    "google_ads": {
+        "cls": GoogleAdsConnector,
+        "fields": [("developer_token", "Google Ads developer token"), ("customer_id", "Customer ID (123-456-7890)")],
+    },
+    "meta": {
+        "cls": MetaAdsConnector,
+        "fields": [("access_token", "Meta access token"), ("ad_account_id", "Ad account ID (act_...)")],
     },
 }
 

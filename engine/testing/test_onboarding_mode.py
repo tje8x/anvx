@@ -18,7 +18,10 @@ from engine.connectors import (
     CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
     LangSmithCostsConnector,
+    MetaAdsConnector,
     OpenAIBillingConnector,
     PineconeCostsConnector,
     SendGridCostsConnector,
@@ -50,6 +53,9 @@ _CONNECTORS = [
     ]}),
     ("coinbase", CoinbaseExchangeConnector, {"api_key": "test-coinbase-key-12345", "api_secret": "test-coinbase-secret-12345"}),
     ("binance", BinanceExchangeConnector, {"api_key": "test-binance-key-12345", "api_secret": "test-binance-secret-12345"}),
+    ("gemini", GeminiBillingConnector, {"api_key": "test-gemini-key-12345"}),
+    ("google_ads", GoogleAdsConnector, {"developer_token": "test-gads-dev-token-12345", "customer_id": "123-456-7890"}),
+    ("meta", MetaAdsConnector, {"access_token": "test-meta-token-12345", "ad_account_id": "act_test12345"}),
 ]
 
 
@@ -79,8 +85,8 @@ async def main() -> None:
     assert not bad.is_connected, "bad credentials: is_connected should be False"
     print(f"  openai (bad creds): correctly rejected")
 
-    assert passed == 16, f"Only {passed}/16 connectors passed"
-    print(f"\nAll 16 connectors: PASS")
+    assert passed == 19, f"Only {passed}/19 connectors passed"
+    print(f"\nAll 19 connectors: PASS")
 
 
 if __name__ == "__main__":

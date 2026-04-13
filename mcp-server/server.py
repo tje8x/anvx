@@ -32,7 +32,10 @@ from engine.connectors import (
     CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
     LangSmithCostsConnector,
+    MetaAdsConnector,
     OpenAIBillingConnector,
     PineconeCostsConnector,
     SendGridCostsConnector,
@@ -78,10 +81,34 @@ _CONNECTOR_REGISTRY: list[dict] = [
         "where_to_find": "https://console.anthropic.com/settings/admin-keys → 'Create Admin Key' (separate from regular API keys).",
     },
     {
+        "name": "gemini", "label": "Gemini (Google AI)", "group": "AI",
+        "cls": GeminiBillingConnector,
+        "credentials": [{"key": "api_key", "label": "Gemini API key"}],
+        "where_to_find": "https://aistudio.google.com/apikey → 'Create API Key'. Works for Gemini Pro, Flash, and other models.",
+    },
+    {
         "name": "stripe", "label": "Stripe", "group": "Payments",
         "cls": StripeConnector,
         "credentials": [{"key": "api_key", "label": "Stripe restricted key (rk_...) or secret key (sk_...)"}],
         "where_to_find": "https://dashboard.stripe.com/apikeys → 'Create restricted key' with read permissions on Charges, Balance, Payouts.",
+    },
+    {
+        "name": "meta", "label": "Meta Ads (Facebook/Instagram)", "group": "Advertising",
+        "cls": MetaAdsConnector,
+        "credentials": [
+            {"key": "access_token", "label": "Meta access token"},
+            {"key": "ad_account_id", "label": "Ad account ID (act_...)"},
+        ],
+        "where_to_find": "developers.facebook.com → Your App → Marketing API → Generate long-lived access token. Ad account ID from Business Manager.",
+    },
+    {
+        "name": "google_ads", "label": "Google Ads", "group": "Advertising",
+        "cls": GoogleAdsConnector,
+        "credentials": [
+            {"key": "developer_token", "label": "Google Ads developer token"},
+            {"key": "customer_id", "label": "Customer ID (123-456-7890)"},
+        ],
+        "where_to_find": "Google Ads → Tools → API Center → Developer token. Customer ID from the top-right of the Google Ads dashboard.",
     },
     {
         "name": "crypto_wallet", "label": "Crypto Wallet (on-chain)", "group": "Crypto",
@@ -780,8 +807,8 @@ def list_providers() -> str:
         by_group.setdefault(entry["group"], []).append(provider_info)
 
     # Preserve a sensible group order
-    group_order = ["AI", "Cloud", "Payments", "Communication",
-                   "Monitoring", "Search/Data", "Crypto"]
+    group_order = ["AI", "Cloud", "Payments", "Advertising",
+                   "Communication", "Monitoring", "Search/Data", "Crypto"]
     categories = {
         g: by_group[g] for g in group_order if g in by_group
     }

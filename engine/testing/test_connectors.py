@@ -14,7 +14,10 @@ from engine.connectors import (
     CryptoWalletConnector,
     DatadogCostsConnector,
     GCPCostsConnector,
+    GeminiBillingConnector,
+    GoogleAdsConnector,
     LangSmithCostsConnector,
+    MetaAdsConnector,
     OpenAIBillingConnector,
     PineconeCostsConnector,
     SendGridCostsConnector,
@@ -47,6 +50,9 @@ _ALL_CONNECTORS = [
     ("LangSmith", LangSmithCostsConnector, Provider.LANGSMITH, SpendCategory.MONITORING),
     ("Pinecone", PineconeCostsConnector, Provider.PINECONE, SpendCategory.SEARCH_DATA),
     ("Tavily", TavilyCostsConnector, Provider.TAVILY, SpendCategory.SEARCH_DATA),
+    ("Gemini", GeminiBillingConnector, Provider.GEMINI, SpendCategory.AI_INFERENCE),
+    ("GoogleAds", GoogleAdsConnector, Provider.GOOGLE_ADS, SpendCategory.ADVERTISING),
+    ("Meta", MetaAdsConnector, Provider.META, SpendCategory.ADVERTISING),
 ]
 
 
@@ -101,9 +107,9 @@ class TestSyntheticData:
         for r1, r2 in zip(records1, records2):
             assert r1.amount == r2.amount, f"{name}: amounts differ across runs"
 
-    def test_all_16_connectors_present(self):
-        """Verify we have exactly 16 connectors in the registry."""
-        assert len(_ALL_CONNECTORS) == 16
+    def test_all_19_connectors_present(self):
+        """Verify we have exactly 19 connectors in the registry."""
+        assert len(_ALL_CONNECTORS) == 19
 
 
 # ── Error handling tests ────────────────────────────────────────

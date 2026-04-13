@@ -35,7 +35,7 @@ Only output the JSON array. No markdown, no explanation."""
 
 # Keyword rules for synthetic mode (no API call needed)
 _KEYWORD_RULES: list[tuple[list[str], SpendCategory, float]] = [
-    (["gpt", "openai", "claude", "anthropic", "llm", "inference", "token", "embedding"],
+    (["gpt", "openai", "claude", "anthropic", "gemini", "google ai", "llm", "inference", "token", "embedding"],
      SpendCategory.AI_INFERENCE, 0.9),
     (["fine-tune", "finetune", "training", "train"],
      SpendCategory.AI_TRAINING, 0.85),
@@ -53,6 +53,9 @@ _KEYWORD_RULES: list[tuple[list[str], SpendCategory, float]] = [
      SpendCategory.SEARCH_DATA, 0.85),
     (["eth", "btc", "sol", "usdc", "crypto", "wallet", "bitcoin", "ethereum", "coinbase", "binance"],
      SpendCategory.CRYPTO_HOLDINGS, 0.85),
+    (["facebook ads", "instagram ads", "meta ads", "google ads", "youtube ads", "display ads",
+      "ad spend", "campaign", "impressions", "cpc", "cpm", "adwords"],
+     SpendCategory.ADVERTISING, 0.85),
     (["charge", "payment received", "invoice paid", "revenue", "subscription revenue", "sale"],
      SpendCategory.REVENUE, 0.8),
 ]
