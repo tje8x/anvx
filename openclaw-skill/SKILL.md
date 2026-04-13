@@ -1,41 +1,7 @@
 ---
 name: ANVX - Token Economy Intel
+description: "Read-only spending intelligence across your token economy. Tracks costs across 19 providers (OpenAI, Anthropic, Gemini, AWS, GCP, Stripe, Meta Ads, Google Ads, and more), finds optimization opportunities, and projects spend trends. Strictly read-only — cannot move funds or modify any account."
 version: 1.3.0
-homepage: https://anvx.io
-source: https://github.com/tje8x/anvx
-type: bundled
-required_env_vars:
-  - ANTHROPIC_API_KEY
-optional_env_vars:
-  - OPENAI_API_KEY
-  - AWS_ACCESS_KEY_ID
-  - AWS_SECRET_ACCESS_KEY
-  - GCP_SERVICE_ACCOUNT_JSON
-  - STRIPE_API_KEY
-  - VERCEL_API_TOKEN
-  - CLOUDFLARE_API_TOKEN
-  - TWILIO_ACCOUNT_SID
-  - TWILIO_AUTH_TOKEN
-  - SENDGRID_API_KEY
-  - DATADOG_API_KEY
-  - DATADOG_APP_KEY
-  - LANGSMITH_API_KEY
-  - PINECONE_API_KEY
-  - TAVILY_API_KEY
-  - COINBASE_API_KEY
-  - COINBASE_API_SECRET
-  - BINANCE_API_KEY
-  - BINANCE_API_SECRET
-  - GOOGLE_ADS_DEVELOPER_TOKEN
-  - GOOGLE_ADS_CLIENT_ID
-  - GOOGLE_ADS_CLIENT_SECRET
-  - META_ADS_ACCESS_TOKEN
-  - ANALYTICS_ENABLED
-  - ANALYTICS_ENDPOINT
-required_binaries:
-  - python3
-  - uv
-install: uv run python -m engine.setup
 ---
 
 # Token Economy Intelligence
@@ -59,6 +25,20 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 - Cache pricing data locally for performance
 
 **Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange endpoints. No transaction-capable methods exist in the codebase. Secret keys and recovery phrases are never requested, accepted, or stored.
+
+## Requirements
+
+**Required environment variable:** `ANTHROPIC_API_KEY` (used by the categorisation engine)
+
+**Required binaries:** `python3`, `uv`
+
+**Install:** `uv sync && uv run python -m engine.setup`
+
+**Optional provider credentials** (set via system keyring, env vars, or the setup script):
+OPENAI_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, GCP_SERVICE_ACCOUNT_JSON, STRIPE_API_KEY, VERCEL_API_TOKEN, CLOUDFLARE_API_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SENDGRID_API_KEY, DATADOG_API_KEY, DATADOG_APP_KEY, LANGSMITH_API_KEY, PINECONE_API_KEY, TAVILY_API_KEY, COINBASE_API_KEY, COINBASE_API_SECRET, BINANCE_API_KEY, BINANCE_API_SECRET, GEMINI_API_KEY, GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, META_ADS_ACCESS_TOKEN
+
+**Homepage:** https://anvx.io
+**Source:** https://github.com/tje8x/anvx
 
 ## On First Use
 
@@ -150,25 +130,25 @@ Parse the user's intent and route to the appropriate script:
 ### Spending questions
 "How much am I spending on AI?", "What are my cloud costs?", "Show me Stripe fees", etc.
 ```
-uv run python openclaw-skill/scripts/query.py "<user's question>"
+uv run python scripts/query.py "<user's question>"
 ```
 
 ### Recommendations
 "How can I save money?", "Optimise my costs", "Any recommendations?", etc.
 ```
-uv run python openclaw-skill/scripts/recommend.py
+uv run python scripts/recommend.py
 ```
 
 ### Status / Overview
 "Show me my finances", "Give me a status update", "Dashboard", etc.
 ```
-uv run python openclaw-skill/scripts/status.py
+uv run python scripts/status.py
 ```
 
 ### Connect a new account
 "Add my AWS account", "Connect Stripe", "Add a new wallet", etc.
 ```
-uv run python openclaw-skill/scripts/connect_account.py "<provider_name>"
+uv run python scripts/connect_account.py "<provider_name>"
 ```
 
 ## Onboarding Test Mode
@@ -185,7 +165,7 @@ When this skill loads in a new session:
 
 1. Check if data is stale (>24 hours since last refresh). If so, refresh automatically:
    ```
-   uv run python openclaw-skill/scripts/status.py --refresh
+   uv run python scripts/status.py --refresh
    ```
 2. Check for anomalies. If any are found, alert the user immediately with severity and details.
 
@@ -208,7 +188,7 @@ Always show this disclaimer when displaying crypto data (wallets, Coinbase, or B
 Every user interaction must be logged via analytics (anonymised, no financial data):
 
 ```
-uv run python openclaw-skill/scripts/analytics.py "<event_type>" "<event_category>" --metadata '{"key": "value"}'
+uv run python scripts/analytics.py "<event_type>" "<event_category>" --metadata '{"key": "value"}'
 ```
 
 Event types: `setup_complete`, `query`, `recommendation_viewed`, `recommendation_accepted`, `account_connected`, `status_viewed`, `anomaly_alerted`, `session_started`

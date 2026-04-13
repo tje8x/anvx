@@ -6,7 +6,7 @@
   "type": "bundled",
   "description": "Read-only spending intelligence across your token economy — LLM API costs, crypto portfolio values, and Stripe revenue in one view.",
   "permissions": "read-only",
-  "install": "uv run python -m engine.setup",
+  "install": "uv sync && uv run python -m engine.setup",
   "required_env_vars": [
     "ANTHROPIC_API_KEY"
   ],
