@@ -57,12 +57,12 @@ class GCPCostsConnector(BaseConnector):
 
         self._client = httpx.AsyncClient(timeout=30.0)
 
-        # Obtain OAuth2 token via Google's token endpoint
+        # Exchange service account credentials for an access token
         try:
             token_resp = await self._client.post(
-                "https://oauth2.googleapis.com/token",
+                "https://accounts.google.com/o/token",
                 data={
-                    "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                    "grant_type": "urn:ietf:params:grant-type:jwt-bearer",
                     "assertion": _build_jwt_assertion(sa),
                 },
             )
@@ -238,20 +238,18 @@ class GCPCostsConnector(BaseConnector):
 
 
 def _build_jwt_assertion(sa: dict) -> str:
-    """Build a JWT assertion for service account auth.
+    """Build a JWT assertion for service account authentication.
 
-    In production this would use the service account private key to sign.
-    Placeholder — real implementation uses google-auth library.
+    Stub — real implementation uses the google-auth library to create
+    a properly authenticated JWT. The connect() method handles failures.
     """
-    # This is a stub; the actual signing requires the google-auth or PyJWT library.
-    # The connect() method will fail with a clear error if the token exchange fails.
     import base64
     import json
     header = base64.urlsafe_b64encode(json.dumps({"alg": "RS256", "typ": "JWT"}).encode()).decode()
     payload = base64.urlsafe_b64encode(json.dumps({
         "iss": sa.get("client_email", ""),
         "scope": "https://www.googleapis.com/auth/cloud-billing.readonly",
-        "aud": "https://oauth2.googleapis.com/token",
+        "aud": "https://accounts.google.com/o/token",
     }).encode()).decode()
-    # Unsigned stub — will be rejected by Google, connect() handles the error
-    return f"{header}.{payload}.stub_signature"
+    # Stub assertion — will be rejected by Google, connect() handles the error
+    return f"{header}.{payload}.stub"

@@ -1,7 +1,10 @@
 # Connectors package
 from engine.connectors.openai_billing import OpenAIBillingConnector
 from engine.connectors.anthropic_billing import AnthropicBillingConnector
+from engine.connectors.gemini_billing import GeminiBillingConnector
+from engine.connectors.google_ads import GoogleAdsConnector
 from engine.connectors.stripe_connector import StripeConnector
+from engine.connectors.meta_ads import MetaAdsConnector
 from engine.connectors.crypto_wallet import CryptoWalletConnector
 from engine.connectors.coinbase_exchange import CoinbaseExchangeConnector
 from engine.connectors.binance_exchange import BinanceExchangeConnector
@@ -22,11 +25,14 @@ CryptoReader = CryptoWalletConnector
 __all__ = [
     "OpenAIBillingConnector",
     "AnthropicBillingConnector",
+    "GeminiBillingConnector",
+    "GoogleAdsConnector",
     "StripeConnector",
+    "MetaAdsConnector",
     "CryptoWalletConnector",
     "CoinbaseExchangeConnector",
     "BinanceExchangeConnector",
-    "CryptoReader",  # backwards compat alias
+    "CryptoReader",
     "AWSCostsConnector",
     "GCPCostsConnector",
     "VercelCostsConnector",

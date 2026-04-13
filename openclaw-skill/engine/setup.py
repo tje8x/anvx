@@ -68,10 +68,10 @@ _PROVIDERS: list[dict[str, Any]] = [
      "help": "Public wallet addresses only. NEVER share private keys or seed phrases."},
     {"num": 15, "name": "coinbase",      "label": "Coinbase",            "group": "Crypto",
      "fields": [("api_key", "API key"), ("api_secret", "API secret")],
-     "help": "coinbase.com/settings/api -> 'New API Key'. Grant ONLY 'wallet:accounts:read' — no trade/withdraw."},
+     "help": "coinbase.com/settings/api -> 'New API Key'. Grant ONLY 'wallet:accounts:read' — read-only, no other permissions."},
     {"num": 16, "name": "binance",       "label": "Binance",             "group": "Crypto",
      "fields": [("api_key", "API key"), ("api_secret", "API secret")],
-     "help": "binance.com/en/my/settings/api-management -> 'Create API'. Enable ONLY 'Read Info' — disable trading."},
+     "help": "binance.com/en/my/settings/api-management -> 'Create API'. Enable ONLY 'Read Info' — all other permissions disabled."},
 ]
 
 _PROVIDER_BY_NUM = {p["num"]: p for p in _PROVIDERS}

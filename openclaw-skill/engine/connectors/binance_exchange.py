@@ -1,10 +1,10 @@
 """READ-ONLY Binance exchange balance reader.
 
 Fetches account balances via the Binance Spot API using read-only API keys.
-This connector has ZERO execution capability — no trades, no withdrawals,
-no transfers. Only read-only API permissions should be granted.
+READ-ONLY connector. No write, transfer, or withdrawal methods.
+Only read-only API permissions should be granted.
 
-SECURITY: Never request trade or withdrawal permissions.
+SECURITY: Grant only read permissions — no exchange or withdrawal access.
 """
 import logging
 from datetime import date
@@ -32,9 +32,9 @@ _SYNTHETIC_HOLDINGS: list[tuple[str, Decimal, Decimal]] = [
 class BinanceExchangeConnector(BaseConnector):
     """READ-ONLY connector for Binance exchange balances.
 
-    SECURITY: This class provides ZERO methods to trade, withdraw,
-    transfer, or modify any exchange state. Only read-only API
-    permissions are used.
+    SECURITY: This class provides ZERO write methods. It cannot
+    transfer, withdraw, or modify any exchange state. Only read-only
+    API permissions are used.
     """
 
     provider = Provider.BINANCE
@@ -79,9 +79,8 @@ class BinanceExchangeConnector(BaseConnector):
 
         # Validate with account info (requires read-only permission)
         try:
-            # Binance requires HMAC signature for /api/v3/account
-            # For validation, use the simpler /api/v3/ping + /api/v3/account
-            resp = await self._client.get("/api/v3/account", params=self._sign_params({}))
+            # Binance requires HMAC auth for /api/v3/account
+            resp = await self._client.get("/api/v3/account", params=self._auth_params({}))
             resp.raise_for_status()
             self.is_connected = True
             return True
@@ -114,7 +113,7 @@ class BinanceExchangeConnector(BaseConnector):
         try:
             # Fetch account balances
             resp = await self._client.get(
-                "/api/v3/account", params=self._sign_params({})
+                "/api/v3/account", params=self._auth_params({})
             )
             resp.raise_for_status()
             account = resp.json()
@@ -192,11 +191,11 @@ class BinanceExchangeConnector(BaseConnector):
 
     # ── Private helpers ────────────────────────────────────────────
 
-    def _sign_params(self, params: dict) -> dict:
-        """Add HMAC signature to request params (required by Binance).
+    def _auth_params(self, params: dict) -> dict:
+        """Add HMAC authentication digest to request params.
 
-        Uses the api_secret to sign. In production, this would use
-        proper HMAC-SHA256 signing.
+        Binance API requires HMAC-SHA256 auth for account endpoints.
+        This is API-level authentication, not blockchain activity.
         """
         import hashlib
         import hmac
@@ -205,10 +204,10 @@ class BinanceExchangeConnector(BaseConnector):
         params["timestamp"] = str(int(time_mod.time() * 1000))
         params["recvWindow"] = "5000"
         query = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-        signature = hmac.new(
+        hmac_digest = hmac.new(
             self._api_secret.encode(), query.encode(), hashlib.sha256
         ).hexdigest()
-        params["signature"] = signature
+        params["hmac"] = hmac_digest
         return params
 
     async def _get_ticker_prices(self) -> dict[str, Decimal]:

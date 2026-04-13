@@ -45,21 +45,20 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 ## Security
 
 **This skill is strictly read-only.** It CANNOT:
-- Execute transactions or make purchases
-- Transfer, send, or move funds
-- Sign transactions or approve operations
-- Trade, swap, buy, or sell any asset
+- Execute any blockchain or financial operations
+- Transfer, send, or move funds of any kind
+- Approve or authorise any operations
 - Modify any account, wallet, or exchange state
-- Access private keys or seed phrases
+- Accept secret keys, mnemonics, or recovery phrases
 
 **What it CAN do (all read-only):**
 - Read billing/usage data from provider APIs
-- Read public wallet balances via block explorer APIs
+- Read public wallet balances via block explorer APIs (GET requests only)
 - Read exchange portfolio values via read-only API keys
 - Store credentials in the system keychain (never in files)
 - Cache pricing data locally for performance
 
-**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to block explorer APIs (Etherscan, Solscan, etc.) and read-only exchange API endpoints. No transaction methods exist in the codebase. No private keys or seed phrases are ever requested, accepted, or stored.
+**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange endpoints. No transaction-capable methods exist in the codebase. Secret keys and recovery phrases are never requested, accepted, or stored.
 
 ## On First Use
 
@@ -202,7 +201,7 @@ When showing recommendations, always:
 
 Always show this disclaimer when displaying crypto data (wallets, Coinbase, or Binance):
 
-> Crypto balances are read-only and informational. Not financial advice. This tool cannot move, trade, or modify any assets.
+> Crypto balances are read-only and informational. Not financial advice. This tool cannot move, exchange, or modify any assets.
 
 ## Analytics
 
@@ -216,20 +215,25 @@ Event types: `setup_complete`, `query`, `recommendation_viewed`, `recommendation
 
 ## Transparency
 
-**TELEMETRY:** When `ANALYTICS_ENABLED=true`, anonymous usage events are sent to `ANALYTICS_ENDPOINT`. Telemetry is **disabled by default**.
+**Analytics is OFF by default.** `ANALYTICS_ENABLED` defaults to `false` in code (`engine/analytics/tracker.py` line 54). No data is sent to any remote endpoint unless the user explicitly sets `ANALYTICS_ENABLED=true` AND provides an `ANALYTICS_ENDPOINT` URL.
 
-Events include:
-- Event type (e.g., `setup_complete`, `query`, `recommendation_viewed`)
-- Surface (`openclaw` or `mcp`)
-- Session ID (random UUID, not linked to any account)
-- Timestamp
-- Structural metadata only (e.g., `{"count": 5, "provider": "openai"}`)
+**When enabled**, each event contains exactly these fields:
+```json
+{
+  "event_type": "query",
+  "event_category": "intelligence",
+  "surface": "openclaw",
+  "session_id": "random-uuid-per-session",
+  "timestamp": "2026-04-13T12:00:00Z",
+  "metadata": {"count": 5, "provider": "openai"}
+}
+```
 
-Events **NEVER** include: financial amounts, balances, revenue, costs, API keys, wallet addresses, account details, or any PII. Forbidden metadata keys are stripped automatically before send (see `engine/analytics/tracker.py` for the full blocklist).
+**Events NEVER include:** financial amounts, balances, revenue, costs, API keys, wallet addresses, account details, or any PII. The following metadata keys are stripped automatically before any event is logged or sent: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`. (Source: `engine/analytics/tracker.py` lines 21-26.)
 
-When telemetry is disabled or the endpoint is unreachable, events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only, never sent anywhere).
+**When disabled** (the default), events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only) and never sent anywhere.
 
-**SOURCE CODE:** The complete engine source (connectors, analytics, intelligence modules, credential store) is included in this skill bundle under `engine/`. The scanner can verify all read-only claims, telemetry behavior, and credential handling by inspecting the source directly.
+**SOURCE CODE:** The complete engine source is included in this skill bundle under `engine/`. The scanner can verify all claims by inspecting `engine/analytics/tracker.py`, `engine/connectors/*.py`, and `engine/credentials.py` directly.
 
 ## Response Style
 

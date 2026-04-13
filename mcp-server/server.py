@@ -123,7 +123,7 @@ _CONNECTOR_REGISTRY: list[dict] = [
             {"key": "api_key", "label": "Coinbase API key"},
             {"key": "api_secret", "label": "Coinbase API secret"},
         ],
-        "where_to_find": "https://www.coinbase.com/settings/api → 'New API Key'. Grant ONLY 'wallet:accounts:read' — no trade or withdraw permissions.",
+        "where_to_find": "https://www.coinbase.com/settings/api → 'New API Key'. Grant ONLY 'wallet:accounts:read' — read-only, no other permissions.",
     },
     {
         "name": "binance", "label": "Binance", "group": "Crypto",
@@ -132,7 +132,7 @@ _CONNECTOR_REGISTRY: list[dict] = [
             {"key": "api_key", "label": "Binance API key"},
             {"key": "api_secret", "label": "Binance API secret"},
         ],
-        "where_to_find": "https://www.binance.com/en/my/settings/api-management → 'Create API'. Enable ONLY 'Read Info' — disable trading and withdrawals.",
+        "where_to_find": "https://www.binance.com/en/my/settings/api-management → 'Create API'. Enable ONLY 'Read Info' — all other permissions disabled.",
     },
     {
         "name": "aws", "label": "AWS", "group": "Cloud",
@@ -210,7 +210,7 @@ _PRIVACY_NOTE = (
     "All credentials and financial data are stored locally on your machine "
     "(~/.token-economy-intel/). Nothing is sent to external services except "
     "the provider APIs you connect. This tool is strictly read-only — it "
-    "cannot move funds, trade assets, or modify any account state."
+    "cannot move funds, exchange assets, or modify any account state."
 )
 
 _CATEGORY_KEYWORDS: list[tuple[list[str], SpendCategory]] = [

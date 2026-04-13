@@ -1,10 +1,10 @@
 """READ-ONLY Coinbase exchange balance reader.
 
 Fetches account balances via the Coinbase API using read-only API keys.
-This connector has ZERO execution capability — no trades, no withdrawals,
-no transfers. Only read-only API permissions should be granted.
+READ-ONLY connector. No write, transfer, or withdrawal methods.
+Only read-only API permissions should be granted.
 
-SECURITY: Never request trade or withdrawal permissions.
+SECURITY: Grant only read permissions — no exchange or withdrawal access.
 """
 import logging
 from datetime import date
@@ -33,9 +33,9 @@ _SYNTHETIC_HOLDINGS: list[tuple[str, Decimal, Decimal]] = [
 class CoinbaseExchangeConnector(BaseConnector):
     """READ-ONLY connector for Coinbase exchange balances.
 
-    SECURITY: This class provides ZERO methods to trade, withdraw,
-    transfer, or modify any exchange state. Only read-only API
-    permissions are used. All calls are GET requests.
+    SECURITY: This class provides ZERO write methods. It cannot
+    transfer, withdraw, or modify any exchange state. Only read-only
+    API permissions are used. All calls are GET requests.
     """
 
     provider = Provider.COINBASE

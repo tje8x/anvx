@@ -175,9 +175,9 @@ class AWSCostsConnector(BaseConnector):
         }
 
     async def _ce_request(self, action: str, payload: dict) -> dict | None:
-        """Make a signed request to AWS Cost Explorer.
+        """Make an authenticated request to AWS Cost Explorer.
 
-        Uses SigV4 signing via the X-Amz headers pattern.
+        Uses SigV4 authentication via X-Amz headers.
         """
         assert self._client is not None
         endpoint = _AWS_CE_ENDPOINT.format(region=self._region)

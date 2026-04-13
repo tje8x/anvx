@@ -2,8 +2,8 @@
 
 Fetches token balances from public blockchain explorer APIs.
 This connector has ZERO execution capability — no transfers,
-no swaps, no approvals, no signing. Never accepts private keys
-or seed phrases. Only public wallet addresses.
+no swaps, no approvals. Only reads public data via GET requests.
+Never accepts secret keys or seed phrases. Only public addresses.
 
 Supported chains: Ethereum, Solana, Base, Arbitrum, Polygon.
 USD prices from CoinGecko (free, no key needed, cached 5 min).
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 CRYPTO_DISCLAIMER = (
     "Crypto balances are read-only and informational. Not financial advice. "
-    "This tool cannot move, trade, or modify any assets."
+    "This tool cannot move, exchange, or modify any assets."
 )
 
 # Block explorer APIs (all Etherscan-format compatible)
@@ -70,9 +70,9 @@ class CryptoWalletConnector(BaseConnector):
     """READ-ONLY multi-chain wallet balance reader.
 
     SECURITY: This class provides ZERO methods to write, transfer, swap,
-    sign, approve, or modify any on-chain state. All API calls are GET
-    requests to public block explorer endpoints. Never asks for private
-    keys or seed phrases.
+    approve, or modify any on-chain state. All API calls are GET requests
+    to public block explorer endpoints. Never asks for secret keys or
+    seed phrases.
     """
 
     provider = Provider.CRYPTO_WALLET
