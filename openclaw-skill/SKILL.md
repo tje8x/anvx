@@ -1,7 +1,7 @@
 ---
 name: anvx
 description: "Track and optimize AI API spending across 19 providers with live pricing and 6 optimization modules."
-version: 1.5.0
+version: 1.4.6
 metadata:
   openclaw:
     requires:
@@ -28,16 +28,16 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 - Transfer, send, or move funds of any kind
 - Approve or authorise any operations
 - Modify any account, wallet, or exchange state
-- Accept secret keys, mnemonics, or recovery phrases
+- Accept wallet keys, mnemonics, or recovery phrases
 
 **What it CAN do (all read-only):**
 - Read billing/usage data from provider APIs
 - Read public wallet balances via block explorer APIs (GET requests only)
 - Read exchange portfolio values via read-only API keys
-- Store credentials in the system keychain (never in files)
+- Store read-only API credentials in the OS keychain (never in plaintext files)
 - Cache pricing data locally for performance
 
-**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange endpoints. No write or mutation methods exist in the codebase. Secret keys and recovery phrases are never requested, accepted, or stored.
+**Crypto specifically:** The crypto connectors read public wallet balances and exchange portfolio values only. They use GET requests to public block explorer APIs and read-only exchange API endpoints. No write or mutation methods exist in the codebase. This skill requests read-only API keys and API secrets to access billing data from your providers. These credentials are stored in your OS keychain, never in plaintext files. Wallet keys, seed phrases, recovery phrases, and wallet-level credentials are never requested or accepted.
 
 ## Requirements
 
@@ -236,41 +236,33 @@ Always show this disclaimer when displaying crypto data (wallets, Coinbase, or B
 
 > Crypto balances are read-only and informational. Not financial advice. This tool cannot move, exchange, or modify any assets.
 
-## Analytics (optional, off by default)
+## Analytics (disabled by default)
 
-This skill includes an optional anonymous event tracker. It is **DISABLED by default**.
+Analytics is OFF by default. No data is sent to any external endpoint unless you explicitly set `ANALYTICS_ENABLED=true` AND provide an `ANALYTICS_ENDPOINT` URL.
 
-When `ANALYTICS_ENABLED` is not set or set to `false` (the default), NO network requests are made to any analytics endpoint. Events are logged locally to `~/.token-economy-intel/events.jsonl` (append-only) and never sent anywhere.
-
-**To enable:** set two environment variables:
-```
-ANALYTICS_ENABLED=true
-ANALYTICS_ENDPOINT=https://your-endpoint/api/events
-```
-
-**When enabled**, the tracker POSTs anonymized events containing:
-- Event type (e.g., `setup_complete`, `query`, `recommendation_viewed`, `account_connected`)
-- Surface (`openclaw` or `mcp`)
-- Session ID (random UUID, not linked to any identity)
-- Timestamp
-- Structural metadata only (e.g., `{"count": 5, "provider": "openai"}`)
-
-**Events NEVER include:**
-- Financial amounts or balances
-- API keys or credentials
-- Wallet addresses
-- Account details or PII
-
-The sanitizer strips all known secret patterns before any event is logged or sent. Blocked keys: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`.
-
-**To verify:** review `engine/analytics/tracker.py` — the `_FORBIDDEN_KEYS` set (lines 21-26) and the `analytics_enabled` property (line 54) which defaults to `false`.
-
-**Log events via CLI:**
-```
-uv run python scripts/analytics.py "<event_type>" "<event_category>" --metadata '{"key": "value"}'
+When enabled, each event POSTs this exact JSON structure:
+```json
+{
+  "event_type": "query",
+  "surface": "openclaw",
+  "session_id": "random-uuid",
+  "timestamp": "2026-04-14T12:00:00Z",
+  "metadata": {"provider": "openai"}
+}
 ```
 
-**Source code:** The complete engine source is included in this skill bundle under `engine/`.
+That is the complete payload. Events never contain:
+- Financial amounts, balances, or costs
+- API keys, tokens, or credentials
+- Wallet addresses or account identifiers
+- Billing record contents or descriptions
+- Any personally identifiable information
+
+The sanitizer (`engine/analytics/tracker.py`, line 21) strips fields matching these patterns before any logging or transmission: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`.
+
+When disabled (default): events are appended to `~/.token-economy-intel/events.jsonl` locally and never transmitted.
+
+Log events via CLI: `uv run python scripts/analytics.py "<event_type>" "<event_category>"`
 
 ## Response Style
 
