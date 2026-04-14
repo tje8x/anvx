@@ -1,7 +1,7 @@
 ---
 name: anvx
 description: "Track and optimize AI API spending across 19 providers with live pricing and 6 optimization modules."
-version: 1.4.1
+version: 1.5.0
 metadata:
   openclaw:
     requires:
@@ -10,6 +10,9 @@ metadata:
       bins:
         - python3
         - uv
+    install:
+      - kind: uv
+        bins: [python3, uv]
     primaryEnv: ANTHROPIC_API_KEY
     emoji: "💰"
     homepage: https://anvx.io
@@ -39,7 +42,7 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 
 ## Requirements
 
-**Required environment variable:** `ANTHROPIC_API_KEY` (used by the categorisation engine)
+**`ANTHROPIC_API_KEY` is required.** It powers the AI categorization engine that classifies billing records across providers, generates natural language answers to spending queries, and produces optimization recommendations. This skill is an AI-powered intelligence tool — the LLM is the core engine, not an optional enhancement.
 
 **Required binaries:** `python3`, `uv`
 
@@ -48,8 +51,32 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 **Optional provider credentials** (set via system keyring, env vars, or the setup script):
 OPENAI_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, GCP_SERVICE_ACCOUNT_JSON, STRIPE_API_KEY, VERCEL_API_TOKEN, CLOUDFLARE_API_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SENDGRID_API_KEY, DATADOG_API_KEY, DATADOG_APP_KEY, LANGSMITH_API_KEY, PINECONE_API_KEY, TAVILY_API_KEY, COINBASE_API_KEY, COINBASE_API_SECRET, BINANCE_API_KEY, BINANCE_API_SECRET, GEMINI_API_KEY, GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, META_ADS_ACCESS_TOKEN
 
-**Homepage:** https://anvx.io
-**Source:** https://github.com/tje8x/anvx
+This skill only reads credentials for connectors explicitly enabled by the user during setup. Unused provider credentials are never accessed.
+
+**Homepage:** https://anvx.io | **Source:** https://github.com/tje8x/anvx
+
+## What setup does
+
+Running `uv run python -m engine.setup`:
+1. Creates `~/.token-economy-intel/` for local cache
+2. Asks which providers you want to connect
+3. For each selected provider, prompts for credentials
+4. Stores credentials in OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Locker)
+5. Validates each credential with a lightweight read-only API call
+
+Setup does NOT:
+- Send credentials to any external server
+- Modify provider account settings
+- Install system software or create daemons
+- Write credentials to disk in plaintext
+
+## About uv
+
+`uv` (https://github.com/astral-sh/uv) is a Python package manager by Astral (creators of Ruff). In this skill:
+- `uv sync` installs pinned dependencies from the included `uv.lock` lockfile. It does not run arbitrary code or hooks.
+- `uv run` executes local Python modules only.
+- All dependencies are declared in `pyproject.toml` and pinned in `uv.lock`.
+- `uv` does not have post-install hooks or lifecycle scripts (unlike npm).
 
 ## On First Use
 
