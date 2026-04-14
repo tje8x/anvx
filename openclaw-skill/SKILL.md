@@ -12,7 +12,6 @@ metadata:
         - uv
     install:
       - kind: uv
-        bins: [python3, uv]
     primaryEnv: ANTHROPIC_API_KEY
     emoji: "💰"
     homepage: https://anvx.io
@@ -48,12 +47,39 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 
 **Install:** `uv sync && uv run python -m engine.setup`
 
-**Optional provider credentials** (set via system keyring, env vars, or the setup script):
-OPENAI_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, GCP_SERVICE_ACCOUNT_JSON, STRIPE_API_KEY, VERCEL_API_TOKEN, CLOUDFLARE_API_TOKEN, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SENDGRID_API_KEY, DATADOG_API_KEY, DATADOG_APP_KEY, LANGSMITH_API_KEY, PINECONE_API_KEY, TAVILY_API_KEY, COINBASE_API_KEY, COINBASE_API_SECRET, BINANCE_API_KEY, BINANCE_API_SECRET, GEMINI_API_KEY, GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, META_ADS_ACCESS_TOKEN
+**Homepage:** https://anvx.io | **Source:** https://github.com/tje8x/anvx
+
+## Environment Variables
+
+**Required:**
+- `ANTHROPIC_API_KEY` — powers AI categorization and natural language queries
+
+**Optional (analytics, disabled by default):**
+- `ANALYTICS_ENABLED` — set to `true` to enable anonymous telemetry (default: `false`)
+- `ANALYTICS_ENDPOINT` — URL to receive events (only used when `ANALYTICS_ENABLED=true`)
+
+When both analytics vars are unset (the default), no outbound network requests are made to any analytics endpoint. Events are logged locally to `~/.token-economy-intel/events.jsonl` only.
+
+**Optional (provider credentials, connect only the services you use):**
+- `OPENAI_API_KEY`
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
+- `GCP_SERVICE_ACCOUNT_JSON`
+- `STRIPE_API_KEY`
+- `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN`
+- `SENDGRID_API_KEY`
+- `DATADOG_API_KEY` / `DATADOG_APP_KEY`
+- `LANGSMITH_API_KEY`
+- `PINECONE_API_KEY`
+- `TAVILY_API_KEY`
+- `VERCEL_API_TOKEN`
+- `CLOUDFLARE_API_TOKEN`
+- `GEMINI_API_KEY`
+- `GOOGLE_ADS_DEVELOPER_TOKEN`
+- `META_ADS_ACCESS_TOKEN`
+- `COINBASE_API_KEY` / `COINBASE_API_SECRET`
+- `BINANCE_API_KEY` / `BINANCE_API_SECRET`
 
 This skill only reads credentials for connectors explicitly enabled by the user during setup. Unused provider credentials are never accessed.
-
-**Homepage:** https://anvx.io | **Source:** https://github.com/tje8x/anvx
 
 ## What setup does
 
@@ -121,21 +147,9 @@ The user runs `uv run python -m engine.setup` in their terminal.
 
 ### Option B — MCP Server
 
-Provide the Claude Desktop config snippet:
+For MCP server setup, see the GitHub repository: https://github.com/tje8x/anvx#mcp-setup
 
-```json
-{
-  "mcpServers": {
-    "token-economy-intel": {
-      "command": "uv",
-      "args": ["run", "python", "mcp-server/server.py"],
-      "cwd": "/path/to/token-economy-intel"
-    }
-  }
-}
-```
-
-Then say: "Once the MCP server is running, I'll use the `list_providers` and `connect_account` tools to walk you through setup."
+MCP users install from GitHub directly, not from ClawHub. Keys are configured in the MCP client's config and managed by the client — not stored by this skill.
 
 ---
 
@@ -195,7 +209,7 @@ uv run python scripts/connect_account.py "<provider_name>"
 When `ONBOARDING_TEST_MODE=true`, the full onboarding UX runs exactly as above but:
 - Credential validation uses built-in `TEST_CREDENTIALS` instead of real APIs.
 - Option A: setup script accepts test credentials (e.g., `sk-test-openai-12345`).
-- Option B: MCP server with test env vars.
+- MCP server: works with test env vars via GitHub install.
 - For bank CSV upload: the keyword "test" loads the synthetic CSV from `engine/testing/data/bank_statement.csv`. This ONLY works when `ONBOARDING_TEST_MODE=true`. In production, "test" is invalid input.
 
 ## Proactive Behaviour
