@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AWSCostsConnector,
     CloudflareCostsConnector,
     GCPCostsConnector,

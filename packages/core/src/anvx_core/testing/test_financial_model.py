@@ -4,12 +4,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AnthropicBillingConnector,
     OpenAIBillingConnector,
     StripeConnector,
 )
-from engine.intelligence.financial_model import FinancialModelManager
+from anvx_core.intelligence.financial_model import FinancialModelManager
 
 
 def test_round_trip() -> None:

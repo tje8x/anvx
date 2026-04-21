@@ -30,7 +30,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from engine.models import FinancialRecord, Provider, SpendCategory
+from anvx_core.models import FinancialRecord, Provider, SpendCategory
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _RNG = random.Random(2026)
@@ -392,7 +392,7 @@ def generate_full_profile(
     if start_date is None:
         start_date = end_date - timedelta(days=90)
 
-    from engine.connectors import (
+    from anvx_core.connectors import (
         AWSCostsConnector, AnthropicBillingConnector, BinanceExchangeConnector,
         CloudflareCostsConnector, CoinbaseExchangeConnector,
         CryptoWalletConnector, DatadogCostsConnector, GCPCostsConnector,

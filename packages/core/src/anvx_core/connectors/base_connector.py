@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from datetime import date
 from typing import Any
 
-from engine.models import FinancialRecord, Provider
+from anvx_core.models import FinancialRecord, Provider
 
 class BaseConnector(ABC):
 	"""Abstract base for all token economy data connectors."""
@@ -16,7 +16,7 @@ class BaseConnector(ABC):
 
 		Returns True if they match (valid for test mode), False otherwise.
 		"""
-		from engine.utils import TEST_CREDENTIALS
+		from anvx_core.utils import TEST_CREDENTIALS
 
 		provider_key = self.provider.value
 		test_creds = TEST_CREDENTIALS.get(provider_key)
@@ -57,7 +57,7 @@ class BaseConnector(ABC):
 		"""
 		if credentials:
 			return credentials
-		from engine.credentials import CredentialStore
+		from anvx_core.credentials import CredentialStore
 		provider_key = self.provider.value
 		creds = CredentialStore.get_all_credentials(provider_key)
 		return creds

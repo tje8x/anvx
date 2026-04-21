@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
-from engine.models import Anomaly, FinancialRecord
+from anvx_core.models import Anomaly, FinancialRecord
 
 logger = logging.getLogger(__name__)
 

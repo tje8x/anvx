@@ -17,13 +17,13 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Add packages/core/src to path so anvx_core is importable
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "core" / "src"))
 
 from mcp.server import FastMCP
 
-from engine.analytics import EventTracker
-from engine.connectors import (
+from anvx_core.analytics import EventTracker
+from anvx_core.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
     BinanceExchangeConnector,
@@ -44,15 +44,15 @@ from engine.connectors import (
     TwilioCostsConnector,
     VercelCostsConnector,
 )
-from engine.intelligence import (
+from anvx_core.intelligence import (
     FinancialModelManager,
     categorise_records,
     detect_anomalies,
     generate_recommendations,
 )
-from engine.credentials import CredentialStore
-from engine.models import Provider, SpendCategory
-from engine.utils import format_currency, format_percent, get_date_range, is_onboarding_test_mode, is_synthetic_mode
+from anvx_core.credentials import CredentialStore
+from anvx_core.models import Provider, SpendCategory
+from anvx_core.utils import format_currency, format_percent, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
 # ── Server setup ────────────────────────────────────────────────
 
@@ -640,7 +640,7 @@ def upload_bank_csv(file_path: str) -> str:
     from decimal import Decimal
     from pathlib import Path as P
 
-    from engine.models import FinancialRecord, Provider as Prov, SpendCategory
+    from anvx_core.models import FinancialRecord, Provider as Prov, SpendCategory
 
     test_mode = is_onboarding_test_mode()
 

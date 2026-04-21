@@ -3,8 +3,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from engine.analytics.local_log import LocalEventLog
-from engine.analytics.tracker import EventTracker
+from anvx_core.analytics.local_log import LocalEventLog
+from anvx_core.analytics.tracker import EventTracker
 
 
 def test_local_log() -> None:

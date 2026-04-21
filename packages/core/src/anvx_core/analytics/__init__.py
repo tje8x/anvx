@@ -1,6 +1,6 @@
 # Analytics package
-from engine.analytics.tracker import EventTracker
-from engine.analytics.local_log import LocalEventLog
+from anvx_core.analytics.tracker import EventTracker
+from anvx_core.analytics.local_log import LocalEventLog
 
 __all__ = [
     "EventTracker",

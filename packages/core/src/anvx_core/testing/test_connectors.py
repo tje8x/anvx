@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
     BinanceExchangeConnector,
@@ -26,7 +26,7 @@ from engine.connectors import (
     TwilioCostsConnector,
     VercelCostsConnector,
 )
-from engine.models import FinancialRecord, Provider, SpendCategory
+from anvx_core.models import FinancialRecord, Provider, SpendCategory
 
 # ── Test data ───────────────────────────────────────────────────
 

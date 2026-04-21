@@ -9,7 +9,7 @@ os.environ["ONBOARDING_TEST_MODE"] = "true"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
     BinanceExchangeConnector,
@@ -30,7 +30,7 @@ from engine.connectors import (
     TwilioCostsConnector,
     VercelCostsConnector,
 )
-from engine.utils import get_date_range
+from anvx_core.utils import get_date_range
 
 # Each entry: (provider label, connector class, credentials dict)
 _CONNECTORS = [

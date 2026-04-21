@@ -1,8 +1,8 @@
 """Abstract base class for optimization modules."""
 from abc import ABC, abstractmethod
 
-from engine.intelligence.pricing_fetcher import PricingFetcher
-from engine.models import FinancialRecord, FinancialSummary, Recommendation
+from anvx_core.intelligence.pricing_fetcher import PricingFetcher
+from anvx_core.models import FinancialRecord, FinancialSummary, Recommendation
 
 
 class OptimizationModule(ABC):

@@ -8,20 +8,20 @@ from pathlib import Path
 
 import pytest
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AnthropicBillingConnector,
     OpenAIBillingConnector,
     SendGridCostsConnector,
     StripeConnector,
     TwilioCostsConnector,
 )
-from engine.intelligence.anomaly_detector import detect_anomalies
-from engine.intelligence.categoriser import categorise_records
-from engine.intelligence.financial_model import FinancialModelManager
-from engine.intelligence.recommender import generate_recommendations
-from engine.intelligence.optimization.model_routing import ModelRoutingModule
-from engine.intelligence.pricing_fetcher import PricingFetcher
-from engine.models import (
+from anvx_core.intelligence.anomaly_detector import detect_anomalies
+from anvx_core.intelligence.categoriser import categorise_records
+from anvx_core.intelligence.financial_model import FinancialModelManager
+from anvx_core.intelligence.recommender import generate_recommendations
+from anvx_core.intelligence.optimization.model_routing import ModelRoutingModule
+from anvx_core.intelligence.pricing_fetcher import PricingFetcher
+from anvx_core.models import (
     FinancialRecord,
     FinancialSummary,
     Provider,

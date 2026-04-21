@@ -6,7 +6,7 @@ business's financial footprint. Use this as the canonical test fixture.
 from datetime import date, timedelta
 from decimal import Decimal
 
-from engine.connectors import (
+from anvx_core.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
     BinanceExchangeConnector,
@@ -24,7 +24,7 @@ from engine.connectors import (
     TwilioCostsConnector,
     VercelCostsConnector,
 )
-from engine.models import FinancialRecord
+from anvx_core.models import FinancialRecord
 
 # All connectors with their expected monthly spend profile
 CONNECTOR_PROFILES: list[dict] = [

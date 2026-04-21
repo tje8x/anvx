@@ -16,8 +16,8 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from engine.analytics import EventTracker
-from engine.connectors import (
+from anvx_core.analytics import EventTracker
+from anvx_core.connectors import (
     AWSCostsConnector,
     AnthropicBillingConnector,
     BinanceExchangeConnector,
@@ -38,14 +38,14 @@ from engine.connectors import (
     TwilioCostsConnector,
     VercelCostsConnector,
 )
-from engine.intelligence import (
+from anvx_core.intelligence import (
     FinancialModelManager,
     categorise_records,
     detect_anomalies,
     generate_recommendations,
 )
-from engine.models import SpendCategory
-from engine.utils import format_currency, format_percent, get_date_range
+from anvx_core.models import SpendCategory
+from anvx_core.utils import format_currency, format_percent, get_date_range
 
 logger = logging.getLogger(__name__)
 

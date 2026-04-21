@@ -1,8 +1,8 @@
 # Intelligence package
-from engine.intelligence.categoriser import categorise_records
-from engine.intelligence.anomaly_detector import detect_anomalies
-from engine.intelligence.recommender import generate_recommendations
-from engine.intelligence.financial_model import FinancialModelManager
+from anvx_core.intelligence.categoriser import categorise_records
+from anvx_core.intelligence.anomaly_detector import detect_anomalies
+from anvx_core.intelligence.recommender import generate_recommendations
+from anvx_core.intelligence.financial_model import FinancialModelManager
 
 __all__ = [
     "categorise_records",

@@ -1,7 +1,7 @@
 [project]
 name = "token-economy-intel"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Token Economy Intelligence — core package"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -15,5 +15,9 @@ dependencies = [
     "python-dotenv>=1.2.2",
 ]
 
+[tool.setuptools.packages.find]
+where = ["packages/core/src"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["packages/core/src/anvx_core/testing"]

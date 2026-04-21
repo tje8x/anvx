@@ -13,9 +13,9 @@ from typing import Any
 
 import httpx
 
-from engine.connectors.base_connector import BaseConnector
-from engine.connectors.crypto_wallet import CRYPTO_DISCLAIMER
-from engine.models import FinancialRecord, Provider, SpendCategory
+from anvx_core.connectors.base_connector import BaseConnector
+from anvx_core.connectors.crypto_wallet import CRYPTO_DISCLAIMER
+from anvx_core.models import FinancialRecord, Provider, SpendCategory
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class CoinbaseExchangeConnector(BaseConnector):
 
         Accepts: {"api_key": "...", "api_secret": "..."}
         """
-        from engine.utils import is_onboarding_test_mode
+        from anvx_core.utils import is_onboarding_test_mode
         if is_onboarding_test_mode():
             if self.validate_test_credentials(credentials):
                 import asyncio
@@ -104,7 +104,7 @@ class CoinbaseExchangeConnector(BaseConnector):
             logger.error("Not connected — call connect() first")
             return []
 
-        from engine.utils import is_onboarding_test_mode
+        from anvx_core.utils import is_onboarding_test_mode
         if is_onboarding_test_mode():
             return self.get_synthetic_records(start_date, end_date)
 

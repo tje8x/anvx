@@ -1,7 +1,7 @@
 """Smoke tests for LangSmith, Pinecone, and Tavily connectors (synthetic mode)."""
 from datetime import date, timedelta
 
-from engine.connectors import (
+from anvx_core.connectors import (
     LangSmithCostsConnector,
     PineconeCostsConnector,
     TavilyCostsConnector,

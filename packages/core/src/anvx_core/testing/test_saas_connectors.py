@@ -1,7 +1,7 @@
 """Smoke tests for Twilio, SendGrid, and Datadog connectors (synthetic mode)."""
 from datetime import date, timedelta
 
-from engine.connectors import (
+from anvx_core.connectors import (
     DatadogCostsConnector,
     SendGridCostsConnector,
     TwilioCostsConnector,

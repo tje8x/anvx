@@ -12,7 +12,7 @@ import platform
 import sys
 from typing import Any
 
-from engine.credentials import CredentialStore, PROVIDER_FIELDS, _SERVICE
+from anvx_core.credentials import CredentialStore, PROVIDER_FIELDS, _SERVICE
 
 # ── Provider registry ──────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ def _validate_provider(
     provider: dict, creds: dict[str, str], label: str
 ) -> bool:
     """Validate credentials by calling the connector's connect() method."""
-    from engine.connectors import (
+    from anvx_core.connectors import (
         AWSCostsConnector, AnthropicBillingConnector, BinanceExchangeConnector,
         CloudflareCostsConnector, CoinbaseExchangeConnector, CryptoWalletConnector,
         DatadogCostsConnector, GCPCostsConnector, LangSmithCostsConnector,

@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from engine.models import SpendCategory
-from engine.testing.synthetic_package import generate_full_profile
+from anvx_core.models import SpendCategory
+from anvx_core.testing.synthetic_package import generate_full_profile
 
 
 def main() -> None:

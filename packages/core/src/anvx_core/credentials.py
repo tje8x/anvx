@@ -76,7 +76,7 @@ class CredentialStore:
         Checks: test mode → keyring → env var. Returns None if not found.
         """
         # 1. Test mode
-        from engine.utils import is_onboarding_test_mode, TEST_CREDENTIALS
+        from anvx_core.utils import is_onboarding_test_mode, TEST_CREDENTIALS
         if is_onboarding_test_mode():
             return _get_test_credential(provider, field)
 
@@ -101,9 +101,9 @@ class CredentialStore:
     @staticmethod
     def get_manifest() -> dict[str, list[str]]:
         """Returns the provider manifest: {provider: [labels]}."""
-        from engine.utils import is_onboarding_test_mode
+        from anvx_core.utils import is_onboarding_test_mode
         if is_onboarding_test_mode():
-            from engine.utils import TEST_CREDENTIALS
+            from anvx_core.utils import TEST_CREDENTIALS
             return {p: ["default"] for p in TEST_CREDENTIALS}
 
         try:
@@ -149,7 +149,7 @@ class CredentialStore:
 
 def _get_test_credential(provider: str, field: str) -> str | None:
     """Extract a specific field from TEST_CREDENTIALS."""
-    from engine.utils import TEST_CREDENTIALS
+    from anvx_core.utils import TEST_CREDENTIALS
     creds = TEST_CREDENTIALS.get(provider)
     if creds is None:
         return None

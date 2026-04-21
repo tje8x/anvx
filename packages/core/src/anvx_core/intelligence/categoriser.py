@@ -5,8 +5,8 @@ from decimal import Decimal
 
 import anthropic
 
-from engine.models import FinancialRecord, SpendCategory
-from engine.utils import is_synthetic_mode
+from anvx_core.models import FinancialRecord, SpendCategory
+from anvx_core.utils import is_synthetic_mode
 
 logger = logging.getLogger(__name__)
 

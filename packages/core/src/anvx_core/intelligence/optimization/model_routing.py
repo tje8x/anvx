@@ -5,9 +5,9 @@ from decimal import Decimal
 
 import statistics
 
-from engine.intelligence.optimization.base_module import OptimizationModule
-from engine.intelligence.pricing_fetcher import PricingFetcher
-from engine.models import (
+from anvx_core.intelligence.optimization.base_module import OptimizationModule
+from anvx_core.intelligence.pricing_fetcher import PricingFetcher
+from anvx_core.models import (
     FinancialRecord,
     FinancialSummary,
     Recommendation,

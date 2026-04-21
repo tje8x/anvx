@@ -16,8 +16,8 @@ from typing import Any
 
 import httpx
 
-from engine.connectors.base_connector import BaseConnector
-from engine.models import FinancialRecord, Provider, SpendCategory
+from anvx_core.connectors.base_connector import BaseConnector
+from anvx_core.models import FinancialRecord, Provider, SpendCategory
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class CryptoWalletConnector(BaseConnector):
           {"wallets": [{"chain": "ethereum", "address": "0xTEST..."}]}
           {"wallet_addresses": ["0xTEST..."]}
         """
-        from engine.utils import TEST_CREDENTIALS
+        from anvx_core.utils import TEST_CREDENTIALS
         test_entry = TEST_CREDENTIALS.get("crypto_wallet", {})
         test_addrs = set(test_entry.get("_test_addresses", []))
         if not test_addrs:
@@ -111,7 +111,7 @@ class CryptoWalletConnector(BaseConnector):
         Accepts: {"wallets": [{"chain": "ethereum", "address": "0x..."}]}
         Legacy: {"wallet_addresses": ["0x..."]}  (assumed Ethereum)
         """
-        from engine.utils import is_onboarding_test_mode
+        from anvx_core.utils import is_onboarding_test_mode
         if is_onboarding_test_mode():
             if self.validate_test_credentials(credentials):
                 import asyncio
@@ -184,7 +184,7 @@ class CryptoWalletConnector(BaseConnector):
             logger.error("Not connected — call connect() first")
             return []
 
-        from engine.utils import is_onboarding_test_mode
+        from anvx_core.utils import is_onboarding_test_mode
         if is_onboarding_test_mode():
             return self.get_synthetic_records(start_date, end_date)
 

@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from engine.analytics.local_log import LocalEventLog
+from anvx_core.analytics.local_log import LocalEventLog
 
 logger = logging.getLogger(__name__)
 

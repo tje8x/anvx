@@ -9,9 +9,9 @@ from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 
-from engine.intelligence.pricing_fetcher import PricingFetcher
-from engine.intelligence.optimization import ALL_MODULES
-from engine.models import (
+from anvx_core.intelligence.pricing_fetcher import PricingFetcher
+from anvx_core.intelligence.optimization import ALL_MODULES
+from anvx_core.models import (
     FinancialRecord,
     FinancialSummary,
     Recommendation,

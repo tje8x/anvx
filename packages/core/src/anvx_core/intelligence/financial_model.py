@@ -10,14 +10,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from engine.models import (
+from anvx_core.models import (
     Anomaly,
     FinancialRecord,
     FinancialSummary,
     Recommendation,
     SpendCategory,
 )
-from engine.utils import format_currency, format_percent
+from anvx_core.utils import format_currency, format_percent
 
 logger = logging.getLogger(__name__)
 
