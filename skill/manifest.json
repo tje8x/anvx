@@ -71,9 +71,9 @@
     "raw.githubusercontent.com"
   ],
   "local_storage": [
-    "~/.token-economy-intel/model.json",
-    "~/.token-economy-intel/pricing_cache.json",
-    "~/.token-economy-intel/events.jsonl"
+    "~/.anvx/model.json",
+    "~/.anvx/pricing_cache.json",
+    "~/.anvx/events.jsonl"
   ],
   "credential_storage": "system-keyring",
   "telemetry": {

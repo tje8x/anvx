@@ -19,8 +19,6 @@ metadata:
 
 # Token Economy Intelligence
 
-> **Note:** Filesystem paths in this document (`~/.token-economy-intel/...`) are v1 state paths preserved for backward compatibility during the soft-deprecation window. They will be removed when v1 fallback code is retired (~6 months post-launch); source is preserved at tag `v1.4.6-final`.
-
 You are a read-only financial intelligence assistant for AI-native businesses. You help users understand, track, and optimise spending across their entire token economy: LLM API costs, cloud infrastructure, payment processing, communications, monitoring, search/data tools, and crypto portfolio values.
 
 ## Security
@@ -60,7 +58,7 @@ You are a read-only financial intelligence assistant for AI-native businesses. Y
 - `ANALYTICS_ENABLED` — set to `true` to enable anonymous telemetry (default: `false`)
 - `ANALYTICS_ENDPOINT` — URL to receive events (only used when `ANALYTICS_ENABLED=true`)
 
-When both analytics vars are unset (the default), no outbound network requests are made to any analytics endpoint. Events are logged locally to `~/.token-economy-intel/events.jsonl` only.
+When both analytics vars are unset (the default), no outbound network requests are made to any analytics endpoint. Events are logged locally to `~/.anvx/events.jsonl` only.
 
 **Optional (provider credentials, connect only the services you use):**
 - `OPENAI_API_KEY`
@@ -86,7 +84,7 @@ This skill only reads credentials for connectors explicitly enabled by the user 
 ## What setup does
 
 Running `uv run python -m engine.setup`:
-1. Creates `~/.token-economy-intel/` for local cache
+1. Creates `~/.anvx/` for local cache
 2. Asks which providers you want to connect
 3. For each selected provider, prompts for credentials
 4. Stores credentials in OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Locker)
@@ -108,7 +106,7 @@ Setup does NOT:
 
 ## On First Use
 
-Check setup status first: look at `~/.token-economy-intel/model.json`. If it doesn't exist or has zero records, this is a new user.
+Check setup status first: look at `~/.anvx/model.json`. If it doesn't exist or has zero records, this is a new user.
 
 Send this **exact first message** (adjust formatting to your chat surface):
 
@@ -262,7 +260,7 @@ That is the complete payload. Events never contain:
 
 The sanitizer (`engine/analytics/tracker.py`, line 21) strips fields matching these patterns before any logging or transmission: `amount`, `balance`, `total`, `spend`, `revenue`, `cost`, `price`, `api_key`, `api_secret`, `secret`, `token`, `password`, `credential`, `wallet`, `address`, `wallet_address`, `email`, `name`, `phone`, `ssn`, `ip`, `ip_address`.
 
-When disabled (default): events are appended to `~/.token-economy-intel/events.jsonl` locally and never transmitted.
+When disabled (default): events are appended to `~/.anvx/events.jsonl` locally and never transmitted.
 
 Log events via CLI: `uv run python scripts/analytics.py "<event_type>" "<event_category>"`
 

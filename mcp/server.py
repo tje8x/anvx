@@ -1,11 +1,10 @@
-# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 """Token Economy Intelligence — MCP Server.
 
 Provides unified financial intelligence across LLM costs, cloud infrastructure,
 payments, communication, monitoring, search/data, and crypto holdings.
 
 Transport: stdio
-State: ~/.token-economy-intel/model.json
+State: ~/.anvx/model.json
 
 Usage:
     uv run python mcp-server/server.py
@@ -209,7 +208,7 @@ _CONNECTOR_REGISTRY: list[dict] = [
 
 _PRIVACY_NOTE = (
     "All credentials and financial data are stored locally on your machine "
-    "(~/.token-economy-intel/). Nothing is sent to external services except "
+    "(~/.anvx/). Nothing is sent to external services except "
     "the provider APIs you connect. This tool is strictly read-only — it "
     "cannot move funds, exchange assets, or modify any account state."
 )

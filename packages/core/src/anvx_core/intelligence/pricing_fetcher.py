@@ -1,9 +1,8 @@
-# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 """Real-time LLM pricing fetcher with caching.
 
 Primary source: OpenRouter API (no auth required).
 Fallback source: LiteLLM pricing database on GitHub.
-Cache: ~/.token-economy-intel/pricing_cache.json (24-hour TTL).
+Cache: ~/.anvx/pricing_cache.json (24-hour TTL).
 """
 import json
 import logging
@@ -17,8 +16,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# v1-compat: filesystem state path, removed post-launch with v1 fallback code
-_CACHE_DIR = Path.home() / ".token-economy-intel"
+_CACHE_DIR = Path.home() / ".anvx"
 _CACHE_FILE = _CACHE_DIR / "pricing_cache.json"
 _CACHE_TTL_SECONDS = 86400  # 24 hours
 
