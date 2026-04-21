@@ -7,7 +7,7 @@ Lookup order:
 4. Explicitly passed credentials (caller's responsibility)
 
 Keys are stored in the system keychain under service name
-"anvx-token-economy-intel" with key format "{provider}:{label}:{field}".
+"anvx" with key format "{provider}:{label}:{field}".
 """
 import json
 import logging
@@ -18,7 +18,7 @@ import keyring
 
 logger = logging.getLogger(__name__)
 
-_SERVICE = "anvx-token-economy-intel"
+_SERVICE = "anvx"
 
 # Maps provider names to their credential fields
 PROVIDER_FIELDS: dict[str, list[str]] = {

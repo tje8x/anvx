@@ -1,5 +1,5 @@
 def main():
-    print("Hello from token-economy-intel!")
+    print("Hello from anvx!")
 
 
 if __name__ == "__main__":

@@ -57,7 +57,7 @@ from anvx_core.utils import format_currency, format_percent, get_date_range, is_
 # ── Server setup ────────────────────────────────────────────────
 
 server = FastMCP(
-    name="token-economy-intel",
+    name="anvx",
     instructions=(
         "Unified financial intelligence for AI-native businesses. "
         "Tracks spending across LLM APIs, cloud infrastructure, payments, "

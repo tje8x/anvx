@@ -3,7 +3,7 @@
 Unified intelligence across your token economy - LLM API costs, crypto holdings, and Stripe revenue in one view.
 
 Surfaces:
-- OpenClaw skill: clawhub install token-economy-intel
+- OpenClaw skill: clawhub install anvx
 - MCP server: works with Claude Desktop and ChatGPT
 - CLI: uv run python -m engine.main --synthetic --status
 
