@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANVX v2 — UI Prototype Reference</title>
+<!--
+  ANVX v2 UI Prototype — Design Reference for Claude Code
+  =========================================================
+  This file is a DESIGN SPEC, not production source code.
+  It demonstrates the visual language, component patterns,
+  interaction flows, and data structures for the ANVX v2
+  web application.
+
+  Production build uses: Next.js 14 + shadcn/ui + Tailwind
+  This prototype uses: Vanilla HTML/CSS/JS for portability
+
+  Key design decisions captured here:
+  - Retro-Macintosh aesthetic (Space Mono + IBM Plex Mono fonts)
+  - Color palette (earthy greens, blues, reds on parchment backgrounds)
+  - Navigation: Dashboard | Routing | Reports | Data
+  - Routing modes: Shadow / Copilot / Autopilot (radio card selector)
+  - Audit trail: clickable feed items expand to show full decision context
+  - Reconciliation: Confirm / Categorize / Flag for accountant
+  - Revenue waterfall: proper connected waterfall chart (SVG)
+  - Income statement: 3-month columnar P&L
+  - Cash position: dual-axis line chart (Chart.js)
+-->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+/* ============================================
+   DESIGN TOKENS
+   These map to the production Tailwind config
+   ============================================ */
+:root {
+  /* Backgrounds */
+  --bg: #e8e4d9;          /* Page background, card fills */
+  --win: #f5f3ed;         /* Window/content background */
+
+  /* Borders */
+  --bdr: #8e8a7e;         /* Primary border */
+
+  /* Brand */
+  --acc: #2d5a27;         /* Primary accent (green) */
+  --acc-l: #e8f0e7;       /* Accent light fill */
+
+  /* Semantic */
+  --dng: #a33228;         /* Danger/error (red) */
+  --dng-l: #fce8e6;       /* Danger light fill */
+  --wrn: #8a6d1b;         /* Warning (amber) */
+  --wrn-l: #fdf4dc;       /* Warning light fill */
+  --blu: #1a5276;         /* Info (blue) */
+  --blu-l: #e1eef6;       /* Info light fill */
+
+  /* Text */
+  --txt: #2c2a25;         /* Primary text */
+  --txt2: #6b675e;        /* Secondary text */
+
+  /* Typography */
+  --fui: 'Space Mono', monospace;    /* UI text */
+  --fd: 'IBM Plex Mono', monospace;  /* Data/numbers */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--fui); font-size: 12px; color: var(--txt); background: var(--bg); padding: 20px; }
+
+/* ============================================
+   WINDOW CHROME — Retro Mac Frame
+   ============================================ */
+.win { background: var(--win); border: 1.5px solid var(--bdr); border-radius: 6px; overflow: hidden; max-width: 900px; margin: 0 auto; }
+.tbar { background: linear-gradient(180deg, #e8e4d9, #d4d0c5); border-bottom: 1.5px solid var(--bdr); padding: 6px 12px; display: flex; align-items: center; gap: 8px; }
+.dots { display: flex; gap: 5px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); }
+.dot-r { background: #e8655a; }
+.dot-y { background: #f0c24a; }
+.dot-g { background: #61c554; }
+.ttxt { flex: 1; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--title); text-transform: uppercase; }
+
+/* ============================================
+   NAVIGATION — Menu Bar
+   ============================================ */
+.mbar { background: var(--bg); border-bottom: 1px solid var(--bdr); padding: 0 8px; display: flex; }
+.mi { padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--txt2); letter-spacing: .3px; }
+.mi:hover { color: var(--txt); background: rgba(0,0,0,.04); }
+.mi.a { color: var(--acc); border-bottom-color: var(--acc); }
+
+/* ============================================
+   CONTENT AREA
+   ============================================ */
+.cnt { padding: 16px; min-height: 460px; background: var(--win); }
+
+/* Section titles */
+.st { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--txt2); margin: 16px 0 8px; border-bottom: 1px solid var(--bdr); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+.st:first-child { margin-top: 0; }
+
+/* ============================================
+   METRIC CARDS
+   ============================================ */
+.mr { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.mc { background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 10px 12px; }
+.ml { font-size: 10px; color: var(--txt2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; font-family: var(--fd); }
+.mv { font-size: 20px; font-weight: 700; font-family: var(--fd); }
+.md { font-size: 10px; margin-top: 2px; font-family: var(--fd); }
+.md.u { color: var(--dng); }
+.md.d { color: var(--acc); }
+
+/* ============================================
+   ALERT BARS
+   ============================================ */
+.ab { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px; font-size: 11px; font-family: var(--fd); border: 1px solid; }
+.ab.dng { background: var(--dng-l); border-color: var(--dng); color: var(--dng); }
+.ab.wrn { background: var(--wrn-l); border-color: var(--wrn); color: var(--wrn); }
+.ab.inf { background: var(--blu-l); border-color: var(--blu); color: var(--blu); }
+
+/* ============================================
+   WATERFALL CHART (SVG container)
+   ============================================ */
+.wf-wrap { background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 12px; margin-bottom: 12px; }
+.wf-sel { display: flex; gap: 0; }
+.wf-btn { padding: 4px 10px; font-size: 10px; font-weight: 700; cursor: pointer; background: var(--win); border: 1px solid var(--bdr); font-family: var(--fui); }
+.wf-btn:first-child { border-radius: 3px 0 0 3px; }
+.wf-btn:last-child { border-radius: 0 3px 3px 0; }
+.wf-btn.a { background: var(--acc); color: #fff; border-color: var(--acc); }
+
+/* ============================================
+   P&L TABLE — Income Statement
+   ============================================ */
+.pnl { width: 100%; border-collapse: collapse; font-family: var(--fd); font-size: 11px; margin-bottom: 12px; }
+.pnl td, .pnl th { padding: 4px 10px; border-bottom: 1px solid #d4d0c5; }
+.pnl th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--txt2); background: var(--bg); font-weight: 700; }
+.pnl th.num { text-align: right; }
+.pnl tr.sh td { font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--txt2); background: var(--bg); padding: 6px 10px; }
+.pnl tr.sub td { font-weight: 700; border-bottom: 2px solid var(--bdr); }
+.pnl tr.tot td { font-weight: 700; border-bottom: 3px double var(--bdr); font-size: 12px; }
+.pnl tr.in td:first-child { padding-left: 24px; color: var(--txt2); }
+.pnl td.n { text-align: right; font-weight: 600; }
+.pnl td.ng { color: var(--dng); text-align: right; font-weight: 600; }
+
+/* ============================================
+   CHART WRAPPER (Chart.js container)
+   ============================================ */
+.chart-wrap { background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 12px; margin-bottom: 12px; }
+.chart-inner { position: relative; height: 180px; }
+.legend-row { display: flex; gap: 14px; font-size: 10px; color: var(--txt2); font-family: var(--fd); margin-bottom: 8px; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-swatch { width: 14px; height: 3px; border-radius: 1px; }
+
+/* ============================================
+   MODE SELECTOR — Radio Cards
+   Shadow / Copilot / Autopilot
+   ============================================ */
+.mode-cards { display: flex; gap: 8px; margin-bottom: 16px; }
+.mode-card { flex: 1; background: var(--bg); border: 1.5px solid var(--bdr); border-radius: 6px; padding: 12px; cursor: pointer; transition: all .15s; position: relative; }
+.mode-card:hover { border-color: var(--txt2); }
+.mode-card.sel { border-color: var(--acc); background: var(--acc-l); }
+.mode-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--bdr); position: absolute; top: 10px; right: 10px; display: flex; align-items: center; justify-content: center; }
+.mode-card.sel .mode-radio { border-color: var(--acc); }
+.mode-card.sel .mode-radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
+.mode-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+.mode-desc { font-size: 10px; color: var(--txt2); line-height: 1.4; }
+.mode-card.sel .mode-name { color: var(--acc); }
+.mode-trust { font-size: 9px; margin-top: 6px; color: var(--txt2); font-family: var(--fd); display: flex; align-items: center; gap: 4px; }
+.trust-dots { display: flex; gap: 2px; }
+.trust-dot { width: 6px; height: 6px; border-radius: 50%; background: #d4d0c5; }
+.trust-dot.f { background: var(--acc); }
+
+/* ============================================
+   SHADOW MODE — Insight Cards
+   ============================================ */
+.si { background: var(--blu-l); border: 1px solid var(--blu); border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+.si-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.si-t { font-size: 10px; font-weight: 700; color: var(--blu); }
+.si-s { font-size: 12px; font-weight: 700; color: var(--acc); font-family: var(--fd); }
+.si-d { font-size: 10px; color: var(--txt2); font-family: var(--fd); }
+
+/* ============================================
+   AUDIT TRAIL — Feed Items + Expandable Detail
+   ============================================ */
+.fi { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--bdr); border-radius: 3px; margin-bottom: 4px; font-size: 10px; font-family: var(--fd); cursor: pointer; transition: background .1s; }
+.fi:hover { background: #ddd9ce; }
+.fi-detail { background: var(--win); border: 1px solid var(--bdr); border-top: none; border-radius: 0 0 3px 3px; padding: 10px 12px; margin-top: -5px; margin-bottom: 4px; font-size: 10px; font-family: var(--fd); }
+.fi-detail-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #e8e4d9; }
+.fi-detail-row:last-child { border: none; }
+.fi-detail-label { color: var(--txt2); }
+.fi-detail-val { font-weight: 600; max-width: 380px; text-align: right; }
+.ft { color: var(--txt2); min-width: 50px; }
+.fa { flex: 1; }
+.fb { font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+.fb.rr { background: var(--acc-l); color: var(--acc); }
+.fb.bl { background: var(--dng-l); color: var(--dng); }
+.fb.al { background: #e8e4d9; color: var(--txt2); }
+.fb.ap { background: var(--blu-l); color: var(--blu); }
+
+/* ============================================
+   ROUTING RULES — Model Groups
+   ============================================ */
+.rc { background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 12px; margin-bottom: 8px; }
+.rh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.rn { font-size: 11px; font-weight: 700; }
+.rb { font-size: 9px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.rb.lv { background: var(--acc-l); color: var(--acc); border: 1px solid var(--acc); }
+.rb.sh { background: var(--blu-l); color: var(--blu); border: 1px solid var(--blu); }
+.rdsc { font-size: 10px; color: var(--txt2); font-family: var(--fd); margin-bottom: 8px; }
+.rm { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.mt { font-size: 10px; padding: 3px 8px; background: var(--win); border: 1px solid var(--bdr); border-radius: 3px; font-family: var(--fd); }
+.rp { display: flex; gap: 6px; align-items: center; font-size: 10px; color: var(--txt2); }
+.rpb { height: 4px; flex: 1; background: #d4d0c5; border-radius: 2px; overflow: hidden; }
+.rpf { height: 100%; border-radius: 2px; }
+
+/* ============================================
+   INLINE INPUTS — Spend Controls
+   ============================================ */
+.ir { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.il { font-size: 10px; font-weight: 600; min-width: 140px; }
+.if { flex: 1; padding: 5px 8px; background: var(--win); border: 1px solid var(--bdr); border-radius: 3px; font-family: var(--fd); font-size: 11px; font-weight: 600; }
+.if:focus { outline: none; border-color: var(--acc); }
+.iu { font-size: 10px; color: var(--txt2); font-family: var(--fd); min-width: 60px; }
+
+/* ============================================
+   REPORT PACKS
+   ============================================ */
+.pc { background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 16px; margin-bottom: 10px; }
+.ph { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.pt { font-size: 13px; font-weight: 700; }
+.ps { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.ps.rdy { background: var(--acc-l); color: var(--acc); border: 1px solid var(--acc); }
+.pi { font-size: 11px; color: var(--txt2); font-family: var(--fd); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.pi::before { content: ''; width: 4px; height: 4px; border-radius: 1px; background: var(--acc); flex-shrink: 0; }
+.pa { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.btn { padding: 6px 14px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid; font-family: var(--fui); }
+.btn-p { background: var(--acc); color: #fff; border-color: var(--acc); }
+.btn-s { background: var(--win); color: var(--txt); border-color: var(--bdr); }
+
+/* ============================================
+   FILE UPLOAD
+   ============================================ */
+.uz { border: 2px dashed var(--bdr); border-radius: 4px; padding: 24px; text-align: center; margin-bottom: 12px; cursor: pointer; }
+.uz:hover { border-color: var(--acc); background: var(--acc-l); }
+.ut { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.us { font-size: 10px; color: var(--txt2); }
+
+/* File list */
+.file-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg); border: 1px solid var(--bdr); border-radius: 3px; margin-bottom: 4px; font-size: 10px; font-family: var(--fd); }
+.file-name { flex: 1; font-weight: 600; }
+.file-size { color: var(--txt2); min-width: 50px; }
+.file-date { color: var(--txt2); min-width: 50px; }
+.file-rm { color: var(--dng); cursor: pointer; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
+.file-rm:hover { background: var(--dng-l); }
+
+/* ============================================
+   RECONCILIATION TABLE
+   ============================================ */
+.rt { width: 100%; border-collapse: collapse; font-size: 11px; font-family: var(--fd); }
+.rt th { text-align: left; padding: 6px 10px; background: var(--bg); border: 1px solid var(--bdr); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--txt2); }
+.rt td { padding: 6px 10px; border: 1px solid var(--bdr); }
+.ms { font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; cursor: pointer; }
+.ms.ok { background: var(--acc-l); color: var(--acc); }
+.ms.rv { background: var(--wrn-l); color: var(--wrn); }
+
+/* Reconciliation review panel */
+.review-panel { background: var(--wrn-l); border: 1px solid var(--wrn); border-radius: 0 0 4px 4px; margin-top: -1px; font-family: var(--fd); }
+.review-item { padding: 8px 12px; border-bottom: 1px solid rgba(138,109,27,.2); font-size: 10px; }
+.review-item:last-child { border: none; }
+.review-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.review-date { color: var(--wrn); min-width: 65px; font-weight: 600; }
+.review-desc { flex: 1; font-weight: 600; }
+.review-amt { font-weight: 700; }
+.review-suggestion { color: var(--txt2); margin-bottom: 6px; padding-left: 73px; font-size: 10px; }
+.review-actions { display: flex; gap: 4px; padding-left: 73px; }
+.rbtn { font-size: 9px; padding: 3px 10px; border-radius: 3px; font-weight: 700; cursor: pointer; border: 1px solid; font-family: var(--fui); }
+.rbtn.confirm { background: var(--acc); color: #fff; border-color: var(--acc); }
+.rbtn.cat { background: var(--win); color: var(--txt); border-color: var(--bdr); }
+.rbtn.flag { background: var(--win); color: var(--wrn); border-color: var(--wrn); }
+
+/* ============================================
+   CONNECTOR GRID
+   ============================================ */
+.cg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ci { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--bdr); border-radius: 4px; padding: 6px 8px; font-size: 10px; cursor: pointer; }
+.ci:hover { border-color: var(--acc); }
+.cd { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cd.on { background: var(--acc); }
+.cd.off { background: var(--bdr); }
+.cn { font-weight: 600; font-size: 10px; }
+.ci .abtn { margin-left: auto; font-size: 9px; color: var(--acc); font-weight: 700; }
+
+/* ============================================
+   FOOTER BAR
+   ============================================ */
+.fbar { border-top: 1px solid var(--bdr); padding: 6px 12px; font-size: 10px; color: var(--txt2); font-family: var(--fd); display: flex; justify-content: space-between; background: var(--bg); }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ============================================
+   APPLICATION STATE
+   ============================================ */
+let pg = 'dashboard';    // Current page
+let wfM = 'apr';         // Waterfall month selection
+let rM = 'copilot';      // Routing mode
+let xFeed = null;        // Expanded feed item ID
+let xReview = null;      // Expanded review file
+
+/* ============================================
+   FINANCIAL DATA (mock)
+   ============================================ */
+const pnlData = {
+  feb: { rev: [7800, 2100, 520], cogs: [4200, 1600, 380], opex: [560, 340, 310, 280] },
+  mar: { rev: [8900, 2540, 640], cogs: [5100, 1800, 420], opex: [620, 380, 350, 300] },
+  apr: { rev: [9240, 2870, 780], cogs: [5890, 2000, 455], opex: [680, 412, 386, 320] }
+};
+
+const cashData = {
+  labels: ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'],
+  cash: [42100, 39800, 38200, 37400, 36800, 35720],
+  burn: [5200, 5400, 5100, 5600, 6210, 5740]
+};
+
+/* ============================================
+   AUDIT TRAIL DATA
+   ============================================ */
+const feedItems = [
+  { id: 0, t: '14:32', a: 'Rerouted classification to Haiku (was Sonnet)', b: 'rr', bl: 'Rerouted', s: '$0.12 saved',
+    d: { request_id: 'req_8f2a', model_requested: 'claude-sonnet-4', model_routed: 'claude-haiku-3.5',
+         reason: 'Classification task — Haiku in approved pool, 68% cheaper, equivalent F1.',
+         tokens: 'In: 340 | Out: 12', cost: '$0.0038 -> $0.0012', policy: 'Classification & extraction pool' }},
+  { id: 1, t: '14:28', a: 'Allowed code-gen to Sonnet (in pool)', b: 'al', bl: 'Allowed', s: '$0.84',
+    d: { request_id: 'req_8f1c', model_requested: 'claude-sonnet-4', model_routed: 'No change',
+         reason: 'Code-gen tag. Sonnet in pool, no cheaper equivalent at quality tier.',
+         tokens: 'In: 2,840 | Out: 1,200', cost: '$0.0840', policy: 'Code generation pool' }},
+  { id: 2, t: '14:15', a: 'Blocked — daily budget 92% consumed', b: 'bl', bl: 'Blocked', s: '$1.20 prevented',
+    d: { request_id: 'req_8f0a', reason: 'Daily budget $500 — $461 consumed (92%). Est. $1.20 would push to 93%.',
+         action: 'Rejected with 429. Client received budget_exceeded.',
+         budget: '$461 / $500', policy: 'Daily budget ceiling' }},
+  { id: 3, t: '14:02', a: 'Rerouted extraction to Flash (was GPT-4o)', b: 'rr', bl: 'Rerouted', s: '$0.08 saved',
+    d: { request_id: 'req_8ef4', model_requested: 'gpt-4o', model_routed: 'gemini-flash',
+         reason: 'Extraction task. Flash 90% cheaper, equivalent accuracy.',
+         tokens: 'In: 1,200 | Out: 380', cost: '$0.0094 -> $0.0011', policy: 'Classification & extraction pool' }},
+  { id: 4, t: '13:44', a: 'Circuit breaker warning — 2.8x hourly avg', b: 'ap', bl: 'Warning', s: 'Monitoring',
+    d: { reason: 'Hourly spend $142 vs 7-day avg $51/hr (2.8x). Threshold: 3x.',
+         action: 'Monitoring. Will pause at $153/hr.',
+         current: '$142/hr', threshold: '$153/hr (3x)', policy: 'Circuit breaker' }}
+];
+
+/* ============================================
+   RECONCILIATION DATA
+   ============================================ */
+const reviewData = {
+  mercury: [
+    { date: 'Mar 28', desc: 'DIGITAL OCEAN — server', amt: '$49.00', note: 'No connected provider. DigitalOcean not in connectors.' },
+    { date: 'Mar 22', desc: 'STRIPE ATLAS FEE', amt: '$500.00', note: 'One-time incorporation fee. No recurring connector match.' },
+    { date: 'Mar 15', desc: 'AMZN WEB SERVICES', amt: '$1,247.33', note: 'AWS connector shows $1,189.40. Difference $57.93 (likely taxes/fees).' },
+    { date: 'Mar 08', desc: 'WISE TRANSFER - USD', amt: '$2,400.00', note: 'Wise not connected. Outbound transfer — may be contractor payment.' }
+  ],
+  amex: [
+    { date: 'Mar 19', desc: 'NOTION TEAM PLAN', amt: '$96.00', note: 'Notion connector not enabled. Connect to auto-match future charges.' },
+    { date: 'Mar 05', desc: 'FIGMA PROFESSIONAL', amt: '$45.00', note: 'No Figma connector available. Manual categorization required.' }
+  ]
+};
+
+/* ============================================
+   HELPER FUNCTIONS
+   ============================================ */
+function fmt(v) { return v < 0 ? '-$' + Math.abs(v).toLocaleString() : '$' + v.toLocaleString(); }
+function sum(a) { return a.reduce((s, v) => s + v, 0); }
+
+/* ============================================
+   WATERFALL SVG GENERATOR
+   Proper connected waterfall: totals from zero,
+   decreases hang from previous total
+   ============================================ */
+function wfSVG(m) {
+  const d = pnlData[m];
+  const rev = sum(d.rev), cogs = sum(d.cogs), gp = rev - cogs;
+  const opx = sum(d.opex), ebitda = gp - opx;
+  const tax = Math.round(ebitda * .4), ni = ebitda - tax;
+
+  const items = [
+    { l: 'Revenue', v: rev, end: rev, t: 'tot' },
+    { l: 'COGS', v: -cogs, end: gp, t: 'dec' },
+    { l: 'Gross profit', v: gp, end: gp, t: 'tot' },
+    { l: 'OpEx', v: -opx, end: ebitda, t: 'dec' },
+    { l: 'EBITDA', v: ebitda, end: ebitda, t: 'tot' },
+    { l: 'Tax', v: -tax, end: ni, t: 'dec' },
+    { l: 'Net income', v: ni, end: ni, t: 'tot' }
+  ];
+
+  const W = 620, H = 165, pt = 25, pb = 30, pl = 10;
+  const cW = (W - pl * 2) / items.length;
+  const bW = cW * .55;
+  const mx = rev * 1.08;
+  const sy = v => ((H - pt - pb) * v / mx);
+  const yB = H - pb;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:var(--fd)">`;
+  let prev = 0;
+
+  items.forEach((it, i) => {
+    const cx = pl + i * cW + cW / 2, bx = cx - bW / 2;
+    let top, h, col;
+
+    if (it.t === 'tot') {
+      top = yB - sy(it.v);
+      h = sy(it.v);
+      col = '#1a5276'; // Blue for totals
+    } else {
+      const from = prev;
+      top = yB - sy(from);
+      h = sy(from - it.end);
+      col = '#a33228'; // Red for decreases
+    }
+
+    // Bar
+    svg += `<rect x="${bx}" y="${top}" width="${bW}" height="${Math.max(h, 1)}" fill="${col}" rx="2"/>`;
+
+    // Value label
+    const vs = it.v < 0
+      ? '(' + '$' + (Math.abs(it.v) / 1000).toFixed(1) + 'k' + ')'
+      : '$' + (it.v / 1000).toFixed(1) + 'k';
+    svg += `<text x="${cx}" y="${top - 5}" text-anchor="middle" font-size="9" font-weight="600" fill="${it.v < 0 ? '#a33228' : '#2c2a25'}">${vs}</text>`;
+
+    // X-axis label
+    svg += `<text x="${cx}" y="${yB + 14}" text-anchor="middle" font-size="8.5" fill="#6b675e">${it.l}</text>`;
+
+    // Connector line to next bar
+    if (i < items.length - 1) {
+      const lineY = yB - sy(it.end);
+      const nx = pl + (i + 1) * cW + cW / 2 - bW / 2;
+      svg += `<line x1="${bx + bW}" y1="${lineY}" x2="${nx}" y2="${lineY}" stroke="#8e8a7e" stroke-width="0.8" stroke-dasharray="3,2"/>`;
+    }
+
+    prev = it.end;
+  });
+
+  return svg + `</svg>`;
+}
+
+/* ============================================
+   P&L TABLE GENERATOR
+   3-month columnar income statement
+   ============================================ */
+function pnlTable() {
+  const ms = ['feb', 'mar', 'apr'], ml = ['Feb', 'Mar', 'Apr'];
+  function row(l, vs, c = '') {
+    return `<tr class="${c}"><td>${l}</td>${vs.map(v => `<td class="${v < 0 ? 'ng' : 'n'}">${fmt(v)}</td>`).join('')}</tr>`;
+  }
+  return `<table class="pnl"><tr><th></th>${ml.map(m => `<th class="num">${m} 2026</th>`).join('')}</tr>
+    <tr class="sh"><td colspan="4">Revenue</td></tr>
+    ${row('SaaS subscriptions', ms.map(m => pnlData[m].rev[0]), 'in')}
+    ${row('API usage', ms.map(m => pnlData[m].rev[1]), 'in')}
+    ${row('Crypto payments', ms.map(m => pnlData[m].rev[2]), 'in')}
+    ${row('Total revenue', ms.map(m => sum(pnlData[m].rev)), 'sub')}
+    <tr class="sh"><td colspan="4">Cost of goods sold</td></tr>
+    ${row('LLM inference', ms.map(m => -pnlData[m].cogs[0]), 'in')}
+    ${row('Cloud infra', ms.map(m => -pnlData[m].cogs[1]), 'in')}
+    ${row('Third-party APIs', ms.map(m => -pnlData[m].cogs[2]), 'in')}
+    ${row('Gross profit', ms.map(m => sum(pnlData[m].rev) - sum(pnlData[m].cogs)), 'sub')}
+    <tr class="sh"><td colspan="4">Operating expenses</td></tr>
+    ${row('Dev tools', ms.map(m => -pnlData[m].opex[0]), 'in')}
+    ${row('Monitoring', ms.map(m => -pnlData[m].opex[1]), 'in')}
+    ${row('Payment processing', ms.map(m => -pnlData[m].opex[2]), 'in')}
+    ${row('Other SaaS', ms.map(m => -pnlData[m].opex[3]), 'in')}
+    ${row('EBITDA', ms.map(m => { const g = sum(pnlData[m].rev) - sum(pnlData[m].cogs); return g - sum(pnlData[m].opex); }), 'sub')}
+    ${row('Tax provision', ms.map(m => { const g = sum(pnlData[m].rev) - sum(pnlData[m].cogs); return -Math.round((g - sum(pnlData[m].opex)) * .4); }), 'in')}
+    ${row('Net income', ms.map(m => { const g = sum(pnlData[m].rev) - sum(pnlData[m].cogs); const e = g - sum(pnlData[m].opex); return e - Math.round(e * .4); }), 'tot')}
+  </table>`;
+}
+
+/* ============================================
+   SCREEN RENDERERS
+   ============================================ */
+const S = {
+  dashboard: () => `
+    <div class="ab dng">! Circuit breaker: "prodbot" hit $420 daily ceiling in 3 hrs. Requests paused.</div>
+    <div class="mr">
+      <div class="mc"><div class="ml">Revenue (MTD)</div><div class="mv">$12,890</div><div class="md d">+8% vs prior</div></div>
+      <div class="mc"><div class="ml">Net income (MTD)</div><div class="mv">$1,247</div><div class="md d">Margin: 9.7%</div></div>
+      <div class="mc"><div class="ml">Total spend (MTD)</div><div class="mv">$11,643</div><div class="md u">+12% vs prior</div></div>
+      <div class="mc"><div class="ml">ANVX savings</div><div class="mv">$934</div><div class="md d">8% cost reduction</div></div>
+    </div>
+    <div class="st"><span>Revenue waterfall</span>
+      <div class="wf-sel">${['feb','mar','apr'].map(m => `<div class="wf-btn ${wfM===m?'a':''}" onclick="wfM='${m}';render()">${m[0].toUpperCase()+m.slice(1)}</div>`).join('')}</div>
+    </div>
+    <div class="wf-wrap">${wfSVG(wfM)}
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--txt2);font-family:var(--fd)">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#1a5276"></span>Totals</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#a33228"></span>Costs</span>
+      </div>
+    </div>
+    <div class="st"><span>Income statement (3-month)</span></div>
+    ${pnlTable()}
+    <div class="st"><span>Cash position & runway</span></div>
+    <div class="chart-wrap">
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-swatch" style="background:#1a5276"></div>Cash position (left)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#a33228;height:0;border-top:2px dashed #a33228"></div>Monthly burn (right)</div>
+      </div>
+      <div class="chart-inner"><canvas id="cashChart"></canvas></div>
+    </div>`,
+
+  routing: () => `
+    <div class="st" style="margin-top:0"><span>Execution mode</span></div>
+    <div class="mode-cards">
+      ${[{k:'shadow',n:'Shadow',d:'Observe and recommend only.',t:1},{k:'copilot',n:'Copilot',d:'Enforce policies. Approve major decisions.',t:2},{k:'autopilot',n:'Autopilot',d:'Fully autonomous within boundaries.',t:3}].map(m => `
+        <div class="mode-card ${rM===m.k?'sel':''}" onclick="rM='${m.k}';xFeed=null;render()">
+          <div class="mode-radio"></div>
+          <div class="mode-name">${m.n}</div>
+          <div class="mode-desc">${m.d}</div>
+          <div class="mode-trust"><span>Trust</span><div class="trust-dots">${[1,2,3].map(i => `<div class="trust-dot ${i<=m.t?'f':''}"></div>`).join('')}</div></div>
+        </div>`).join('')}
+    </div>
+    ${rM==='shadow' ? `
+      <div class="st"><span>Recommendations</span></div>
+      <div class="si"><div class="si-h"><div class="si-t">Routing opportunity</div><div class="si-s">~$187/wk</div></div><div class="si-d">47 classification requests to Sonnet could use Haiku at equivalent quality.</div><div style="display:flex;gap:6px;margin-top:8px"><div class="btn btn-p" style="font-size:10px;padding:4px 10px">Accept rule</div><div class="btn btn-s" style="font-size:10px;padding:4px 10px">Dismiss</div></div></div>
+      <div class="si"><div class="si-h"><div class="si-t">Budget protection</div><div class="si-s">~$840 prevented</div></div><div class="si-d">3 spike events. Circuit breaker would have saved ~$840.</div><div style="display:flex;gap:6px;margin-top:8px"><div class="btn btn-p" style="font-size:10px;padding:4px 10px">Enable</div><div class="btn btn-s" style="font-size:10px;padding:4px 10px">Keep observing</div></div></div>
+    ` : rM==='copilot' ? `
+      <div class="st"><span>Awaiting approval</span></div>
+      <div class="fi" style="border-color:var(--wrn);background:var(--wrn-l)"><span class="ft">14:32</span><span class="fa" style="color:var(--wrn);font-weight:600">Daily budget 92%. Block remaining?</span><div class="btn btn-p" style="font-size:9px;padding:2px 8px">Approve</div><div class="btn btn-s" style="font-size:9px;padding:2px 8px">Override</div></div>
+      <div class="st"><span>Audit trail — click to expand</span></div>
+    ` : `<div class="st"><span>Autopilot log — click to expand</span></div>`}
+    ${rM !== 'shadow' ? feedItems.map(f => `
+      <div class="fi" onclick="xFeed=xFeed===${f.id}?null:${f.id};render()"><span class="ft">${f.t}</span><span class="fa">${f.a}</span><span class="fb ${f.b}">${f.bl}</span><span style="min-width:80px;text-align:right;font-weight:600">${f.s}</span></div>
+      ${xFeed===f.id ? `<div class="fi-detail">${Object.entries(f.d).map(([k,v]) => `<div class="fi-detail-row"><span class="fi-detail-label">${k.replace(/_/g,' ')}</span><span class="fi-detail-val">${v}</span></div>`).join('')}</div>` : ''}`).join('') : ''}
+    <div class="st"><span>Model routing rules</span></div>
+    ${[{n:'Code generation',d:'No substitution below this tier.',m:['claude-sonnet-4','gpt-4o'],q:80,c:30},{n:'Classification & extraction',d:'Speed and cost priority.',m:['claude-haiku-3.5','gemini-flash','gpt-4o-mini'],q:30,c:90},{n:'Agent planning',d:'Single model only.',m:['claude-opus-4'],q:100,c:0}].map(r => `
+      <div class="rc"><div class="rh"><div class="rn">${r.n}</div><div class="rb ${rM==='shadow'?'sh':'lv'}">${rM==='shadow'?'Shadow':'Live'}</div></div><div class="rdsc">${r.d}</div><div class="rm">${r.m.map(m => `<div class="mt">${m}</div>`).join('')}</div><div class="rp"><span>Optimize:</span><span style="font-weight:600">Quality</span><div class="rpb"><div class="rpf" style="width:${r.q}%;background:var(--acc)"></div></div><span>Cost</span><div class="rpb"><div class="rpf" style="width:${r.c}%;background:var(--blu)"></div></div></div></div>`).join('')}
+    <div class="st"><span>Spend controls</span></div>
+    <div class="rc">
+      ${[{l:'Daily budget',v:'$500',u:'per day'},{l:'Monthly budget',v:'$12,000',u:'per month'},{l:'Per-request cap',v:'$2.00',u:'max / request'},{l:'Circuit breaker',v:'3x',u:'vs 7-day hourly avg'},{l:'Runway alert',v:'3',u:'months minimum'}].map(i => `<div class="ir"><div class="il">${i.l}</div><input class="if" type="text" value="${i.v}" style="max-width:100px"><div class="iu">${i.u}</div></div>`).join('')}
+      <div class="ir"><div class="il">When budget hit</div><select class="if" style="max-width:200px"><option>Block requests</option><option>Fall back to cheapest</option><option>Alert only</option></select><div class="iu"></div></div>
+    </div>`,
+
+  reports: () => `
+    <div class="st" style="margin-top:0"><span>Close packs</span></div>
+    <div class="pc"><div class="ph"><div><div class="pt">March 2026 — Monthly close</div><div style="font-size:10px;color:var(--txt2);margin-top:2px;font-family:var(--fd)">28 providers + 2 bank statements reconciled</div></div><div class="ps rdy">Ready</div></div><div class="pi">Consolidated spend by provider and category</div><div class="pi">LLM inference breakdown (tokens, cost, model, project)</div><div class="pi">Revenue reconciliation (Stripe + crypto vs bank deposits)</div><div class="pi">Bank statement reconciliation (Mercury — 138/142 matched)</div><div class="pi">Anomaly log and circuit breaker events</div><div class="pi">Chart of accounts mapping + accountant notes</div><div class="pa"><div class="btn btn-p">Download PDF</div><div class="btn btn-s">Preview</div><div class="btn btn-s">Send to accountant</div></div></div>
+    <div class="pc"><div class="ph"><div><div class="pt">Q1 2026 — AI audit pack</div><div style="font-size:10px;color:var(--txt2);margin-top:2px;font-family:var(--fd)">Quarterly AI spend + optimization report</div></div><div class="ps rdy">Ready</div></div><div class="pi">Quarter-over-quarter inference spend trend</div><div class="pi">Model usage and routing efficiency</div><div class="pi">Realized vs missed savings</div><div class="pi">Provider cost comparison</div><div class="pa"><div class="btn btn-p">Download PDF</div><div class="btn btn-s">Preview</div></div></div>
+    <div class="st"><span>Audit trail exports</span></div>
+    <div class="pc"><div class="ph"><div><div class="pt">Routing audit trail — March 2026</div><div style="font-size:10px;color:var(--txt2);margin-top:2px;font-family:var(--fd)">8,412 routing decisions | 342 reroutes | 18 blocks | 3 circuit breaker events</div></div><div class="ps rdy">Ready</div></div><div class="pi">Full decision log with model, cost, policy, and reasoning per request</div><div class="pi">Reroute summary (models substituted, savings realized)</div><div class="pi">Block and circuit breaker event log with trigger details</div><div class="pi">Shadow mode recommendation acceptance/rejection history</div><div class="pa"><div class="btn btn-p">Download CSV</div><div class="btn btn-s">Download PDF summary</div></div></div>
+    <div class="st"><span>Handoff settings</span></div>
+    <div class="rc"><div class="ir"><div class="il">Auto-generate on</div><select class="if" style="max-width:180px"><option>1st of each month</option><option>Last day</option><option>Custom</option></select><div class="iu"></div></div><div class="ir"><div class="il">Email to accountant</div><input class="if" type="text" value="janet@theirfirm.com" style="max-width:200px"><div class="iu"></div></div><div class="ir"><div class="il">Pack format</div><select class="if" style="max-width:180px"><option>PDF + CSV attachments</option><option>PDF only</option><option>CSV export only</option></select><div class="iu"></div></div></div>`,
+
+  data: () => `
+    <div class="st" style="margin-top:0"><span>Upload financial data</span></div>
+    <div class="uz"><div style="font-size:18px;margin-bottom:6px;color:var(--txt2)">[+]</div><div class="ut">Drop CSV, bank statement, or invoice here</div><div class="us">.csv, .xlsx, .pdf — auto-matches against connected provider data</div></div>
+    <div class="st"><span>Uploaded files</span></div>
+    ${[{n:'mercury_mar2026.csv',s:'142 rows',d:'Apr 2'},{n:'coinbase_q1_export.csv',s:'89 rows',d:'Apr 1'},{n:'amex_statement_mar.pdf',s:'36 txns',d:'Mar 31'},{n:'aws_invoice_mar.pdf',s:'1 page',d:'Mar 31'}].map(f => `<div class="file-item"><div class="file-name">${f.n}</div><div class="file-size">${f.s}</div><div class="file-date">${f.d}</div><div class="file-rm" onclick="this.parentElement.style.display='none'">x</div></div>`).join('')}
+    <div class="st"><span>Reconciliation — click status to review</span></div>
+    <table class="rt"><thead><tr><th>File</th><th>Matched</th><th>Status</th></tr></thead><tbody>
+      <tr><td style="font-weight:600">mercury_mar2026.csv</td><td>138 / 142</td><td><span class="ms rv" onclick="xReview=xReview==='mercury'?null:'mercury';render()">4 need review</span></td></tr>
+      ${xReview==='mercury' ? `<tr><td colspan="3" style="padding:0"><div class="review-panel">${reviewData.mercury.map(r => `<div class="review-item"><div class="review-top"><span class="review-date">${r.date}</span><span class="review-desc">${r.desc}</span><span class="review-amt">${r.amt}</span></div><div class="review-suggestion">${r.note}</div><div class="review-actions"><div class="rbtn confirm">Confirm match</div><div class="rbtn cat">Categorize</div><div class="rbtn flag">Flag for accountant</div></div></div>`).join('')}</div></td></tr>` : ''}
+      <tr><td style="font-weight:600">coinbase_q1_export.csv</td><td>89 / 89</td><td><span class="ms ok">All matched</span></td></tr>
+      <tr><td style="font-weight:600">amex_statement_mar.pdf</td><td>34 / 36</td><td><span class="ms rv" onclick="xReview=xReview==='amex'?null:'amex';render()">2 need review</span></td></tr>
+      ${xReview==='amex' ? `<tr><td colspan="3" style="padding:0"><div class="review-panel">${reviewData.amex.map(r => `<div class="review-item"><div class="review-top"><span class="review-date">${r.date}</span><span class="review-desc">${r.desc}</span><span class="review-amt">${r.amt}</span></div><div class="review-suggestion">${r.note}</div><div class="review-actions"><div class="rbtn confirm">Confirm match</div><div class="rbtn cat">Categorize</div><div class="rbtn flag">Flag for accountant</div></div></div>`).join('')}</div></td></tr>` : ''}
+      <tr><td style="font-weight:600">aws_invoice_mar.pdf</td><td>1 / 1</td><td><span class="ms ok">Matched</span></td></tr>
+    </tbody></table>
+    <div class="st"><span>Connected providers (28)</span></div>
+    <div class="cg">${[{n:'Anthropic',o:1},{n:'OpenAI',o:1},{n:'Google AI',o:1},{n:'AWS',o:1},{n:'Vercel',o:1},{n:'Cloudflare',o:1},{n:'Stripe',o:1},{n:'Coinbase',o:1},{n:'Binance',o:1},{n:'Twilio',o:1},{n:'SendGrid',o:1},{n:'Datadog',o:1},{n:'LangSmith',o:1},{n:'Pinecone',o:1},{n:'Tavily',o:1},{n:'Ethereum',o:1},{n:'Solana',o:1},{n:'Base',o:1},{n:'Cursor',o:1},{n:'GitHub',o:1},{n:'Supabase',o:1},{n:'Mercury',o:1},{n:'Wise',o:0},{n:'PayPal',o:0},{n:'Replicate',o:0},{n:'Cohere',o:0},{n:'Together',o:0},{n:'Notion',o:0}].map(c => `<div class="ci"><div class="cd ${c.o?'on':'off'}"></div><div class="cn">${c.n}</div>${!c.o?`<span class="abtn">Connect</span>`:''}</div>`).join('')}</div>`
+};
+
+/* ============================================
+   MAIN RENDER FUNCTION
+   ============================================ */
+function render() {
+  document.getElementById('app').innerHTML = `
+    <div class="win">
+      <div class="tbar">
+        <div class="dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <div class="ttxt">ANVX — Financial Autopilot</div>
+      </div>
+      <div class="mbar">
+        ${[['dashboard','Dashboard'],['routing','Routing'],['reports','Reports'],['data','Data']].map(([k,l]) => `<div class="mi ${pg===k?'a':''}" onclick="pg='${k}';render()">${l}</div>`).join('')}
+      </div>
+      <div class="cnt">${S[pg]()}</div>
+      <div class="fbar">
+        <span>Workspace: acme-labs | 28 providers</span>
+        <span>Last sync: 2 min ago | anvx.io/v1</span>
+      </div>
+    </div>`;
+
+  // Initialize Chart.js on dashboard
+  if (pg === 'dashboard') {
+    const c = document.getElementById('cashChart');
+    if (c) {
+      new Chart(c, {
+        type: 'line',
+        data: {
+          labels: cashData.labels,
+          datasets: [
+            { label: 'Cash position', data: cashData.cash, borderColor: '#1a5276', backgroundColor: 'rgba(26,82,118,0.08)', fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: '#1a5276', borderWidth: 2 },
+            { label: 'Monthly burn', data: cashData.burn, borderColor: '#a33228', backgroundColor: 'transparent', borderDash: [6,3], tension: .3, pointRadius: 5, pointBackgroundColor: '#a33228', borderWidth: 2, yAxisID: 'y1' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { position: 'left', ticks: { callback: v => '$'+(v/1000)+'k', font: {size:10} }, grid: { color: 'rgba(0,0,0,.06)' }, title: { display: true, text: 'Cash position', font: {size:9} } },
+            y1: { position: 'right', ticks: { callback: v => '$'+(v/1000)+'k', font: {size:10} }, grid: { display: false }, title: { display: true, text: 'Monthly burn', font: {size:9} } },
+            x: { grid: { display: false }, ticks: { font: {size:10} } }
+          }
+        }
+      });
+    }
+  }
+}
+
+// Initial render
+render();
+</script>
+
+</body>
+</html>
