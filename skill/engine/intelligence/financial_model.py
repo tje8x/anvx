@@ -21,6 +21,7 @@ from engine.utils import format_currency, format_percent
 
 logger = logging.getLogger(__name__)
 
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 _DEFAULT_STATE_DIR = Path.home() / ".token-economy-intel"
 _DEFAULT_STATE_FILE = _DEFAULT_STATE_DIR / "model.json"
 

@@ -1,3 +1,4 @@
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 """Token Economy Intelligence — MCP Server.
 
 Provides unified financial intelligence across LLM costs, cloud infrastructure,

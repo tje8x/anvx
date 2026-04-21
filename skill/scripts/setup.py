@@ -30,6 +30,7 @@ from engine.connectors import (
 from engine.intelligence import FinancialModelManager, categorise_records
 from engine.utils import format_currency, get_date_range, is_onboarding_test_mode, is_synthetic_mode
 
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 _DATA_DIR = Path.home() / ".token-economy-intel"
 
 _ACCOUNT_GROUPS = [

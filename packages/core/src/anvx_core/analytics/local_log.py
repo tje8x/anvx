@@ -7,6 +7,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 _DEFAULT_LOG_PATH = Path.home() / ".token-economy-intel" / "events.jsonl"
 
 

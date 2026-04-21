@@ -1,3 +1,4 @@
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 """Real-time LLM pricing fetcher with caching.
 
 Primary source: OpenRouter API (no auth required).
@@ -16,6 +17,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# v1-compat: filesystem state path, removed post-launch with v1 fallback code
 _CACHE_DIR = Path.home() / ".token-economy-intel"
 _CACHE_FILE = _CACHE_DIR / "pricing_cache.json"
 _CACHE_TTL_SECONDS = 86400  # 24 hours
