@@ -14,3 +14,4 @@ build/
 .mcpregistry_github_token
 .env.example
 .env
+.env.local
