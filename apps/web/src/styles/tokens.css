@@ -1,0 +1,22 @@
+:root {
+	--anvx-bg: #e8e4d9;
+	--anvx-win: #f5f3ed;
+	--anvx-bdr: #8e8a7e;
+	--anvx-acc: #2d5a27;
+	--anvx-acc-light: #e8f0e7;
+	--anvx-danger: #a33228;
+	--anvx-danger-light: #fce8e6;
+	--anvx-warn: #8a6d1b;
+	--anvx-warn-light: #fdf4dc;
+	--anvx-info: #1a5276;
+	--anvx-info-light: #e1eef6;
+	--anvx-text: #2c2a25;
+	--anvx-text-dim: #6b675e;
+}
+
+body {
+	font-family: var(--font-ui), 'Space Mono', monospace;
+	font-size: 12px;
+	background: var(--anvx-bg);
+	color: var(--anvx-text);
+}

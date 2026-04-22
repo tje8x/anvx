@@ -1,19 +1,18 @@
-import { auth } from '@clerk/nextjs/server'
-import { UserButton, OrganizationSwitcher } from '@clerk/nextjs'
+import SectionTitle from '@/components/anvx/section-title'
+import MetricCard from '@/components/anvx/metric-card'
 
-export default async function DashboardPage() {
-  const { userId, orgId, orgRole } = await auth()
+export default function DashboardPage() {
   return (
-    <div className="min-h-screen p-8">
-      <header className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <OrganizationSwitcher afterCreateOrganizationUrl="/dashboard" />
-          <UserButton />
-        </div>
-      </header>
-      <p className="text-sm text-gray-600">
-        User: {userId} · Org: {orgId} · Role: {orgRole}
+    <div>
+      <SectionTitle>Overview</SectionTitle>
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        <MetricCard label="Total spend (30d)" value="—" />
+        <MetricCard label="Top provider" value="—" />
+        <MetricCard label="Runway" value="—" />
+        <MetricCard label="Prevented" value="—" />
+      </div>
+      <p className="text-[11px] font-data text-anvx-text-dim">
+        Live data coming in Week 6
       </p>
     </div>
   )

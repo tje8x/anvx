@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import localFont from "next/font/local";
+import { Space_Mono, IBM_Plex_Mono } from 'next/font/google'
 import "./globals.css";
+import '../styles/tokens.css'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -13,6 +15,18 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
   weight: "100 900",
 });
+
+const fontUi = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-ui',
+})
+
+const fontData = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-data',
+})
 
 export const metadata: Metadata = {
   title: "anvx",
@@ -26,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" className={`${fontUi.variable} ${fontData.variable}`}>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
