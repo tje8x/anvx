@@ -63,11 +63,9 @@ async def get_context(request: Request) -> WorkspaceContext:
 	)
 
 def require_role(min_role: Role):
-	"""FastAPI dependency: enforces the caller has at least min_role."""
-	async def _checker(ctx: WorkspaceContext = Depends(get_context)) ->
-WorkspaceContext:
-		if ROLE_RANK[ctx.role] < ROLE_RANK[min_role]:
-			raise HTTPException(403, f"Requires role >= {min_role}, have
-{ctx.role}")
-		return ctx
-	return _checker
+    """FastAPI dependency: enforces the caller has at least min_role."""
+    async def _checker(ctx: WorkspaceContext = Depends(get_context)) -> WorkspaceContext:
+        if ROLE_RANK[ctx.role] < ROLE_RANK[min_role]:
+            raise HTTPException(403, f"Requires role >= {min_role}, have {ctx.role}")
+        return ctx
+    return _checker
