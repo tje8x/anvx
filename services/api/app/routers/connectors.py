@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -114,7 +115,7 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
             raise HTTPException(400, f"Invalid manifest: {e}")
 
         # Store manifest as encrypted envelope (same column, different semantics)
-        envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+        envelope = crypto.encrypt(body.api_key, UUID(ctx.workspace_id))
         result = sb.from_("provider_keys").insert({
             "workspace_id": ctx.workspace_id,
             "provider": body.provider,
@@ -146,7 +147,7 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
         except Exception as e:
             raise HTTPException(400, f"Validation failed: {e}")
 
-        envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+        envelope = crypto.encrypt(body.api_key, UUID(ctx.workspace_id))
         result = sb.from_("provider_keys").insert({
             "workspace_id": ctx.workspace_id,
             "provider": body.provider,
@@ -187,7 +188,7 @@ async def rotate_connector(key_id: str, body: RotateBody, ctx: WorkspaceContext 
     except Exception as e:
         raise HTTPException(400, f"Validation failed: {e}")
 
-    envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+    envelope = crypto.encrypt(body.api_key, UUID(ctx.workspace_id))
     sb.from_("provider_keys").update({"envelope": envelope}).eq("id", key_id).execute()
 
     _audit(sb, ctx.workspace_id, ctx.user_id, "credential:rotate", "provider_key", key_id, {"provider": provider})
@@ -220,7 +221,7 @@ async def sync_connector(key_id: str, ctx: WorkspaceContext = Depends(require_ro
     if not connector:
         raise HTTPException(400, f"Unknown provider: {provider}")
 
-    api_key = crypto.decrypt_api_key(ctx.workspace_id, envelope)
+    api_key = crypto.decrypt(envelope, UUID(ctx.workspace_id))
 
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=30)
