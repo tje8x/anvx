@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import connectors as connectors_router
 from .routers import insights as insights_router
 from .routers import models as models_router
+from .routers import policies as policies_router
+from .routers import routing as routing_router
 from .routers import routing_rules as routing_rules_router
 from .routers import shadow as shadow_router
 from .routers import tokens as tokens_router
@@ -36,6 +38,8 @@ app.include_router(tokens_router.router, prefix="/api/v2")
 app.include_router(shadow_router.router, prefix="/api/v2")
 app.include_router(routing_rules_router.router, prefix="/api/v2")
 app.include_router(models_router.router, prefix="/api/v2")
+app.include_router(policies_router.router, prefix="/api/v2")
+app.include_router(routing_router.router, prefix="/api/v2")
 
 
 @app.get("/health")

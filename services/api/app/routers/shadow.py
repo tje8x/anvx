@@ -17,7 +17,10 @@ class RespondBody(BaseModel):
 
 @router.get("/shadow/recommendations")
 async def get_shadow_recommendations(ctx: WorkspaceContext = Depends(require_role("member"))):
-    refresh_recommendations(ctx.workspace_id)
+    try:
+        refresh_recommendations(ctx.workspace_id)
+    except Exception:
+        pass  # Best-effort refresh — don't block the list
     return list_for_workspace(ctx.workspace_id)
 
 

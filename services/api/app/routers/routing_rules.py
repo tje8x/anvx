@@ -38,7 +38,7 @@ def _audit(sb, workspace_id: str, actor_user_id: str, action: str, target_id: st
 @router.get("/routing-rules")
 async def list_rules(ctx: WorkspaceContext = Depends(require_role("member"))):
     sb = sb_service()
-    result = sb.from_("routing_rules").select("*").eq("workspace_id", ctx.workspace_id).order("created_at", desc=True).execute()
+    result = sb.from_("model_routing_rules").select("*").eq("workspace_id", ctx.workspace_id).order("created_at", desc=True).execute()
     return result.data or []
 
 
@@ -50,7 +50,7 @@ async def create_rule(body: RuleCreate, ctx: WorkspaceContext = Depends(require_
 
     sb = sb_service()
     try:
-        result = sb.from_("routing_rules").insert({
+        result = sb.from_("model_routing_rules").insert({
             "workspace_id": ctx.workspace_id,
             "name": body.name,
             "description": body.description,
@@ -75,7 +75,7 @@ async def update_rule(rule_id: str, body: RuleUpdate, ctx: WorkspaceContext = De
     sb = sb_service()
 
     # Load current row
-    lookup = sb.from_("routing_rules").select("*").eq("id", rule_id).eq("workspace_id", ctx.workspace_id).single().execute()
+    lookup = sb.from_("model_routing_rules").select("*").eq("id", rule_id).eq("workspace_id", ctx.workspace_id).single().execute()
     if not lookup.data:
         raise HTTPException(404, "Routing rule not found")
 
@@ -107,7 +107,7 @@ async def update_rule(rule_id: str, body: RuleUpdate, ctx: WorkspaceContext = De
         raise HTTPException(400, f"quality_priority + cost_priority must sum to 100, got {total}")
 
     try:
-        result = sb.from_("routing_rules").update(updates).eq("id", rule_id).eq("workspace_id", ctx.workspace_id).execute()
+        result = sb.from_("model_routing_rules").update(updates).eq("id", rule_id).eq("workspace_id", ctx.workspace_id).execute()
     except Exception as e:
         err_str = str(e)
         if "duplicate" in err_str.lower() or "unique" in err_str.lower() or "23505" in err_str:
@@ -123,10 +123,10 @@ async def update_rule(rule_id: str, body: RuleUpdate, ctx: WorkspaceContext = De
 async def delete_rule(rule_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
     sb = sb_service()
 
-    lookup = sb.from_("routing_rules").select("id, name").eq("id", rule_id).eq("workspace_id", ctx.workspace_id).single().execute()
+    lookup = sb.from_("model_routing_rules").select("id, name").eq("id", rule_id).eq("workspace_id", ctx.workspace_id).single().execute()
     if not lookup.data:
         raise HTTPException(404, "Routing rule not found")
 
-    sb.from_("routing_rules").delete().eq("id", rule_id).eq("workspace_id", ctx.workspace_id).execute()
+    sb.from_("model_routing_rules").delete().eq("id", rule_id).eq("workspace_id", ctx.workspace_id).execute()
     _audit(sb, ctx.workspace_id, ctx.user_id, "routing_rule:delete", rule_id, {"name": lookup.data["name"]})
     return {"ok": True}

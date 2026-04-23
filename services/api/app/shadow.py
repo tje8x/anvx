@@ -30,7 +30,7 @@ _MIN_SAVINGS_CENTS = 100  # $1
 
 def _lookup_model_price(sb, provider: str, model: str) -> dict:
     """Look up model price from models table. Returns {input, output} in cents per MTok."""
-    result = sb.from_("models").select("input_price_per_mtok_cents, output_price_per_mtok_cents").eq("provider", provider).eq("model", model).maybeSingle().execute()
+    result = sb.from_("models").select("input_price_per_mtok_cents, output_price_per_mtok_cents").eq("provider", provider).eq("model", model).maybe_single().execute()
     if result.data:
         return {"input": result.data["input_price_per_mtok_cents"] or _FALLBACK_PRICE["input"], "output": result.data["output_price_per_mtok_cents"] or _FALLBACK_PRICE["output"]}
     return dict(_FALLBACK_PRICE)
@@ -69,7 +69,7 @@ class BudgetProtection:
 def compute_routing_opportunities(workspace_id: str, window_days: int = 7) -> list[RoutingOpportunity]:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=window_days)).isoformat()
     sb = sb_service()
-    result = sb.from_("routing_usage_records").select("model_routed, tokens_in, tokens_out, provider_cost_cents").eq("workspace_id", workspace_id).gte("ts", cutoff).execute()
+    result = sb.from_("routing_usage_records").select("model_routed, tokens_in, tokens_out, provider_cost_cents").eq("workspace_id", workspace_id).gte("created_at", cutoff).execute()
     rows = result.data or []
     if not rows:
         return []
@@ -118,7 +118,7 @@ def compute_routing_opportunities(workspace_id: str, window_days: int = 7) -> li
 def compute_budget_protections(workspace_id: str, window_days: int = 7) -> list[BudgetProtection]:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=window_days)).isoformat()
     sb = sb_service()
-    result = sb.from_("routing_usage_records").select("ts, provider_cost_cents").eq("workspace_id", workspace_id).gte("ts", cutoff).order("ts").execute()
+    result = sb.from_("routing_usage_records").select("created_at, provider_cost_cents").eq("workspace_id", workspace_id).gte("created_at", cutoff).order("created_at").execute()
     rows = result.data or []
     if not rows:
         return []
@@ -126,7 +126,7 @@ def compute_budget_protections(workspace_id: str, window_days: int = 7) -> list[
     # Bucket by hour
     hourly: dict[str, int] = defaultdict(int)
     for r in rows:
-        ts_str = r.get("ts", "")
+        ts_str = r.get("created_at", "")
         try:
             ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             hour_key = ts.strftime("%Y-%m-%dT%H")
@@ -160,12 +160,18 @@ def refresh_recommendations(workspace_id: str) -> None:
     sb = sb_service()
 
     # Get existing unresponded recommendation kinds
-    existing = sb.from_("shadow_recommendations").select("kind").eq("workspace_id", workspace_id).is_("user_response", "null").execute()
-    existing_kinds = {r["kind"] for r in (existing.data or [])}
+    try:
+        existing = sb.from_("shadow_recommendations").select("kind").eq("workspace_id", workspace_id).is_("user_response", "null").execute()
+        existing_kinds = {r["kind"] for r in (existing.data or [])}
+    except Exception:
+        existing_kinds = set()
 
     # Routing opportunities
     if RecommendationKind.ROUTING_OPPORTUNITY.value not in existing_kinds:
-        opps = compute_routing_opportunities(workspace_id)
+        try:
+            opps = compute_routing_opportunities(workspace_id)
+        except Exception:
+            opps = []
         for opp in opps:
             sb.from_("shadow_recommendations").insert({
                 "workspace_id": workspace_id,
@@ -178,7 +184,10 @@ def refresh_recommendations(workspace_id: str) -> None:
 
     # Budget protections
     if RecommendationKind.BUDGET_PROTECTION.value not in existing_kinds:
-        bps = compute_budget_protections(workspace_id)
+        try:
+            bps = compute_budget_protections(workspace_id)
+        except Exception:
+            bps = []
         for bp in bps:
             sb.from_("shadow_recommendations").insert({
                 "workspace_id": workspace_id,
@@ -192,6 +201,9 @@ def refresh_recommendations(workspace_id: str) -> None:
 
 def list_for_workspace(workspace_id: str) -> list[dict]:
     """Return unresponded shadow_recommendations ordered by estimated_value_cents desc."""
-    sb = sb_service()
-    result = sb.from_("shadow_recommendations").select("id, kind, headline, detail, estimated_value_cents, metadata, created_at").eq("workspace_id", workspace_id).is_("user_response", "null").order("estimated_value_cents", desc=True).execute()
-    return result.data or []
+    try:
+        sb = sb_service()
+        result = sb.from_("shadow_recommendations").select("id, kind, headline, detail, estimated_value_cents, metadata, created_at").eq("workspace_id", workspace_id).is_("user_response", "null").order("estimated_value_cents", desc=True).execute()
+        return result.data or []
+    except Exception:
+        return []
