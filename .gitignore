@@ -16,3 +16,4 @@ build/
 .env
 .env.local
 services/api/.env
+.env.check

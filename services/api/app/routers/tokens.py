@@ -33,7 +33,7 @@ async def create_token(body: CreateTokenBody, ctx: WorkspaceContext = Depends(re
     token_prefix = plaintext[:18]
 
     sb = sb_service()
-    result = sb.from_("tokens").insert({
+    result = sb.from_("anvx_api_tokens").insert({
         "workspace_id": ctx.workspace_id,
         "label": body.label,
         "token_hash": token_hash,
@@ -50,7 +50,7 @@ async def create_token(body: CreateTokenBody, ctx: WorkspaceContext = Depends(re
 @router.get("/tokens")
 async def list_tokens(ctx: WorkspaceContext = Depends(require_role("member"))):
     sb = sb_service()
-    result = sb.from_("tokens").select("id, label, token_prefix, created_at, last_used_at, revoked_at, created_by_user_id").eq("workspace_id", ctx.workspace_id).is_("revoked_at", "null").order("created_at", desc=True).execute()
+    result = sb.from_("anvx_api_tokens").select("id, label, token_prefix, created_at, last_used_at, revoked_at, created_by_user_id").eq("workspace_id", ctx.workspace_id).is_("revoked_at", "null").order("created_at", desc=True).execute()
     return [{"id": r["id"], "label": r["label"], "prefix": r["token_prefix"], "created_at": r["created_at"], "last_used_at": r.get("last_used_at"), "revoked_at": r.get("revoked_at"), "created_by_user_id": r["created_by_user_id"]} for r in (result.data or [])]
 
 
@@ -58,6 +58,6 @@ async def list_tokens(ctx: WorkspaceContext = Depends(require_role("member"))):
 async def revoke_token(token_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
     sb = sb_service()
     now = datetime.now(timezone.utc).isoformat()
-    sb.from_("tokens").update({"revoked_at": now}).eq("id", token_id).eq("workspace_id", ctx.workspace_id).execute()
+    sb.from_("anvx_api_tokens").update({"revoked_at": now}).eq("id", token_id).eq("workspace_id", ctx.workspace_id).execute()
     _audit(sb, ctx.workspace_id, ctx.user_id, "token:revoke", "token", token_id)
     return {"ok": True}
