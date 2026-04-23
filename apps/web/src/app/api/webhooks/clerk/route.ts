@@ -126,6 +126,37 @@ export async function POST(req: NextRequest) {
               user_id: owner.id,
               role: 'owner',
             })
+
+          // Seed default routing rules for the new workspace
+          await sb.from('routing_rules').insert([
+            {
+              workspace_id: workspace.id,
+              name: 'Code generation',
+              description: 'Higher reasoning tasks — accept premium models for quality.',
+              approved_models: ['anthropic/claude-sonnet-4', 'openai/gpt-4o'],
+              quality_priority: 80,
+              cost_priority: 20,
+              enabled: true,
+            },
+            {
+              workspace_id: workspace.id,
+              name: 'Classification & extraction',
+              description: 'Short prompts, small outputs — prefer fast/cheap models.',
+              approved_models: ['anthropic/claude-haiku-3.5', 'google/gemini-flash-1.5', 'openai/gpt-4o-mini'],
+              quality_priority: 30,
+              cost_priority: 70,
+              enabled: true,
+            },
+            {
+              workspace_id: workspace.id,
+              name: 'Agent planning',
+              description: 'Multi-step agentic flows — lock to the most capable model only.',
+              approved_models: ['anthropic/claude-opus-4'],
+              quality_priority: 100,
+              cost_priority: 0,
+              enabled: true,
+            },
+          ])
         }
         break
       }
