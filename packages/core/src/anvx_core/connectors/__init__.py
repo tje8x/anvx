@@ -27,6 +27,11 @@ from .solana_wallet import SolanaWalletConnector
 from .base_wallet import BaseWalletConnector
 from .coinbase import CoinbaseConnector
 from .binance import BinanceConnector
+from .mercury import MercuryConnector
+from .wise import WiseConnector
+from .paypal import PayPalConnector
+from .notion import NotionConnector
+from .supabase_billing import SupabaseBillingConnector
 
 REGISTRY = {
     "openai": OpenAIConnector(),
@@ -58,4 +63,9 @@ REGISTRY = {
     "base_wallet": BaseWalletConnector(),
     "coinbase": CoinbaseConnector(),
     "binance": BinanceConnector(),
+    "mercury": MercuryConnector(),
+    "wise": WiseConnector(),
+    "paypal": PayPalConnector(),
+    "notion": NotionConnector(),
+    "supabase": SupabaseBillingConnector(),
 }
