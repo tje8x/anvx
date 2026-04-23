@@ -24,23 +24,32 @@ type WorkspaceMe = { role: 'owner' | 'admin' | 'member' }
 type ProviderMeta = { provider: string; kind: string; input_schema: { fields: { name: string; type: string; options?: string[]; accept?: string; unit?: string; required?: boolean }[] } }
 
 const PROVIDER_GROUPS: { label: string; items: { value: string; display: string }[] }[] = [
-  { label: 'LLM Providers', items: [{ value: 'openai', display: 'OpenAI' }, { value: 'anthropic', display: 'Anthropic' }] },
+  { label: 'LLM Providers', items: [{ value: 'openai', display: 'OpenAI' }, { value: 'anthropic', display: 'Anthropic' }, { value: 'google_ai', display: 'Google AI' }, { value: 'cohere', display: 'Cohere' }, { value: 'replicate', display: 'Replicate' }, { value: 'together', display: 'Together' }, { value: 'fireworks', display: 'Fireworks' }] },
   { label: 'Cloud', items: [{ value: 'aws', display: 'AWS' }, { value: 'gcp', display: 'Google Cloud' }, { value: 'vercel', display: 'Vercel' }, { value: 'cloudflare', display: 'Cloudflare' }] },
   { label: 'Payments', items: [{ value: 'stripe', display: 'Stripe' }] },
   { label: 'Observability', items: [{ value: 'datadog', display: 'Datadog' }, { value: 'langsmith', display: 'LangSmith' }] },
   { label: 'Utility', items: [{ value: 'twilio', display: 'Twilio' }, { value: 'sendgrid', display: 'SendGrid' }, { value: 'pinecone', display: 'Pinecone' }, { value: 'tavily', display: 'Tavily' }] },
   { label: 'AI Dev Tools', items: [{ value: 'cursor', display: 'Cursor' }, { value: 'github_copilot', display: 'GitHub Copilot' }, { value: 'replit', display: 'Replit' }, { value: 'lovable', display: 'Lovable' }, { value: 'v0', display: 'v0' }, { value: 'bolt', display: 'Bolt' }] },
+  { label: 'Crypto', items: [{ value: 'ethereum_wallet', display: 'Ethereum Wallet' }, { value: 'solana_wallet', display: 'Solana Wallet' }, { value: 'base_wallet', display: 'Base Wallet' }, { value: 'coinbase', display: 'Coinbase' }, { value: 'binance', display: 'Binance' }] },
 ]
 
 const KIND_BADGES: Record<string, { label: string; className: string }> = {
   api_key: { label: 'API', className: 'bg-anvx-acc-light text-anvx-acc' },
   csv_source: { label: 'CSV', className: 'bg-anvx-warn-light text-anvx-warn' },
   manifest: { label: 'Subscription', className: 'bg-anvx-bg text-anvx-text-dim' },
+  address: { label: 'Wallet', className: 'bg-anvx-info-light text-anvx-info' },
 }
 
 const PROVIDER_KINDS: Record<string, string> = {
   cursor: 'csv_source', replit: 'csv_source',
   lovable: 'manifest', v0: 'manifest', bolt: 'manifest',
+  ethereum_wallet: 'address', solana_wallet: 'address', base_wallet: 'address',
+}
+
+const ADDRESS_PLACEHOLDERS: Record<string, string> = {
+  ethereum_wallet: '0x742d35Cc6634C0532925a3b844Bc...',
+  solana_wallet: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA...',
+  base_wallet: '0x742d35Cc6634C0532925a3b844Bc...',
 }
 
 function kindFor(provider: string): string {
@@ -141,6 +150,7 @@ export default function ConnectorsPage() {
   const isConnectValid = (): boolean => {
     if (!connectProvider || !connectLabel) return false
     if (connectKind === 'api_key') return !!connectKey
+    if (connectKind === 'address') return !!connectKey
     if (connectKind === 'csv_source') return !!connectCsvContent
     if (connectKind === 'manifest') return !!connectPlan && !!connectMonthlyCost && !!connectRenewalDate
     return false
@@ -268,6 +278,10 @@ export default function ConnectorsPage() {
 
             {connectKind === 'api_key' && (
               <Input type="password" placeholder="API key" value={connectKey} onChange={(e) => setConnectKey(e.target.value)} />
+            )}
+
+            {connectKind === 'address' && (
+              <Input type="text" placeholder={ADDRESS_PLACEHOLDERS[connectProvider] ?? 'Wallet address'} value={connectKey} onChange={(e) => setConnectKey(e.target.value)} />
             )}
 
             {connectKind === 'csv_source' && (

@@ -17,10 +17,25 @@ from .replit import ReplitConnector
 from .lovable import LovableConnector
 from .v0 import V0Connector
 from .bolt import BoltConnector
+from .google_ai import GoogleAIConnector
+from .cohere import CohereConnector
+from .replicate import ReplicateConnector
+from .together import TogetherConnector
+from .fireworks import FireworksConnector
+from .ethereum_wallet import EthereumWalletConnector
+from .solana_wallet import SolanaWalletConnector
+from .base_wallet import BaseWalletConnector
+from .coinbase import CoinbaseConnector
+from .binance import BinanceConnector
 
 REGISTRY = {
     "openai": OpenAIConnector(),
     "anthropic": AnthropicConnector(),
+    "google_ai": GoogleAIConnector(),
+    "cohere": CohereConnector(),
+    "replicate": ReplicateConnector(),
+    "together": TogetherConnector(),
+    "fireworks": FireworksConnector(),
     "aws": AWSConnector(),
     "gcp": GCPConnector(),
     "vercel": VercelConnector(),
@@ -38,4 +53,9 @@ REGISTRY = {
     "lovable": LovableConnector(),
     "v0": V0Connector(),
     "bolt": BoltConnector(),
+    "ethereum_wallet": EthereumWalletConnector(),
+    "solana_wallet": SolanaWalletConnector(),
+    "base_wallet": BaseWalletConnector(),
+    "coinbase": CoinbaseConnector(),
+    "binance": BinanceConnector(),
 }

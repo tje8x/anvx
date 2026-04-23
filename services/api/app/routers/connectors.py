@@ -12,7 +12,8 @@ from ..db import sb_service
 router = APIRouter()
 
 _CATEGORIES = {
-    "openai": "llm", "anthropic": "llm",
+    "openai": "llm", "anthropic": "llm", "google_ai": "llm",
+    "cohere": "llm", "replicate": "llm", "together": "llm", "fireworks": "llm",
     "aws": "cloud", "gcp": "cloud", "vercel": "cloud", "cloudflare": "cloud",
     "stripe": "payments",
     "twilio": "comms", "sendgrid": "comms",
@@ -20,16 +21,22 @@ _CATEGORIES = {
     "pinecone": "utility", "tavily": "utility",
     "cursor": "dev_tools", "github_copilot": "dev_tools", "replit": "dev_tools",
     "lovable": "dev_tools", "v0": "dev_tools", "bolt": "dev_tools",
+    "ethereum_wallet": "crypto", "solana_wallet": "crypto", "base_wallet": "crypto",
+    "coinbase": "crypto", "binance": "crypto",
 }
 
 _TIERS = {
     "openai": "core", "anthropic": "core", "stripe": "core",
     "aws": "core", "gcp": "core", "vercel": "core", "cloudflare": "core",
+    "google_ai": "core", "cohere": "extended", "replicate": "extended",
+    "together": "extended", "fireworks": "extended",
     "twilio": "extended", "sendgrid": "extended",
     "datadog": "extended", "langsmith": "extended",
     "pinecone": "extended", "tavily": "extended",
     "cursor": "extended", "github_copilot": "extended", "replit": "extended",
     "lovable": "extended", "v0": "extended", "bolt": "extended",
+    "ethereum_wallet": "extended", "solana_wallet": "extended", "base_wallet": "extended",
+    "coinbase": "extended", "binance": "extended",
 }
 
 _KINDS: dict[str, str] = {
