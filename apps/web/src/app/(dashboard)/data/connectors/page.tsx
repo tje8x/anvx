@@ -263,6 +263,17 @@ export default function ConnectorsPage() {
               <SelectContent>
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="aws">AWS</SelectItem>
+                <SelectItem value="gcp">Google Cloud</SelectItem>
+                <SelectItem value="vercel">Vercel</SelectItem>
+                <SelectItem value="cloudflare">Cloudflare</SelectItem>
+                <SelectItem value="stripe">Stripe</SelectItem>
+                <SelectItem value="twilio">Twilio</SelectItem>
+                <SelectItem value="sendgrid">SendGrid</SelectItem>
+                <SelectItem value="datadog">Datadog</SelectItem>
+                <SelectItem value="langsmith">LangSmith</SelectItem>
+                <SelectItem value="pinecone">Pinecone</SelectItem>
+                <SelectItem value="tavily">Tavily</SelectItem>
               </SelectContent>
             </Select>
             <Input placeholder="Label (e.g. production)" value={connectLabel} onChange={(e) => setConnectLabel(e.target.value)} maxLength={64} />

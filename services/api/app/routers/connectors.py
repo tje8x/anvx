@@ -11,6 +11,40 @@ from ..db import sb_service
 
 router = APIRouter()
 
+_CATEGORIES = {
+    "openai": "llm", "anthropic": "llm",
+    "aws": "cloud", "gcp": "cloud", "vercel": "cloud", "cloudflare": "cloud",
+    "stripe": "payments",
+    "twilio": "comms", "sendgrid": "comms",
+    "datadog": "observability", "langsmith": "observability",
+    "pinecone": "utility", "tavily": "utility",
+}
+
+_TIERS = {
+    "openai": "core", "anthropic": "core", "stripe": "core",
+    "aws": "core", "gcp": "core", "vercel": "core", "cloudflare": "core",
+    "twilio": "extended", "sendgrid": "extended",
+    "datadog": "extended", "langsmith": "extended",
+    "pinecone": "extended", "tavily": "extended",
+}
+
+
+def _category_for(name: str) -> str:
+    return _CATEGORIES.get(name, "other")
+
+
+def _tier_for(name: str) -> str:
+    return _TIERS.get(name, "extended")
+
+
+@router.get("/connectors/catalog")
+async def get_catalog():
+    """Public list of available providers. Used by onboarding and docs."""
+    return [
+        {"provider": name, "category": _category_for(name), "tier": _tier_for(name)}
+        for name in REGISTRY.keys()
+    ]
+
 
 class ConnectBody(BaseModel):
     provider: str
@@ -124,11 +158,20 @@ async def sync_connector(key_id: str, ctx: WorkspaceContext = Depends(require_ro
 
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=30)
-    records = await connector.fetch_usage(api_key, since, now)
 
-    if records:
-        rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
-        sb.from_("usage_records").upsert(rows, on_conflict="workspace_id,provider,ts,model").execute()
+    # Detect connector type: revenue (Stripe) vs usage (OpenAI, etc.)
+    is_revenue = hasattr(connector, "fetch_transactions")
+
+    if is_revenue:
+        records = await connector.fetch_transactions(api_key, since, now)
+        if records:
+            rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
+            sb.from_("transactions").upsert(rows, on_conflict="workspace_id,provider,ts,amount_cents,counterparty").execute()
+    else:
+        records = await connector.fetch_usage(api_key, since, now)
+        if records:
+            rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
+            sb.from_("usage_records").upsert(rows, on_conflict="workspace_id,provider,ts,model").execute()
 
     sb.from_("provider_keys").update({"last_used_at": now.isoformat()}).eq("id", key_id).execute()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 
 @dataclass
@@ -30,8 +30,41 @@ class UsageRecord:
         }
 
 
+@dataclass
+class TransactionRecord:
+    provider: str
+    direction: Literal["in", "out"]
+    counterparty: str | None
+    amount_cents: int
+    currency: str
+    ts: datetime
+    category_hint: str | None
+    raw: dict[str, Any]
+
+    def as_insert_row(self, workspace_id: str, provider_key_id: str) -> dict:
+        return {
+            "workspace_id": workspace_id,
+            "provider": self.provider,
+            "provider_key_id": provider_key_id,
+            "direction": self.direction,
+            "counterparty": self.counterparty,
+            "amount_cents": self.amount_cents,
+            "currency": self.currency,
+            "ts": self.ts.isoformat(),
+            "category_hint": self.category_hint,
+            "raw": self.raw,
+        }
+
+
 class Connector(Protocol):
     provider: str
 
     async def validate(self, api_key: str) -> None: ...
     async def fetch_usage(self, api_key: str, since: datetime, until: datetime) -> list[UsageRecord]: ...
+
+
+class RevenueConnector(Protocol):
+    provider: str
+
+    async def validate(self, api_key: str) -> None: ...
+    async def fetch_transactions(self, api_key: str, since: datetime, until: datetime) -> list[TransactionRecord]: ...

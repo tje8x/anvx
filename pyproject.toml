@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.86.0",
+    "anvx-core",
     "httpx>=0.28.1",
     "keyring>=25.0.0",
     "mcp>=1.26.0",
@@ -13,6 +14,7 @@ dependencies = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.0.0",
     "python-dotenv>=1.2.2",
+    "tenacity>=9.1.4",
 ]
 
 [tool.setuptools.packages.find]
@@ -27,3 +29,6 @@ members = [
     "packages/core",
     "services/api",
 ]
+
+[tool.uv.sources]
+anvx-core = { workspace = true, editable = true }
