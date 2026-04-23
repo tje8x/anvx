@@ -68,3 +68,18 @@ class RevenueConnector(Protocol):
 
     async def validate(self, api_key: str) -> None: ...
     async def fetch_transactions(self, api_key: str, since: datetime, until: datetime) -> list[TransactionRecord]: ...
+
+
+class UploadableConnector(Protocol):
+    provider: str
+    kind: Literal["csv_source", "manifest"]
+
+    async def parse_input(self, raw: str) -> list[UsageRecord]: ...
+
+
+class ApiKeyConnector(Protocol):
+    provider: str
+    kind: Literal["api_key"]
+
+    async def validate(self, api_key: str) -> None: ...
+    async def fetch_usage(self, api_key: str, since: datetime, until: datetime) -> list[UsageRecord]: ...

@@ -18,6 +18,8 @@ _CATEGORIES = {
     "twilio": "comms", "sendgrid": "comms",
     "datadog": "observability", "langsmith": "observability",
     "pinecone": "utility", "tavily": "utility",
+    "cursor": "dev_tools", "github_copilot": "dev_tools", "replit": "dev_tools",
+    "lovable": "dev_tools", "v0": "dev_tools", "bolt": "dev_tools",
 }
 
 _TIERS = {
@@ -26,6 +28,13 @@ _TIERS = {
     "twilio": "extended", "sendgrid": "extended",
     "datadog": "extended", "langsmith": "extended",
     "pinecone": "extended", "tavily": "extended",
+    "cursor": "extended", "github_copilot": "extended", "replit": "extended",
+    "lovable": "extended", "v0": "extended", "bolt": "extended",
+}
+
+_KINDS: dict[str, str] = {
+    "cursor": "csv_source", "replit": "csv_source",
+    "lovable": "manifest", "v0": "manifest", "bolt": "manifest",
 }
 
 
@@ -37,19 +46,33 @@ def _tier_for(name: str) -> str:
     return _TIERS.get(name, "extended")
 
 
+def _kind_for(name: str) -> str:
+    return _KINDS.get(name, "api_key")
+
+
 @router.get("/connectors/catalog")
 async def get_catalog():
     """Public list of available providers. Used by onboarding and docs."""
     return [
-        {"provider": name, "category": _category_for(name), "tier": _tier_for(name)}
+        {"provider": name, "category": _category_for(name), "tier": _tier_for(name), "kind": _kind_for(name)}
         for name in REGISTRY.keys()
     ]
+
+
+@router.get("/connectors/catalog/{provider}")
+async def get_provider_detail(provider: str):
+    if provider not in REGISTRY:
+        raise HTTPException(404, "unknown provider")
+    conn = REGISTRY[provider]
+    kind = getattr(conn, "kind", "api_key")
+    return {"provider": provider, "kind": kind, "category": _category_for(provider)}
 
 
 class ConnectBody(BaseModel):
     provider: str
     label: str
     api_key: str
+    kind: str | None = None
 
 
 class RotateBody(BaseModel):
@@ -73,27 +96,63 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
         raise HTTPException(400, f"Unknown provider: {body.provider}")
 
     connector = REGISTRY[body.provider]
-    try:
-        await connector.validate(body.api_key)
-    except Exception as e:
-        raise HTTPException(400, f"Validation failed: {e}")
-
-    envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+    kind = body.kind or getattr(connector, "kind", "api_key")
     sb = sb_service()
 
-    result = sb.from_("provider_keys").insert({
-        "workspace_id": ctx.workspace_id,
-        "provider": body.provider,
-        "label": body.label,
-        "envelope": envelope,
-        "created_by": ctx.user_id,
-    }).execute()
+    if kind == "manifest":
+        # Validate the JSON manifest against the connector
+        try:
+            await connector.parse_input(body.api_key)
+        except Exception as e:
+            raise HTTPException(400, f"Invalid manifest: {e}")
+
+        # Store manifest as encrypted envelope (same column, different semantics)
+        envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+        result = sb.from_("provider_keys").insert({
+            "workspace_id": ctx.workspace_id,
+            "provider": body.provider,
+            "label": body.label,
+            "envelope": envelope,
+            "created_by": ctx.user_id,
+        }).execute()
+
+    elif kind == "csv_source":
+        # Validate CSV parses
+        try:
+            await connector.parse_input(body.api_key)
+        except Exception as e:
+            raise HTTPException(400, f"CSV parse failed: {e}")
+
+        # Insert into provider_csv_uploads
+        result = sb.from_("provider_csv_uploads").insert({
+            "workspace_id": ctx.workspace_id,
+            "provider": body.provider,
+            "label": body.label,
+            "content": body.api_key,
+            "uploaded_by": ctx.user_id,
+        }).execute()
+
+    else:
+        # api_key path (existing behavior)
+        try:
+            await connector.validate(body.api_key)
+        except Exception as e:
+            raise HTTPException(400, f"Validation failed: {e}")
+
+        envelope = crypto.encrypt_api_key(ctx.workspace_id, body.api_key)
+        result = sb.from_("provider_keys").insert({
+            "workspace_id": ctx.workspace_id,
+            "provider": body.provider,
+            "label": body.label,
+            "envelope": envelope,
+            "created_by": ctx.user_id,
+        }).execute()
 
     row = result.data[0]
 
-    _audit(sb, ctx.workspace_id, ctx.user_id, "credential:create", "provider_key", row["id"], {"provider": body.provider, "label": body.label})
+    _audit(sb, ctx.workspace_id, ctx.user_id, "credential:create", "provider_key", row["id"], {"provider": body.provider, "label": body.label, "kind": kind})
 
-    return {"id": row["id"], "provider": row["provider"], "label": row["label"], "created_at": row["created_at"]}
+    return {"id": row["id"], "provider": row.get("provider", body.provider), "label": row.get("label", body.label), "created_at": row["created_at"]}
 
 
 @router.get("/connectors")

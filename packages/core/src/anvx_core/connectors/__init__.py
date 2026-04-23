@@ -11,6 +11,12 @@ from .datadog import DatadogConnector
 from .langsmith import LangSmithConnector
 from .pinecone import PineconeConnector
 from .tavily import TavilyConnector
+from .cursor import CursorConnector
+from .github_copilot import GitHubCopilotConnector
+from .replit import ReplitConnector
+from .lovable import LovableConnector
+from .v0 import V0Connector
+from .bolt import BoltConnector
 
 REGISTRY = {
     "openai": OpenAIConnector(),
@@ -26,4 +32,10 @@ REGISTRY = {
     "langsmith": LangSmithConnector(),
     "pinecone": PineconeConnector(),
     "tavily": TavilyConnector(),
+    "cursor": CursorConnector(),
+    "github_copilot": GitHubCopilotConnector(),
+    "replit": ReplitConnector(),
+    "lovable": LovableConnector(),
+    "v0": V0Connector(),
+    "bolt": BoltConnector(),
 }
