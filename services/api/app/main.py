@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import connectors as connectors_router
 from .routers import insights as insights_router
+from .routers import tokens as tokens_router
 from .routers import workspace as workspace_router
 
 
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(workspace_router.router, prefix="/api/v2")
 app.include_router(connectors_router.router, prefix="/api/v2")
 app.include_router(insights_router.router, prefix="/api/v2")
+app.include_router(tokens_router.router, prefix="/api/v2")
 
 
 @app.get("/health")
