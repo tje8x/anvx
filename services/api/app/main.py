@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .routers import anomalies as anomalies_router
 from .routers import connectors as connectors_router
 from .routers import insights as insights_router
 from .routers import models as models_router
@@ -40,6 +41,7 @@ app.include_router(routing_rules_router.router, prefix="/api/v2")
 app.include_router(models_router.router, prefix="/api/v2")
 app.include_router(policies_router.router, prefix="/api/v2")
 app.include_router(routing_router.router, prefix="/api/v2")
+app.include_router(anomalies_router.router, prefix="/api/v2")
 
 
 @app.get("/health")

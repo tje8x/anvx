@@ -1,11 +1,15 @@
 {
 	"functions": {
 		"api/route.ts": { "maxDuration": 60 },
-		"api/health.ts": { "maxDuration": 10}
+		"api/health.ts": { "maxDuration": 10},
+		"api/cron/anomaly-scan.ts": { "maxDuration": 30 }
 	},
 	"regions": ["iad1"],
 	"rewrites": [
 		{ "source": "/v1/_ping", "destination": "/api/health" },
 		{ "source": "/v1/(.*)", "destination": "/api/route?path=$1" }
+	],
+	"crons": [
+		{ "path": "/api/cron/anomaly-scan", "schedule": "*/5 * * * *" }
 	]
 }
