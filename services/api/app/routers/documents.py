@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from ..auth import WorkspaceContext, require_role
 from ..db import sb_service
+from ..jobs.parse_document import parse_document as run_parse_document
 
 router = APIRouter()
 
@@ -175,3 +176,47 @@ async def delete_document(document_id: str, ctx: WorkspaceContext = Depends(requ
     })
 
     return {"ok": True}
+
+
+@router.post("/documents/{document_id}/parse")
+async def parse(document_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
+    sb = sb_service()
+    lookup = (
+        sb.from_("documents")
+        .select("id")
+        .eq("id", document_id)
+        .eq("workspace_id", ctx.workspace_id)
+        .single()
+        .execute()
+    )
+    if not lookup.data:
+        raise HTTPException(404, "Document not found")
+
+    run_parse_document(document_id)
+    return {"status": "ok"}
+
+
+@router.get("/documents/{document_id}/transactions")
+async def list_transactions(document_id: str, ctx: WorkspaceContext = Depends(require_role("member"))):
+    sb = sb_service()
+    lookup = (
+        sb.from_("documents")
+        .select("id")
+        .eq("id", document_id)
+        .eq("workspace_id", ctx.workspace_id)
+        .single()
+        .execute()
+    )
+    if not lookup.data:
+        raise HTTPException(404, "Document not found")
+
+    result = (
+        sb.from_("document_transactions")
+        .select("*")
+        .eq("document_id", document_id)
+        .eq("workspace_id", ctx.workspace_id)
+        .order("row_index", desc=False)
+        .limit(1000)
+        .execute()
+    )
+    return result.data or []
