@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import anomalies as anomalies_router
 from .routers import connectors as connectors_router
 from .routers import copilot as copilot_router
+from .routers import documents as documents_router
 from .routers import incidents as incidents_router
 from .routers import insights as insights_router
 from .routers import models as models_router
@@ -46,6 +47,7 @@ app.include_router(routing_router.router, prefix="/api/v2")
 app.include_router(anomalies_router.router, prefix="/api/v2")
 app.include_router(incidents_router.router, prefix="/api/v2")
 app.include_router(copilot_router.router, prefix="/api/v2")
+app.include_router(documents_router.router, prefix="/api/v2")
 
 
 @app.get("/health")

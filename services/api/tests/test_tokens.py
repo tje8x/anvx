@@ -71,7 +71,7 @@ def test_create_token_returns_plaintext(mock_jwt, mock_resolve, mock_sb, client)
     def from_side(table):
         c = call_count["i"]
         call_count["i"] += 1
-        if table == "tokens":
+        if table == "anvx_api_tokens":
             return _mock_sb_query([{"id": "tok-1", "label": "prod", "token_prefix": "anvx_live_XXXXXXXX", "created_at": now_iso}])
         return _mock_sb_query([])
 
@@ -119,7 +119,7 @@ def test_revoke_sets_revoked_at(mock_jwt, mock_resolve, mock_sb, client):
     resp = client.post("/api/v2/tokens/tok-1/revoke", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 200
     assert resp.json() == {"ok": True}
-    sb.from_.assert_any_call("tokens")
+    sb.from_.assert_any_call("anvx_api_tokens")
 
 
 @patch("app.db.resolve_workspace_member")
