@@ -6,6 +6,7 @@ from charset_normalizer import from_bytes
 from ..db import sb_service
 from ..parsing.auto_detect import NoTemplateMatch, detect
 from ..parsing.sniffer import sniff
+from ..reconcile import match_document
 
 STORAGE_BUCKET = "documents"
 BATCH_SIZE = 500
@@ -79,7 +80,15 @@ def parse_document(document_id: str) -> None:
             "error_message": None,
         }).eq("id", document_id).execute()
 
-        print(f"TODO: chain reconciliation (Day 24) for document {document_id}")
+        try:
+            summary = match_document(doc["workspace_id"], document_id)
+            print(
+                f"reconcile done doc={document_id} "
+                f"auto={summary['auto_matched']} review={summary['needs_review']} "
+                f"unmatched={summary['unmatched']}"
+            )
+        except Exception as e:
+            print(f"WARN: reconcile failed for {document_id}: {e}")
 
     except NoTemplateMatch as e:
         sb.from_("documents").update({
