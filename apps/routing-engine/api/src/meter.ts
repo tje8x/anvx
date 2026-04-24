@@ -1,7 +1,4 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import pino from 'pino'
-
-const log = pino({ level: process.env.LOG_LEVEL ?? 'info' })
 
 let _sb: SupabaseClient | null = null
 function sb(): SupabaseClient {
@@ -29,9 +26,18 @@ async function priceFor(provider: string, model: string): Promise<{ input: numbe
     .select('input_price_per_mtok_cents, output_price_per_mtok_cents')
     .eq('provider', provider).eq('model', model).maybeSingle()
 
+  const FALLBACK: Record<string, { input: number; output: number }> = {
+    'gpt-4o': { input: 250, output: 1000 },
+    'gpt-4o-mini': { input: 15, output: 60 },
+    'gpt-4o-mini-2024-07-18': { input: 15, output: 60 },
+    'gpt-4.1': { input: 200, output: 800 },
+    'gpt-4.1-mini': { input: 40, output: 160 },
+    'gpt-4.1-nano': { input: 10, output: 40 },
+  }
+  const fb = FALLBACK[model] ?? { input: 300, output: 1500 }
   const row: PriceRow = {
-    input: data?.input_price_per_mtok_cents ?? 0,
-    output: data?.output_price_per_mtok_cents ?? 0,
+    input: data?.input_price_per_mtok_cents || fb.input,
+    output: data?.output_price_per_mtok_cents || fb.output,
     cachedAt: Date.now(),
   }
   priceCache.set(key, row)
@@ -59,22 +65,39 @@ export type MeterInput = {
 
 export async function writeUsage(input: MeterInput): Promise<void> {
   const price = await priceFor(input.provider, input.model_routed)
-  const provider_cost_cents = Math.round(
-    (input.tokens_in * price.input + input.tokens_out * price.output) / 1_000_000
-  )
+  const rawCost = (input.tokens_in * price.input + input.tokens_out * price.output) / 1_000_000
+  const provider_cost_cents = (input.tokens_in > 0 || input.tokens_out > 0) ? Math.max(1, Math.ceil(rawCost)) : 0
   const markup_bps = parseInt(process.env.ROUTING_MARKUP_BPS ?? '0', 10)
   const markup_cents = Math.floor((provider_cost_cents * markup_bps) / 10_000)
 
-  const row = { ...input, provider_cost_cents, markup_cents }
+  // Build row matching exact routing_usage_records schema
+  // total_cost_cents is GENERATED ALWAYS — do NOT include it
+  const row = {
+    request_id: input.request_id,
+    workspace_id: input.workspace_id,
+    token_id: input.token_id,
+    model_requested: input.model_requested,
+    model_routed: input.model_routed,
+    provider: input.provider,
+    tokens_in: input.tokens_in,
+    tokens_out: input.tokens_out,
+    provider_cost_cents,
+    markup_cents,
+    decision: input.decision,
+    shadow_suggestion: input.shadow_suggestion ?? null,
+    policy_triggered: input.policy_triggered ?? null,
+    reasoning: input.reasoning ?? null,
+    upstream_latency_ms: input.upstream_latency_ms,
+    total_latency_ms: input.total_latency_ms,
+    project_tag: input.project_tag ?? null,
+    user_hint: input.user_hint ?? null,
+  }
+
   try {
     const { error } = await sb().from('routing_usage_records').insert(row)
     if (error) throw error
-  } catch {
-    try {
-      const { error } = await sb().from('routing_usage_records').insert(row)
-      if (error) throw error
-    } catch (err2) {
-      log.error({ request_id: input.request_id, err: String(err2) }, 'meter.write.failed')
-    }
+  } catch (err) {
+    console.error("meter.write.failed", JSON.stringify(err))
+    console.error("meter.write.row", JSON.stringify({ ...row, shadow_suggestion: '[redacted]' }))
   }
 }
