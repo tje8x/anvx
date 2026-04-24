@@ -4,6 +4,7 @@ import { ReactNode } from 'react'
 import { OrganizationSwitcher, UserButton } from '@clerk/nextjs'
 import WindowFrame from '@/components/anvx/window-frame'
 import MenuBar from '@/components/anvx/menu-bar'
+import IncidentBanner from '@/components/IncidentBanner'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const { userId, orgId } = await auth()
@@ -18,6 +19,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <OrganizationSwitcher afterCreateOrganizationUrl="/dashboard" />
             <UserButton />
           </div>
+          <IncidentBanner />
           <MenuBar />
           <div className="mt-4">{children}</div>
         </WindowFrame>

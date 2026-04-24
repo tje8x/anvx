@@ -17,6 +17,7 @@ export type RoutingContext = {
   policies: any[]
   rules: any[]
   period_spend: { day_cents: number; month_cents: number; hourly_baseline_cents: number }
+  active_incidents: any[]
 }
 
 export type DecisionResult = {
@@ -54,6 +55,12 @@ function scopeMatches(policy: any, provider: string, project_tag?: string, user_
   if (policy.scope_provider && policy.scope_provider !== provider) return false
   if (policy.scope_project_tag && policy.scope_project_tag !== project_tag) return false
   if (policy.scope_user_hint && policy.scope_user_hint !== user_hint) return false
+  return true
+}
+
+function incidentMatches(inc: any, provider: string, project_tag?: string): boolean {
+  if (inc.scope_provider && inc.scope_provider !== provider) return false
+  if (inc.scope_project_tag && inc.scope_project_tag !== project_tag) return false
   return true
 }
 
@@ -117,6 +124,23 @@ export async function decide(
   const parts = req.model_requested.includes('/') ? req.model_requested.split('/', 2) : ['openai', req.model_requested]
   const provider = parts[0]
   const model = parts[1] ?? req.model_requested
+
+  // Pre-policy: check for active incidents
+  for (const inc of (ctx as any).active_incidents ?? []) {
+    if (incidentMatches(inc, provider, req.project_tag)) {
+      return {
+        decision: 'blocked', model_routed: model, provider_routed: provider,
+        policy_triggered_id: null, shadow_suggestion: null,
+        reasoning: `Incident ${inc.id} active (${inc.trigger_kind}) — routing paused.`,
+        blocked_http_status: 503,
+        blocked_body: {
+          error: 'routing_paused',
+          message: `Routing is paused due to ${inc.trigger_kind.replace(/_/g, ' ')}. Resume from the Routing tab.`,
+          incident_id: inc.id,
+        },
+      }
+    }
+  }
 
   const defaultPass: DecisionResult = {
     decision: 'passthrough', model_routed: model, provider_routed: provider,
