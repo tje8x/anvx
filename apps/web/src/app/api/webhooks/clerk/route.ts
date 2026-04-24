@@ -157,6 +157,26 @@ export async function POST(req: NextRequest) {
               enabled: true,
             },
           ])
+
+          // Seed the standard AI-native chart of accounts
+          const defaultCoa: { code: string; name: string; kind: 'revenue' | 'cogs' | 'opex' }[] = [
+            { code: '4010', name: 'SaaS subscriptions', kind: 'revenue' },
+            { code: '4020', name: 'API usage', kind: 'revenue' },
+            { code: '4030', name: 'Crypto payments', kind: 'revenue' },
+            { code: '5010', name: 'LLM inference', kind: 'cogs' },
+            { code: '5020', name: 'Cloud infrastructure', kind: 'cogs' },
+            { code: '5030', name: 'Third-party APIs', kind: 'cogs' },
+            { code: '6010', name: 'Dev tools', kind: 'opex' },
+            { code: '6020', name: 'Monitoring', kind: 'opex' },
+            { code: '6030', name: 'Payment processing', kind: 'opex' },
+            { code: '6040', name: 'Other SaaS', kind: 'opex' },
+            { code: '6050', name: 'Payroll', kind: 'opex' },
+            { code: '6060', name: 'Rent & office', kind: 'opex' },
+          ]
+          await sb.from('chart_of_accounts').upsert(
+            defaultCoa.map((a) => ({ workspace_id: workspace.id, ...a })),
+            { onConflict: 'workspace_id,code', ignoreDuplicates: true }
+          )
         }
         break
       }

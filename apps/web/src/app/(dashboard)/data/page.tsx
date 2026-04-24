@@ -7,6 +7,7 @@ import SectionTitle from '@/components/anvx/section-title'
 import MacButton from '@/components/anvx/mac-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ReconciliationSection } from './reconciliation-section'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const MAX_FILE_SIZE_BYTES = 25_000_000
@@ -374,10 +375,8 @@ export default function DataPage() {
         )}
       </section>
 
-      <section>
-        <SectionTitle>Reconciliation</SectionTitle>
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">Reconciliation — built on Days 23-25</p>
-      </section>
+      <ReconciliationSection parsedDocuments={documents.filter((d) => d.status === 'parsed')} />
+
 
       <section>
         <SectionTitle>Connected providers</SectionTitle>
