@@ -1,0 +1,54 @@
+Date,Card Last 4,Merchant,Category,Amount,Receipt URL
+01/02/2026,4821,OPENAI,Software & SaaS,95.23,https://receipts.example.com/acme/a4f9c2e1-1b3c-4d2e-8f1a-7c9b2d4e6f10.pdf
+01/02/2026,7733,ANTHROPIC PBC,Software & SaaS,82.15,https://receipts.example.com/acme/b5a0d3f2-2c4d-5e3f-9021-8d0c3e5f7021.pdf
+01/03/2026,4821,SWEETGREEN #412,Meals,18.45,https://receipts.example.com/acme/c6b1e4f3-3d5e-6f4a-a132-9e1d4f6a8132.pdf
+01/03/2026,7733,UBER EATS,Meals,42.80,https://receipts.example.com/acme/d7c2f5a4-4e6f-7a5b-b243-af2e5a7b9243.pdf
+01/04/2026,4821,OPENAI,Software & SaaS,142.67,https://receipts.example.com/acme/e8d3a6b5-5f7a-8b6c-c354-b03f6b8c0354.pdf
+01/05/2026,4821,GITHUB,Software & SaaS,25.00,https://receipts.example.com/acme/f9e4b7c6-607b-9c7d-d465-c1407c9d1465.pdf
+01/05/2026,7733,NOTION LABS,Software & SaaS,15.00,https://receipts.example.com/acme/0af5c8d7-718c-ad8e-e576-d2518dae2576.pdf
+01/06/2026,7733,ANTHROPIC PBC,Software & SaaS,105.30,https://receipts.example.com/acme/1b06d9e8-829d-be9f-f687-e362aebf3687.pdf
+01/06/2026,4821,LINEAR.APP,Software & SaaS,10.00,https://receipts.example.com/acme/2c17eaf9-93ae-cfa0-0798-f473bfc04798.pdf
+01/07/2026,4821,OPENAI,Software & SaaS,118.40,https://receipts.example.com/acme/3d28fb0a-a4bf-d0b1-18a9-058400d158a9.pdf
+01/07/2026,7733,SENTRY (FUNCTIONAL SOFTWARE),Software & SaaS,26.00,https://receipts.example.com/acme/4e390c1b-b5c0-e1c2-29ba-169511e269ba.pdf
+01/08/2026,4821,UBER,Travel,23.50,https://receipts.example.com/acme/5f4a1d2c-c6d1-f2d3-3acb-27a622f37acb.pdf
+01/08/2026,7733,GOOGLE*GEMINI,Software & SaaS,65.23,https://receipts.example.com/acme/605b2e3d-d7e2-03e4-4bdc-38b733048bdc.pdf
+01/09/2026,4821,RESEND.COM,Software & SaaS,20.00,https://receipts.example.com/acme/716c3f4e-e8f3-14f5-5ced-49c844159ced.pdf
+01/09/2026,7733,OPENAI,Software & SaaS,175.22,https://receipts.example.com/acme/827d405f-f904-2506-6dfe-5ad955260dfe.pdf
+01/10/2026,4821,CHIPOTLE #0421,Meals,14.85,https://receipts.example.com/acme/9380516a-0a15-3617-7eaf-6bea66371eaf.pdf
+01/12/2026,7733,ANTHROPIC PBC,Software & SaaS,118.45,https://receipts.example.com/acme/a491627b-1b26-4728-8f00-7cfb77480f00.pdf
+01/12/2026,4821,UNITED AIRLINES,Travel,68.00,https://receipts.example.com/acme/b5a2738c-2c37-5839-9011-8d0c88591011.pdf
+01/13/2026,4821,OPENAI,Software & SaaS,203.15,https://receipts.example.com/acme/c6b3849d-3d48-694a-a122-9e1d996a2122.pdf
+01/13/2026,7733,STARBUCKS STORE 04712,Meals,8.45,https://receipts.example.com/acme/d7c495ae-4e59-7a5b-b233-af2eaa7b3233.pdf
+01/14/2026,4821,SWEETGREEN #412,Meals,16.20,https://receipts.example.com/acme/e8d5a6bf-5f6a-8b6c-c344-b03fbb8c4344.pdf
+01/14/2026,7733,VERCEL INC,Software & SaaS,40.00,https://receipts.example.com/acme/f9e6b7c0-607b-9c7d-d455-c140cc9d5455.pdf
+01/15/2026,7733,OPENAI,Software & SaaS,88.97,https://receipts.example.com/acme/0af7c8d1-718c-ad8e-e566-d251dd8e6566.pdf
+01/15/2026,4821,AWS MARKETPLACE - LAMBDA,Software & SaaS,47.30,https://receipts.example.com/acme/1b08d9e2-829d-be9f-f677-e362eeaf7677.pdf
+01/16/2026,7733,ANTHROPIC PBC,Software & SaaS,95.80,https://receipts.example.com/acme/2c19eaf3-93ae-cfa0-0788-f473ffb08788.pdf
+01/16/2026,4821,LYFT,Travel,19.45,https://receipts.example.com/acme/3d2afb04-a4bf-d0b1-1899-05840cc19899.pdf
+01/17/2026,4821,OPENAI,Software & SaaS,156.43,https://receipts.example.com/acme/4e3b0c15-b5c0-e1c2-29aa-16951dd2a9aa.pdf
+01/19/2026,7733,UBER EATS,Meals,38.90,https://receipts.example.com/acme/5f4c1d26-c6d1-f2d3-3abb-2762eee3babb.pdf
+01/19/2026,4821,DOORDASH,Meals,32.15,https://receipts.example.com/acme/605d2e37-d7e2-03e4-4bcc-3873ff04cbcc.pdf
+01/20/2026,4821,GOOGLE*GEMINI,Software & SaaS,78.40,https://receipts.example.com/acme/716e3f48-e8f3-14f5-5cdd-4984001b5cdd.pdf
+01/20/2026,7733,OPENAI,Software & SaaS,134.88,https://receipts.example.com/acme/827f4059-f904-2506-6dee-5a95112c6dee.pdf
+01/21/2026,4821,UNITED AIRLINES,Travel,74.00,https://receipts.example.com/acme/9380516a-0a15-3617-7eff-6ba6223d7eff.pdf
+01/21/2026,7733,VERCEL INC,Software & SaaS,52.34,https://receipts.example.com/acme/a491627b-1b26-4728-8f00-7cb7334e8f00.pdf
+01/22/2026,4821,ANTHROPIC PBC,Software & SaaS,112.60,https://receipts.example.com/acme/b5a2738c-2c37-5839-9011-8dc8445f9011.pdf
+01/22/2026,7733,SWEETGREEN #218,Meals,22.40,https://receipts.example.com/acme/c6b3849d-3d48-694a-a122-9ed95560a122.pdf
+01/23/2026,7733,OPENAI,Software & SaaS,189.50,https://receipts.example.com/acme/d7c495ae-4e59-7a5b-b233-afea6671b233.pdf
+01/23/2026,4821,UBER,Travel,28.75,https://receipts.example.com/acme/e8d5a6bf-5f6a-8b6c-c344-b0fb7782c344.pdf
+01/24/2026,4821,CHIPOTLE #0421,Meals,15.60,https://receipts.example.com/acme/f9e6b7c0-607b-9c7d-d455-c10c8893d455.pdf
+01/26/2026,7733,GOOGLE*GEMINI,Software & SaaS,56.37,https://receipts.example.com/acme/0af7c8d1-718c-ad8e-e566-d21d99a4e566.pdf
+01/26/2026,4821,OPENAI,Software & SaaS,145.23,https://receipts.example.com/acme/1b08d9e2-829d-be9f-f677-e32eaab5f677.pdf
+01/27/2026,7733,UBER EATS,Meals,44.20,https://receipts.example.com/acme/2c19eaf3-93ae-cfa0-0788-f43fbbc60788.pdf
+01/27/2026,4821,ANTHROPIC PBC,Software & SaaS,88.25,https://receipts.example.com/acme/3d2afb04-a4bf-d0b1-1899-05400cd71899.pdf
+01/28/2026,4821,VERCEL INC,Software & SaaS,48.90,https://receipts.example.com/acme/4e3b0c15-b5c0-e1c2-29aa-1611dde829aa.pdf
+01/28/2026,7733,STARBUCKS STORE 04712,Meals,9.30,https://receipts.example.com/acme/5f4c1d26-c6d1-f2d3-3abb-2722eef93abb.pdf
+01/29/2026,4821,OPENAI,Software & SaaS,178.45,https://receipts.example.com/acme/605d2e37-d7e2-03e4-4bcc-3833ff0a4bcc.pdf
+01/29/2026,7733,ANTHROPIC PBC,Software & SaaS,103.40,https://receipts.example.com/acme/716e3f48-e8f3-14f5-5cdd-4944001b5cdd.pdf
+01/30/2026,4821,LYFT,Travel,24.60,https://receipts.example.com/acme/827f4059-f904-2506-6dee-5a55112c6dee.pdf
+01/30/2026,7733,DOORDASH,Meals,29.85,https://receipts.example.com/acme/9380516a-0a15-3617-7eff-6b66223d7eff.pdf
+01/30/2026,4821,OPENAI,Software & SaaS,172.21,https://receipts.example.com/acme/a491627b-1b26-4728-8f00-7c77334e8f00.pdf
+01/30/2026,7733,ANTHROPIC PBC,Software & SaaS,94.05,https://receipts.example.com/acme/b5a2738c-2c37-5839-9011-8d88445f9011.pdf
+01/31/2026,4821,UNITED AIRLINES,Travel,52.00,https://receipts.example.com/acme/c6b3849d-3d48-694a-a122-9e99556aa122.pdf
+01/31/2026,7733,SWEETGREEN #218,Meals,19.85,https://receipts.example.com/acme/d7c495ae-4e59-7a5b-b233-afaa667bb233.pdf
+01/31/2026,4821,UBER,Travel,31.20,https://receipts.example.com/acme/e8d5a6bf-5f6a-8b6c-c344-b0bb778cc344.pdf

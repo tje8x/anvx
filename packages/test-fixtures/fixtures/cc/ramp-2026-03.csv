@@ -1,0 +1,51 @@
+Date,Card Last 4,Merchant,Category,Amount,Receipt URL
+03/02/2026,4821,OPENAI,Software & SaaS,118.40,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667701.pdf
+03/02/2026,7733,ANTHROPIC PBC,Software & SaaS,98.50,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667702.pdf
+03/03/2026,7733,NOTION LABS,Software & SaaS,15.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667703.pdf
+03/03/2026,4821,SWEETGREEN #412,Meals,19.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667704.pdf
+03/04/2026,4821,OPENAI,Software & SaaS,162.85,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667705.pdf
+03/04/2026,7733,UBER EATS,Meals,40.15,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667706.pdf
+03/05/2026,4821,GITHUB,Software & SaaS,25.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667707.pdf
+03/05/2026,7733,ANTHROPIC PBC,Software & SaaS,128.40,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667708.pdf
+03/06/2026,4821,LINEAR.APP,Software & SaaS,10.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667709.pdf
+03/06/2026,7733,SENTRY (FUNCTIONAL SOFTWARE),Software & SaaS,26.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667710.pdf
+03/07/2026,4821,OPENAI,Software & SaaS,188.20,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667711.pdf
+03/08/2026,7733,GOOGLE*GEMINI,Software & SaaS,78.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667712.pdf
+03/09/2026,4821,RESEND.COM,Software & SaaS,20.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667713.pdf
+03/09/2026,7733,OPENAI,Software & SaaS,212.90,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667714.pdf
+03/10/2026,4821,CHIPOTLE #0421,Meals,16.40,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667715.pdf
+03/10/2026,7733,UBER,Travel,29.30,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667716.pdf
+03/11/2026,7733,ANTHROPIC PBC,Software & SaaS,142.75,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667717.pdf
+03/12/2026,4821,UNITED AIRLINES,Travel,75.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667718.pdf
+03/12/2026,7733,OPENAI,Software & SaaS,225.40,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667719.pdf
+03/13/2026,4821,STARBUCKS STORE 04712,Meals,9.85,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667720.pdf
+03/13/2026,7733,VERCEL INC,Software & SaaS,40.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667721.pdf
+03/14/2026,4821,SWEETGREEN #412,Meals,20.15,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667722.pdf
+03/16/2026,7733,OPENAI,Software & SaaS,108.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667723.pdf
+03/16/2026,4821,AWS MARKETPLACE - LAMBDA,Software & SaaS,58.45,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667724.pdf
+03/17/2026,4821,ANTHROPIC PBC,Software & SaaS,112.30,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667725.pdf
+03/17/2026,7733,LYFT,Travel,24.50,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667726.pdf
+03/18/2026,4821,OPENAI,Software & SaaS,172.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667727.pdf
+03/19/2026,7733,UBER EATS,Meals,43.80,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667728.pdf
+03/19/2026,4821,DOORDASH,Meals,36.90,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667729.pdf
+03/20/2026,4821,GOOGLE*GEMINI,Software & SaaS,74.20,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667730.pdf
+03/20/2026,7733,OPENAI,Software & SaaS,168.45,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667731.pdf
+03/21/2026,4821,UNITED AIRLINES,Travel,80.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667732.pdf
+03/21/2026,7733,VERCEL INC,Software & SaaS,58.70,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667733.pdf
+03/23/2026,4821,ANTHROPIC PBC,Software & SaaS,118.95,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667734.pdf
+03/23/2026,7733,SWEETGREEN #218,Meals,24.30,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667735.pdf
+03/24/2026,7733,OPENAI,Software & SaaS,198.15,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667736.pdf
+03/24/2026,4821,UBER,Travel,33.70,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667737.pdf
+03/25/2026,4821,CHIPOTLE #0421,Meals,17.25,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667738.pdf
+03/25/2026,7733,GOOGLE*GEMINI,Software & SaaS,66.80,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667739.pdf
+03/26/2026,4821,OPENAI,Software & SaaS,182.75,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667740.pdf
+03/26/2026,7733,UBER EATS,Meals,47.40,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667741.pdf
+03/27/2026,4821,ANTHROPIC PBC,Software & SaaS,95.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667742.pdf
+03/27/2026,7733,VERCEL INC,Software & SaaS,49.80,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667743.pdf
+03/27/2026,4821,STARBUCKS STORE 04712,Meals,11.10,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667744.pdf
+03/28/2026,4821,OPENAI,Software & SaaS,215.30,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667745.pdf
+03/29/2026,7733,ANTHROPIC PBC,Software & SaaS,124.75,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667746.pdf
+03/30/2026,4821,LYFT,Travel,29.60,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667747.pdf
+03/30/2026,7733,DOORDASH,Meals,34.90,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667748.pdf
+03/31/2026,4821,UNITED AIRLINES,Travel,62.00,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667749.pdf
+03/31/2026,7733,SWEETGREEN #218,Meals,22.80,https://receipts.example.com/acme/c3d4e5f6-2222-3333-4444-555566667750.pdf

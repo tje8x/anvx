@@ -1,6 +1,29 @@
 const OPENAI_BASE = 'https://api.openai.com/v1'
 const UPSTREAM_TIMEOUT_MS = 25_000
 
+function resolveUpstreamBase(): string {
+  const mockBase = process.env.MOCK_UPSTREAM_BASE
+  if (!mockBase) return OPENAI_BASE
+
+  const isProd = process.env.NODE_ENV === 'production'
+  const explicitlyAllowed = process.env.ALLOW_MOCK_UPSTREAM === '1'
+  if (isProd && !explicitlyAllowed) {
+    console.error(
+      `[upstream] IGNORING MOCK_UPSTREAM_BASE in production (NODE_ENV=production, ALLOW_MOCK_UPSTREAM!=1). Set ALLOW_MOCK_UPSTREAM=1 to force.`,
+    )
+    return OPENAI_BASE
+  }
+  return mockBase
+}
+
+const UPSTREAM_BASE = resolveUpstreamBase()
+
+if (UPSTREAM_BASE !== OPENAI_BASE) {
+  console.warn(
+    `[upstream] ⚠ MOCK_UPSTREAM_BASE active → ${UPSTREAM_BASE} (NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}, ALLOW_MOCK_UPSTREAM=${process.env.ALLOW_MOCK_UPSTREAM ?? 'unset'}). Real provider calls are disabled.`,
+  )
+}
+
 export async function forwardToUpstream(body: Record<string, unknown>, providerKey: string): Promise<Response> {
   // G: Fail fast if no key
   if (!providerKey) {
@@ -14,7 +37,7 @@ export async function forwardToUpstream(body: Record<string, unknown>, providerK
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
 
   try {
-    const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
+    const res = await fetch(`${UPSTREAM_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
