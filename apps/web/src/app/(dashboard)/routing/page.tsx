@@ -8,10 +8,12 @@ import SectionTitle from '@/components/anvx/section-title'
 import MacButton from '@/components/anvx/mac-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+const ROUTING_TTL = 30_000
+const ROUTING_MODE_STORAGE_KEY = 'anvx:routing_mode'
 
 type Mode = 'shadow' | 'copilot' | 'autopilot'
 type Recommendation = { id: string; kind: string; headline: string; detail: string; estimated_value_cents: number }
@@ -20,7 +22,6 @@ type ModelGroup = { provider: string; models: { model: string; pool_hint: string
 type Policy = { id: string; name: string; scope_provider: string | null; scope_project_tag: string | null; scope_user_hint: string | null; daily_limit_cents: number | null; monthly_limit_cents: number | null; per_request_limit_cents: number | null; circuit_breaker_multiplier: number | null; runway_alert_months: number | null; alert_at_pcts: number[]; action: string; fail_mode: string }
 type Spend = { day_cents: number; month_cents: number }
 type CopilotApproval = { id: string; kind: string; policy_id: string | null; status: string; created_at: string; user_response: string | null }
-type AutopilotLog = { id: string; model_requested: string; model_routed: string; reasoning: string; created_at: string; decision: string }
 
 const MODES: { id: Mode; name: string; desc: string; trustDots: number }[] = [
   { id: 'shadow', name: 'Shadow', desc: 'Observe and suggest. No changes to live traffic.', trustDots: 1 },
@@ -51,7 +52,26 @@ function ModeCard({ mode, selected, onSelect }: { mode: typeof MODES[0]; selecte
 }
 
 function PriorityBar({ quality, cost }: { quality: number; cost: number }) {
-  return (<div className="flex items-center gap-2 text-[9px] font-data text-anvx-text-dim"><span>Quality {quality}%</span><div className="flex-1 h-1 bg-anvx-bdr rounded-full overflow-hidden flex"><div className="h-full bg-anvx-acc rounded-l-full" style={{ width: `${quality}%` }} /><div className="h-full bg-anvx-warn rounded-r-full" style={{ width: `${cost}%` }} /></div><span>Cost {cost}%</span></div>)
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex flex-col gap-1 cursor-help">
+            <span className="text-[9px] font-bold uppercase tracking-wider font-ui text-anvx-text-dim">Optimization priority</span>
+            <div className="flex items-center gap-2 text-[9px] font-data text-anvx-text-dim">
+              <span className="w-14 text-anvx-acc font-bold">Quality {quality}%</span>
+              <div className="flex-1 h-1.5 bg-anvx-bdr rounded-full overflow-hidden flex">
+                <div className="h-full bg-anvx-acc rounded-l-full" style={{ width: `${quality}%` }} />
+                <div className="h-full rounded-r-full" style={{ width: `${cost}%`, backgroundColor: '#D97706' }} />
+              </div>
+              <span className="w-14 text-right font-bold" style={{ color: '#D97706' }}>Cost {cost}%</span>
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>This rule prioritizes {quality}% quality and {cost}% cost optimization</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 }
 
 function SpendBar({ current, limit, label }: { current: number; limit: number; label: string }) {
@@ -108,7 +128,15 @@ export default function RoutingPage() {
   const { getToken } = useAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [mode, setMode] = useState<Mode>('shadow')
+  const [mode, setModeRaw] = useState<Mode>(() => {
+    if (typeof window === 'undefined') return 'shadow'
+    const stored = window.sessionStorage.getItem(ROUTING_MODE_STORAGE_KEY)
+    return stored === 'copilot' || stored === 'autopilot' || stored === 'shadow' ? stored : 'shadow'
+  })
+  const setMode = useCallback((m: Mode) => {
+    setModeRaw(m)
+    if (typeof window !== 'undefined') window.sessionStorage.setItem(ROUTING_MODE_STORAGE_KEY, m)
+  }, [])
   const [recs, setRecs] = useState<Recommendation[]>([])
   const [rules, setRules] = useState<Rule[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
@@ -117,7 +145,6 @@ export default function RoutingPage() {
   const [role, setRole] = useState('member')
   const [loading, setLoading] = useState(true)
   const [approvals, setApprovals] = useState<CopilotApproval[]>([])
-  const [autopilotLog, setAutopilotLog] = useState<AutopilotLog[]>([])
 
   // Rule modal
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
@@ -152,23 +179,31 @@ export default function RoutingPage() {
 
   const fetchAll = useCallback(async () => {
     const h = await authHeaders()
-    const [recsRes, rulesRes, modelsRes, meRes, policiesRes, spendRes, approvalsRes] = await Promise.all([
-      fetch(`${API_BASE}/api/v2/shadow/recommendations`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/routing-rules`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/models`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/workspace/me`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/policies`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/routing/spend`, { headers: h }).catch(() => null),
-      fetch(`${API_BASE}/api/v2/copilot-approvals?only_unresponded=true`, { headers: h }).catch(() => null),
+    const tryFetch = <T,>(path: string, ttl = ROUTING_TTL): Promise<T | null> =>
+      cachedFetch<T>(`${API_BASE}${path}`, { headers: h }, ttl).catch(() => null)
+    const [recs, rulesData, modelsData, meData, policiesData, spendData, approvalsData] = await Promise.all([
+      tryFetch<Recommendation[]>('/api/v2/shadow/recommendations'),
+      tryFetch<Rule[]>('/api/v2/routing-rules'),
+      tryFetch<ModelGroup[]>('/api/v2/models', 300_000),
+      tryFetch<{ role: string; routing_mode?: Mode }>('/api/v2/workspace/me', 60_000),
+      tryFetch<Policy[]>('/api/v2/policies'),
+      tryFetch<Spend>('/api/v2/routing/spend'),
+      tryFetch<CopilotApproval[]>('/api/v2/copilot-approvals?only_unresponded=true'),
     ])
-    if (recsRes?.ok) setRecs(await recsRes.json())
-    if (rulesRes?.ok) setRules(await rulesRes.json())
-    if (modelsRes?.ok) { const g: ModelGroup[] = await modelsRes.json(); setAllModels(g.flatMap((x) => x.models.map((m) => `${x.provider}/${m.model}`))) }
-    if (meRes?.ok) { const d = await meRes.json(); setRole(d.role) }
-    if (policiesRes?.ok) setPolicies(await policiesRes.json())
-    if (spendRes?.ok) setSpend(await spendRes.json())
-    if (approvalsRes?.ok) setApprovals(await approvalsRes.json())
-  }, [authHeaders])
+    if (recs) setRecs(recs)
+    if (rulesData) setRules(rulesData)
+    if (modelsData) setAllModels(modelsData.flatMap((x) => x.models.map((m) => `${x.provider}/${m.model}`)))
+    if (meData) {
+      setRole(meData.role)
+      // Workspace's persisted mode wins over sessionStorage when present.
+      if (meData.routing_mode === 'shadow' || meData.routing_mode === 'copilot' || meData.routing_mode === 'autopilot') {
+        setMode(meData.routing_mode)
+      }
+    }
+    if (policiesData) setPolicies(policiesData)
+    if (spendData) setSpend(spendData)
+    if (approvalsData) setApprovals(approvalsData)
+  }, [authHeaders, setMode])
 
   useEffect(() => { fetchAll().finally(() => setLoading(false)) }, [fetchAll])
 
@@ -181,6 +216,7 @@ export default function RoutingPage() {
   const handleModeClick = (m: Mode) => { if (m !== mode) { setPendingMode(m); setModeSwitchOpen(true) } }
   const handleModeConfirm = async () => {
     const h = await authHeaders()
+    invalidateCache(`${API_BASE}/api/v2/workspace/me`)
     const res = await fetch(`${API_BASE}/api/v2/workspace/me`, { method: 'PATCH', headers: h, body: JSON.stringify({ routing_mode: pendingMode }) })
     if (res.ok) { setMode(pendingMode); setModeSwitchOpen(false); toast.success(`Switched to ${pendingMode} mode`); await fetchAll() }
     else { toast.error('Failed to switch mode') }
@@ -212,9 +248,9 @@ export default function RoutingPage() {
   const handleSaveRule = async () => {
     setRuleError(''); setRuleLoading(true)
     const payload = { name: ruleName, description: ruleDesc || null, approved_models: ruleModels, quality_priority: ruleQuality, cost_priority: 100 - ruleQuality, ...(editingRule ? { enabled: editingRule.enabled } : {}) }
-    try { const h = await authHeaders(); const res = await fetch(editingRule ? `${API_BASE}/api/v2/routing-rules/${editingRule.id}` : `${API_BASE}/api/v2/routing-rules`, { method: editingRule ? 'PATCH' : 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setRuleError(d.detail || 'Failed'); return }; setRuleModalOpen(false); await fetchAll(); toast.success(editingRule ? 'Rule updated' : 'Rule created') } catch (e) { setRuleError(String(e)) } finally { setRuleLoading(false) }
+    try { const h = await authHeaders(); const res = await fetch(editingRule ? `${API_BASE}/api/v2/routing-rules/${editingRule.id}` : `${API_BASE}/api/v2/routing-rules`, { method: editingRule ? 'PATCH' : 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setRuleError(d.detail || 'Failed'); return }; invalidateCache(`${API_BASE}/api/v2/routing-rules`); setRuleModalOpen(false); await fetchAll(); toast.success(editingRule ? 'Rule updated' : 'Rule created') } catch (e) { setRuleError(String(e)) } finally { setRuleLoading(false) }
   }
-  const handleToggle = async (rule: Rule) => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/routing-rules/${rule.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ enabled: !rule.enabled }) }); await fetchAll(); toast.success(rule.enabled ? 'Disabled' : 'Enabled') }
+  const handleToggle = async (rule: Rule) => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/routing-rules/${rule.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ enabled: !rule.enabled }) }); invalidateCache(`${API_BASE}/api/v2/routing-rules`); await fetchAll(); toast.success(rule.enabled ? 'Disabled' : 'Enabled') }
   const toggleModel = (m: string) => setRuleModels((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m])
 
   // Policies
@@ -226,9 +262,9 @@ export default function RoutingPage() {
     if (!hasAnyLimit()) { setPError('At least one limit is required'); return }
     setPError(''); setPLoading(true)
     const payload = { name: pName, scope_provider: orNull(pProvider), scope_project_tag: orNull(pProject), scope_user_hint: orNull(pUser), daily_limit_cents: orNullNum(pDaily) != null ? Math.round(Number(pDaily) * 100) : null, monthly_limit_cents: orNullNum(pMonthly) != null ? Math.round(Number(pMonthly) * 100) : null, per_request_limit_cents: orNullNum(pPerReq) != null ? Math.round(Number(pPerReq) * 100) : null, circuit_breaker_multiplier: orNullNum(pCB), runway_alert_months: orNullNum(pRunway), alert_at_pcts: pAlerts, action: pAction, fail_mode: pFailMode }
-    try { const h = await authHeaders(); const res = await fetch(`${API_BASE}/api/v2/policies`, { method: 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setPError(d.detail || 'Failed'); return }; setPolicyModalOpen(false); await fetchAll(); toast.success('Policy created') } catch (e) { setPError(String(e)) } finally { setPLoading(false) }
+    try { const h = await authHeaders(); const res = await fetch(`${API_BASE}/api/v2/policies`, { method: 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setPError(d.detail || 'Failed'); return }; invalidateCache(`${API_BASE}/api/v2/policies`); invalidateCache(`${API_BASE}/api/v2/routing/spend`); setPolicyModalOpen(false); await fetchAll(); toast.success('Policy created') } catch (e) { setPError(String(e)) } finally { setPLoading(false) }
   }
-  const handleDelete = async () => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/${deleteType === 'rule' ? 'routing-rules' : 'policies'}/${deleteId}`, { method: 'DELETE', headers: h }); setDeleteOpen(false); await fetchAll(); toast.success('Deleted') }
+  const handleDelete = async () => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/${deleteType === 'rule' ? 'routing-rules' : 'policies'}/${deleteId}`, { method: 'DELETE', headers: h }); invalidateCache(`${API_BASE}/api/v2/${deleteType === 'rule' ? 'routing-rules' : 'policies'}`); setDeleteOpen(false); await fetchAll(); toast.success('Deleted') }
   const toggleAlert = (n: number) => setPAlerts((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b))
 
   // Incident resume

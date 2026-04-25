@@ -21,7 +21,6 @@ type ProviderKey = {
 }
 
 type WorkspaceMe = { role: 'owner' | 'admin' | 'member' }
-type ProviderMeta = { provider: string; kind: string; input_schema: { fields: { name: string; type: string; options?: string[]; accept?: string; unit?: string; required?: boolean }[] } }
 
 const PROVIDER_GROUPS: { label: string; items: { value: string; display: string }[] }[] = [
   { label: 'LLM Providers', items: [{ value: 'openai', display: 'OpenAI' }, { value: 'anthropic', display: 'Anthropic' }, { value: 'google_ai', display: 'Google AI' }, { value: 'cohere', display: 'Cohere' }, { value: 'replicate', display: 'Replicate' }, { value: 'together', display: 'Together' }, { value: 'fireworks', display: 'Fireworks' }] },

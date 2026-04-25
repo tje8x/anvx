@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
+import { cachedFetch, getCached } from '@/lib/api-cache'
+import { SkeletonTable } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+const TTL_MS = 60_000
 
 type Row = {
   label: string
@@ -29,7 +32,11 @@ function formatMonth(ym: string): string {
 export default function IncomeStatement({ endMonth }: { endMonth?: string }) {
   const { getToken } = useAuth()
   const [months, setMonths] = useState<3 | 6>(3)
-  const [data, setData] = useState<Response | null>(null)
+  const url = endMonth
+    ? `${API_BASE}/api/v2/dashboard/income-statement?months=${months}&end_month=${endMonth}`
+    : `${API_BASE}/api/v2/dashboard/income-statement?months=${months}`
+
+  const [data, setData] = useState<Response | null>(() => getCached<Response>(url))
   const [isRefetching, setIsRefetching] = useState(false)
   const fetchSeq = useRef(0)
 
@@ -39,18 +46,14 @@ export default function IncomeStatement({ endMonth }: { endMonth?: string }) {
   }, [getToken])
 
   useEffect(() => {
+    setData((prev) => getCached<Response>(url) ?? prev)
     const seq = ++fetchSeq.current
     setIsRefetching(true)
     let cancelled = false
     ;(async () => {
       try {
         const h = await authHeaders()
-        const url = endMonth
-          ? `${API_BASE}/api/v2/dashboard/income-statement?months=${months}&end_month=${endMonth}`
-          : `${API_BASE}/api/v2/dashboard/income-statement?months=${months}`
-        const res = await fetch(url, { headers: h })
-        if (!res.ok) return
-        const json = (await res.json()) as Response
+        const json = await cachedFetch<Response>(url, { headers: h }, TTL_MS)
         if (cancelled || seq !== fetchSeq.current) return
         setData(json)
       } catch {
@@ -60,7 +63,7 @@ export default function IncomeStatement({ endMonth }: { endMonth?: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [authHeaders, months, endMonth])
+  }, [authHeaders, url])
 
   const initialLoading = data === null
   const fadeClass = isRefetching && !initialLoading ? 'opacity-60 transition-opacity' : 'opacity-100 transition-opacity'
@@ -85,11 +88,11 @@ export default function IncomeStatement({ endMonth }: { endMonth?: string }) {
       </div>
 
       {initialLoading ? (
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading…</p>
+        <SkeletonTable rows={8} columns={[42, 18, 18, 18]} />
       ) : !data || data.rows.length === 0 ? (
         <p className="text-[11px] font-data text-anvx-text-dim py-4">No data.</p>
       ) : (
-        <table className={`w-full text-[11px] font-data border-collapse ${fadeClass}`}>
+        <table className={`w-full text-[11px] font-data border-collapse anvx-fade-in ${fadeClass}`}>
           <thead>
             <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider">
               <th className="py-1 pr-4 text-left font-bold"></th>

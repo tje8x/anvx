@@ -8,6 +8,7 @@ import MacButton from '@/components/anvx/mac-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ReconciliationSection } from './reconciliation-section'
+import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const MAX_FILE_SIZE_BYTES = 25_000_000
@@ -132,11 +133,12 @@ export default function DataPage() {
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (force = false) => {
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/documents`, { headers: h })
-      if (res.ok) setDocuments(await res.json())
+      if (force) invalidateCache(`${API_BASE}/api/v2/documents`)
+      const list = await cachedFetch<DocumentRow[]>(`${API_BASE}/api/v2/documents`, { headers: h }, 15_000)
+      setDocuments(list)
     } catch {
       /* ignore */
     }
@@ -145,11 +147,8 @@ export default function DataPage() {
   const fetchRole = useCallback(async () => {
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/workspace/me`, { headers: h })
-      if (res.ok) {
-        const data: WorkspaceMe = await res.json()
-        setRole(data.role)
-      }
+      const data = await cachedFetch<WorkspaceMe>(`${API_BASE}/api/v2/workspace/me`, { headers: h }, 60_000)
+      setRole(data.role)
     } catch {
       /* ignore */
     }
@@ -240,7 +239,7 @@ export default function DataPage() {
         }
       }
 
-      await fetchDocuments()
+      await fetchDocuments(true)
     },
     [authHeaders, fetchDocuments, updateUpload],
   )
@@ -267,6 +266,8 @@ export default function DataPage() {
       } else {
         toast.success('Removed')
         setDocuments((prev) => prev.filter((d) => d.id !== deleteTarget.id))
+        invalidateCache(`${API_BASE}/api/v2/documents`)
+        invalidateCache(`${API_BASE}/api/v2/reconcile/queue`)
       }
     } catch {
       toast.error('Delete failed')

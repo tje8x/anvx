@@ -13,8 +13,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { cachedFetch, getCached } from '@/lib/api-cache'
+import { SkeletonChart } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+const TTL_MS = 60_000
 
 type CashPoint = {
   month: string
@@ -63,7 +66,11 @@ function ChartTooltip(props: { active?: boolean; payload?: Array<{ name: string;
 
 export default function CashRunway({ endMonth }: { endMonth?: string }) {
   const { getToken } = useAuth()
-  const [data, setData] = useState<CashResponse | null>(null)
+  const url = endMonth
+    ? `${API_BASE}/api/v2/dashboard/cash?months=6&end_month=${endMonth}`
+    : `${API_BASE}/api/v2/dashboard/cash?months=6`
+
+  const [data, setData] = useState<CashResponse | null>(() => getCached<CashResponse>(url))
   const [isRefetching, setIsRefetching] = useState(false)
   const fetchSeq = useRef(0)
 
@@ -73,18 +80,14 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
   }, [getToken])
 
   useEffect(() => {
+    setData((prev) => getCached<CashResponse>(url) ?? prev)
     const seq = ++fetchSeq.current
     setIsRefetching(true)
     let cancelled = false
     ;(async () => {
       try {
         const h = await authHeaders()
-        const url = endMonth
-          ? `${API_BASE}/api/v2/dashboard/cash?months=6&end_month=${endMonth}`
-          : `${API_BASE}/api/v2/dashboard/cash?months=6`
-        const res = await fetch(url, { headers: h })
-        if (!res.ok) return
-        const json = (await res.json()) as CashResponse
+        const json = await cachedFetch<CashResponse>(url, { headers: h }, TTL_MS)
         if (cancelled || seq !== fetchSeq.current) return
         setData(json)
       } catch {
@@ -94,7 +97,7 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [authHeaders, endMonth])
+  }, [authHeaders, url])
 
   const initialLoading = data === null
   const fadeClass = isRefetching && !initialLoading ? 'opacity-60 transition-opacity' : 'opacity-100 transition-opacity'
@@ -137,11 +140,11 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
       )}
 
       {initialLoading ? (
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading…</p>
+        <SkeletonChart height={280} />
       ) : !data || data.series.length === 0 ? (
         <p className="text-[11px] font-data text-anvx-text-dim py-4">No cash data yet.</p>
       ) : (
-        <div className={`w-full ${fadeClass}`} style={{ height: 280 }}>
+        <div className={`w-full anvx-fade-in ${fadeClass}`} style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data.series} margin={{ top: 10, right: 24, bottom: 10, left: 8 }}>
               <CartesianGrid stroke="var(--anvx-bdr, #8e8a7e)" strokeDasharray="2 3" strokeOpacity={0.4} />

@@ -107,8 +107,6 @@ export default function Waterfall({ stages, revenueCents }: Props) {
   if (stages.length === 0) return null
 
   const rotateLabels = stages.length > 10
-  const innerW = VB_W - PADDING.left - PADDING.right
-  const colW = innerW / stages.length
 
   const zeroY = yMin < 0 && yMax > 0
     ? PADDING.top + (yMax / (yMax - yMin)) * (VB_H - PADDING.top - PADDING.bottom)

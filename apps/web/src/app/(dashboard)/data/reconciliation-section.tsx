@@ -8,8 +8,19 @@ import MacButton from '@/components/anvx/mac-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { cachedFetch, invalidateCache } from '@/lib/api-cache'
+import { SkeletonTable } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+
+// Reconciliation status palette — keeps each state visually distinct from
+// each other AND from the green "Ready" used in Reports.
+const RECON_COLORS = {
+  autoMatched: { bg: '#E0F2F1', fg: '#00695C' }, // teal
+  needsReview: { bg: '#FFF8E1', fg: '#F57F17' }, // amber
+  unmatched:   { bg: '#FFEBEE', fg: '#C62828' }, // soft red
+  flagged:     { bg: '#F3E5F5', fg: '#7B1FA2' }, // purple
+} as const
 
 export type ParsedDocument = {
   id: string
@@ -96,13 +107,15 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
     setSelectedDocId(sorted[0].id)
   }, [parsedDocuments, selectedDocId])
 
-  const fetchQueue = useCallback(async () => {
+  const fetchQueue = useCallback(async (force = false) => {
     if (!selectedDocId) return
     setLoading(true)
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/reconcile/queue?document_id=${selectedDocId}`, { headers: h })
-      if (res.ok) setQueue(await res.json())
+      const url = `${API_BASE}/api/v2/reconcile/queue?document_id=${selectedDocId}`
+      if (force) invalidateCache(url)
+      const json = await cachedFetch<QueueResponse>(url, { headers: h }, 15_000)
+      setQueue(json)
     } catch {
       /* ignore */
     } finally {
@@ -113,8 +126,11 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
   const fetchCoa = useCallback(async () => {
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/reconcile/chart-of-accounts`, { headers: h })
-      if (res.ok) setCoa(await res.json())
+      const list = await cachedFetch<CoaRow[]>(
+        `${API_BASE}/api/v2/reconcile/chart-of-accounts`,
+        { headers: h }, 300_000,
+      )
+      setCoa(list)
     } catch {
       /* ignore */
     }
@@ -146,10 +162,10 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
           candidate_id: row.top_candidate.id,
         }),
       })
-      if (res.status === 409) { toast.error('Already resolved — refresh'); await fetchQueue(); return }
+      if (res.status === 409) { toast.error('Already resolved — refresh'); await fetchQueue(true); return }
       if (!res.ok) { toast.error('Confirm failed'); return }
       toast.success('Confirmed')
-      await fetchQueue()
+      await fetchQueue(true)
     } catch {
       toast.error('Confirm failed')
     }
@@ -177,7 +193,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
         const data = await res.json().catch(() => ({}))
         setCatError(data.detail || 'Categorize failed'); return
       }
-      setCatTarget(null); toast.success('Categorized'); await fetchQueue()
+      setCatTarget(null); toast.success('Categorized'); await fetchQueue(true)
     } catch (e) {
       setCatError(String(e))
     } finally {
@@ -208,7 +224,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
         const data = await res.json().catch(() => ({}))
         setFlagError(data.detail || 'Flag failed'); return
       }
-      setFlagTarget(null); toast.success('Flagged'); await fetchQueue()
+      setFlagTarget(null); toast.success('Flagged'); await fetchQueue(true)
     } catch (e) {
       setFlagError(String(e))
     } finally {
@@ -246,28 +262,29 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
       </div>
 
       <p className="text-[11px] font-ui text-anvx-text-dim mb-3">
-        {loading ? 'Loading…' : (
+        {loading && !queue ? 'Loading…' : (
           <>
             {totals.total} transaction{totals.total === 1 ? '' : 's'} ·{' '}
-            <span className="text-emerald-700">{totals.auto} auto-matched</span> ·{' '}
-            <span className="text-anvx-info">{totals.review} need review</span> ·{' '}
-            <span className="text-anvx-text-dim">{totals.unmatched} unmatched</span>
+            <span style={{ color: RECON_COLORS.autoMatched.fg }}>{totals.auto} auto-matched</span> ·{' '}
+            <span style={{ color: RECON_COLORS.needsReview.fg }}>{totals.review} need review</span> ·{' '}
+            <span style={{ color: RECON_COLORS.unmatched.fg }}>{totals.unmatched} unmatched</span>
           </>
         )}
       </p>
 
       <div className="flex gap-4 border-b border-anvx-bdr px-1 mb-3">
         {([
-          { key: 'review', label: `Needs review (${totals.review})` },
-          { key: 'unmatched', label: `Unmatched (${totals.unmatched})` },
-          { key: 'auto', label: `Auto-matched (${totals.auto})` },
-        ] as { key: TabKey; label: string }[]).map((tab) => (
+          { key: 'review' as TabKey, label: `Needs review (${totals.review})`, color: RECON_COLORS.needsReview.fg },
+          { key: 'unmatched' as TabKey, label: `Unmatched (${totals.unmatched})`, color: RECON_COLORS.unmatched.fg },
+          { key: 'auto' as TabKey, label: `Auto-matched (${totals.auto})`, color: RECON_COLORS.autoMatched.fg },
+        ]).map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`py-1.5 text-[11px] font-bold uppercase tracking-wider font-ui border-b-2 -mb-px transition-colors
+            style={activeTab === tab.key ? { color: tab.color } : undefined}
+            className={`py-1.5 text-[11px] font-bold uppercase tracking-wider font-ui border-b-2 -mb-px transition-colors duration-150
               ${activeTab === tab.key
-                ? 'border-anvx-acc text-anvx-text'
+                ? 'border-current'
                 : 'border-transparent text-anvx-text-dim hover:text-anvx-text'}
             `}
           >
@@ -275,6 +292,9 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
           </button>
         ))}
       </div>
+
+      {/* Initial-load skeleton — only shown when we have no cached queue yet */}
+      {loading && !queue && <SkeletonTable rows={5} columns={[16, 50, 14, 8, 6, 6]} />}
 
       {/* ───── Needs review ───── */}
       {activeTab === 'review' && queue && (

@@ -6,6 +6,8 @@ import SectionTitle from '@/components/anvx/section-title'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
 import IncomeStatement from '@/components/dashboard/income-statement'
 import CashRunway from '@/components/dashboard/cash-runway'
+import { cachedFetch, getCached } from '@/lib/api-cache'
+import { SkeletonChart, SkeletonMetricCardRow } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -113,10 +115,17 @@ export default function DashboardPage() {
   const isCurrentMonth = selectedMonth === today
   const mtdSuffix = isCurrentMonth ? ' (MTD)' : ''
 
-  // Stale-while-revalidate state: keep previous values; isRefetching tracks in-flight fetches.
-  const [waterfall, setWaterfall] = useState<WaterfallResponse | null>(null)
-  const [priorWaterfall, setPriorWaterfall] = useState<WaterfallResponse | null>(null)
-  const [savingsCents, setSavingsCents] = useState<number | null>(null)
+  const waterfallUrl = `${API_BASE}/api/v2/dashboard/waterfall?month=${selectedMonth}`
+  const priorWaterfallUrl = `${API_BASE}/api/v2/dashboard/waterfall?month=${priorMonth(selectedMonth)}`
+  const metricsUrl = `${API_BASE}/api/v2/dashboard/metrics`
+
+  // Stale-while-revalidate: seed from cache so tab switches render instantly.
+  const [waterfall, setWaterfall] = useState<WaterfallResponse | null>(() => getCached<WaterfallResponse>(waterfallUrl))
+  const [priorWaterfall, setPriorWaterfall] = useState<WaterfallResponse | null>(() => getCached<WaterfallResponse>(priorWaterfallUrl))
+  const [savingsCents, setSavingsCents] = useState<number | null>(() => {
+    const m = getCached<Metrics>(metricsUrl)
+    return m ? m.anvx_savings_realized_cents ?? 0 : null
+  })
   const [isRefetching, setIsRefetching] = useState(false)
   const fetchSeq = useRef(0) // guards against out-of-order responses
 
@@ -125,26 +134,25 @@ export default function DashboardPage() {
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 
-  // ANVX Savings: always MTD, fetched once on mount.
+  // ANVX Savings: always MTD.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const h = await authHeaders()
-        const res = await fetch(`${API_BASE}/api/v2/dashboard/metrics`, { headers: h })
-        if (!cancelled && res.ok) {
-          const data: Metrics = await res.json()
-          setSavingsCents(data.anvx_savings_realized_cents ?? 0)
-        }
+        const data = await cachedFetch<Metrics>(metricsUrl, { headers: h }, 60_000)
+        if (!cancelled) setSavingsCents(data.anvx_savings_realized_cents ?? 0)
       } catch {
-        if (!cancelled) setSavingsCents(0)
+        if (!cancelled && savingsCents == null) setSavingsCents(0)
       }
     })()
     return () => { cancelled = true }
-  }, [authHeaders])
+  }, [authHeaders, metricsUrl, savingsCents])
 
   // Month-driven fetch: load current + prior waterfall together, swap atomically.
   useEffect(() => {
+    setWaterfall((prev) => getCached<WaterfallResponse>(waterfallUrl) ?? prev)
+    setPriorWaterfall((prev) => getCached<WaterfallResponse>(priorWaterfallUrl) ?? prev)
     const seq = ++fetchSeq.current
     setIsRefetching(true)
 
@@ -152,14 +160,10 @@ export default function DashboardPage() {
     ;(async () => {
       try {
         const h = await authHeaders()
-        const prior = priorMonth(selectedMonth)
-        const [curRes, priorRes] = await Promise.all([
-          fetch(`${API_BASE}/api/v2/dashboard/waterfall?month=${selectedMonth}`, { headers: h }),
-          fetch(`${API_BASE}/api/v2/dashboard/waterfall?month=${prior}`, { headers: h }),
+        const [curJson, priorJson] = await Promise.all([
+          cachedFetch<WaterfallResponse>(waterfallUrl, { headers: h }, 60_000).catch(() => null),
+          cachedFetch<WaterfallResponse>(priorWaterfallUrl, { headers: h }, 60_000).catch(() => null),
         ])
-        const curJson = curRes.ok ? (await curRes.json() as WaterfallResponse) : null
-        const priorJson = priorRes.ok ? (await priorRes.json() as WaterfallResponse) : null
-        // Drop stale responses if a newer fetch has started.
         if (cancelled || seq !== fetchSeq.current) return
         if (curJson) setWaterfall(curJson)
         if (priorJson) setPriorWaterfall(priorJson)
@@ -170,7 +174,7 @@ export default function DashboardPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [authHeaders, selectedMonth])
+  }, [authHeaders, waterfallUrl, priorWaterfallUrl])
 
   const cur = waterfall ? summarizeWaterfall(waterfall.stages) : null
   const prev = priorWaterfall ? summarizeWaterfall(priorWaterfall.stages) : null
@@ -221,7 +225,7 @@ export default function DashboardPage() {
         </div>
 
         {initialLoading ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading metrics…</p>
+          <SkeletonMetricCardRow count={4} />
         ) : !cur ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">Could not load metrics.</p>
         ) : isBrandNew ? (
@@ -229,7 +233,7 @@ export default function DashboardPage() {
             Connect your first source to see metrics.
           </p>
         ) : (
-          <div className={`grid grid-cols-4 gap-3 ${fadeClass}`}>
+          <div className={`grid grid-cols-4 gap-3 anvx-fade-in ${fadeClass}`}>
             <MetricCard
               label={`Revenue${mtdSuffix}`}
               value={formatDollars(cur.revenue)}
@@ -257,11 +261,11 @@ export default function DashboardPage() {
       <section>
         <SectionTitle>Revenue waterfall</SectionTitle>
         {initialLoading ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading…</p>
+          <SkeletonChart height={300} />
         ) : !waterfall ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">Could not load waterfall.</p>
         ) : (
-          <div className={fadeClass}>
+          <div className={`anvx-fade-in ${fadeClass}`}>
             {!waterfall.has_revenue && (
               <p className="text-[11px] font-data text-anvx-text-dim mb-2">
                 No revenue data yet. Connect Stripe or categorize revenue rows in Reconciliation to see your waterfall.

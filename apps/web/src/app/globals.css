@@ -6,6 +6,32 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Subtle shimmer for skeleton placeholders. Uses the workspace palette so
+     it stays neutral against the retro-Mac beige background. */
+  @keyframes anvx-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .anvx-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      var(--anvx-bg) 0%,
+      var(--anvx-win) 50%,
+      var(--anvx-bg) 100%
+    );
+    background-size: 200% 100%;
+    animation: anvx-shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* Content fade-in once skeleton swaps to real data */
+  @keyframes anvx-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .anvx-fade-in {
+    animation: anvx-fade-in 0.2s ease-out;
+  }
 }
 
 @layer base {

@@ -9,8 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cachedFetch, invalidateCache } from '@/lib/api-cache'
+import { SkeletonTable } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+const PACKS_TTL = 30_000
 
 type Pack = {
   id: string
@@ -105,11 +108,12 @@ export default function ReportsPage() {
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 
-  const fetchPacks = useCallback(async () => {
+  const fetchPacks = useCallback(async (revalidate = false) => {
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/packs`, { headers: h })
-      if (res.ok) setPacks(await res.json())
+      if (revalidate) invalidateCache(`${API_BASE}/api/v2/packs`)
+      const list = await cachedFetch<Pack[]>(`${API_BASE}/api/v2/packs`, { headers: h }, PACKS_TTL)
+      setPacks(list)
     } catch {
       /* ignore */
     } finally {
@@ -127,9 +131,9 @@ export default function ReportsPage() {
       const interval = setInterval(async () => {
         try {
           const h = await authHeaders()
-          const res = await fetch(`${API_BASE}/api/v2/packs`, { headers: h })
-          if (!res.ok) return
-          const list: Pack[] = await res.json()
+          // Bypass cache while polling for status changes.
+          invalidateCache(`${API_BASE}/api/v2/packs`)
+          const list = await cachedFetch<Pack[]>(`${API_BASE}/api/v2/packs`, { headers: h }, PACKS_TTL)
           const updated = list.find((x) => x.id === p.id)
           if (!updated) return
           setPacks(list)
@@ -201,6 +205,7 @@ export default function ReportsPage() {
       }
       const newPack: Pack = await res.json()
       setPacks((prev) => [newPack, ...prev])
+      invalidateCache(`${API_BASE}/api/v2/packs`)
       setGenOpen(null)
       toast.success(genKind === 'audit_trail_export' ? 'Audit export queued — generating now' : 'Pack requested')
     } catch (e) {
@@ -221,7 +226,7 @@ export default function ReportsPage() {
           <MacButton onClick={openCloseGenerator}>Generate close pack</MacButton>
         </div>
         {loading ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading…</p>
+          <SkeletonTable rows={3} columns={[60, 15, 15, 10]} />
         ) : closePacks.length === 0 ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">
             No close packs yet. Generate one to lock in a month.
