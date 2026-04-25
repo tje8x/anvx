@@ -13,6 +13,7 @@ from .routers import incidents as incidents_router
 from .routers import reconcile as reconcile_router
 from .routers import insights as insights_router
 from .routers import models as models_router
+from .routers import packs as packs_router
 from .routers import policies as policies_router
 from .routers import routing as routing_router
 from .routers import routing_rules as routing_rules_router
@@ -54,6 +55,7 @@ app.include_router(documents_router.router, prefix="/api/v2")
 app.include_router(reconcile_router.router, prefix="/api/v2")
 app.include_router(attribution_router.router, prefix="/api/v2")
 app.include_router(dashboard_router.router, prefix="/api/v2")
+app.include_router(packs_router.router, prefix="/api/v2")
 
 
 @app.get("/health")
