@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import SectionTitle from '@/components/anvx/section-title'
@@ -14,6 +15,8 @@ import { SkeletonTable } from '@/components/anvx/skeleton'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const PACKS_TTL = 30_000
+const PURCHASE_POLL_INTERVAL_MS = 2_000
+const PURCHASE_POLL_TIMEOUT_MS = 60_000
 
 type Pack = {
   id: string
@@ -44,6 +47,10 @@ function packTitle(pack: Pack): string {
   if (pack.kind === 'close_pack') return `${formatPeriod(pack.period_start, pack.period_end)} — Monthly close`
   if (pack.kind === 'ai_audit_pack') return `${formatPeriod(pack.period_start, pack.period_end)} — AI audit pack`
   return `${formatPeriod(pack.period_start, pack.period_end)} — Audit trail export`
+}
+
+function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(0)}`
 }
 
 function StatusBadge({ pack }: { pack: Pack }) {
@@ -91,9 +98,14 @@ function lastNMonths(n: number): { start: string; end: string; label: string }[]
 
 export default function ReportsPage() {
   const { getToken } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [packs, setPacks] = useState<Pack[]>([])
   const [loading, setLoading] = useState(true)
   const pollersRef = useRef<Set<string>>(new Set())
+  const purchasePollHandledRef = useRef<Set<string>>(new Set())
+  const [purchasingId, setPurchasingId] = useState<string | null>(null)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
 
   const [genOpen, setGenOpen] = useState<null | 'close_or_audit_trail' | 'ai_audit_pack'>(null)
   const monthOptions = useMemo(() => lastNMonths(6), [])
@@ -123,6 +135,7 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchPacks() }, [fetchPacks])
 
+  // Background pollers for any pack still requested/generating.
   useEffect(() => {
     const pending = packs.filter((p) => PENDING_STATUSES.includes(p.status))
     pending.forEach((p) => {
@@ -131,7 +144,6 @@ export default function ReportsPage() {
       const interval = setInterval(async () => {
         try {
           const h = await authHeaders()
-          // Bypass cache while polling for status changes.
           invalidateCache(`${API_BASE}/api/v2/packs`)
           const list = await cachedFetch<Pack[]>(`${API_BASE}/api/v2/packs`, { headers: h }, PACKS_TTL)
           const updated = list.find((x) => x.id === p.id)
@@ -148,7 +160,7 @@ export default function ReportsPage() {
     })
   }, [packs, authHeaders])
 
-  const handleDownload = async (packId: string) => {
+  const handleDownload = useCallback(async (packId: string) => {
     try {
       const h = await authHeaders()
       const res = await fetch(`${API_BASE}/api/v2/packs/${packId}/download`, { headers: h })
@@ -158,7 +170,196 @@ export default function ReportsPage() {
     } catch {
       toast.error('Download failed')
     }
+  }, [authHeaders])
+
+  // ── Stripe checkout return-URL handling ─────────────────────────
+  // ?purchased=true → poll up to 60s, auto-download on ready
+  // ?canceled=true  → toast and clear
+  useEffect(() => {
+    const packId = searchParams.get('pack_id')
+    const purchased = searchParams.get('purchased') === 'true'
+    const canceled = searchParams.get('canceled') === 'true'
+
+    if (!packId) return
+    if (purchasePollHandledRef.current.has(packId)) return
+    purchasePollHandledRef.current.add(packId)
+
+    const clearReturnParams = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('pack_id')
+      url.searchParams.delete('purchased')
+      url.searchParams.delete('canceled')
+      router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false })
+    }
+
+    if (canceled) {
+      toast.error('Purchase canceled. Click Purchase again to retry.')
+      clearReturnParams()
+      return
+    }
+
+    if (!purchased) return
+
+    const startedAt = Date.now()
+    const interval = setInterval(async () => {
+      if (Date.now() - startedAt > PURCHASE_POLL_TIMEOUT_MS) {
+        clearInterval(interval)
+        toast('Pack still generating — check back in a moment.')
+        clearReturnParams()
+        return
+      }
+      try {
+        const h = await authHeaders()
+        invalidateCache(`${API_BASE}/api/v2/packs`)
+        const list = await cachedFetch<Pack[]>(`${API_BASE}/api/v2/packs`, { headers: h }, PACKS_TTL)
+        setPacks(list)
+        const pack = list.find((p) => p.id === packId)
+        if (!pack) return
+        if (pack.status === 'ready') {
+          clearInterval(interval)
+          toast.success('Pack ready — downloading...')
+          await handleDownload(pack.id)
+          clearReturnParams()
+        } else if (pack.status === 'failed') {
+          clearInterval(interval)
+          toast.error(`Generation failed: ${pack.error_message ?? 'unknown error'}`)
+          clearReturnParams()
+        }
+      } catch { /* keep polling */ }
+    }, PURCHASE_POLL_INTERVAL_MS)
+
+    return () => { clearInterval(interval) }
+  }, [searchParams, router, authHeaders, handleDownload])
+
+  // ── Purchase / retry ────────────────────────────────────────────
+
+  const handlePurchase = async (pack: Pack) => {
+    setPurchasingId(pack.id)
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`${API_BASE}/api/v2/billing/checkout/pack`, {
+        method: 'POST',
+        headers: h,
+        body: JSON.stringify({ pack_id: pack.id }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.detail || 'Could not start checkout')
+        return
+      }
+      const data = await res.json()
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url
+        return
+      }
+      if (data.free) {
+        toast.success('Generating now…')
+        await fetchPacks(true)
+      }
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setPurchasingId(null)
+    }
   }
+
+  const handleRetry = async (pack: Pack) => {
+    setRetryingId(pack.id)
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`${API_BASE}/api/v2/packs/${pack.id}/retry`, {
+        method: 'POST',
+        headers: h,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.detail || 'Could not reset pack')
+        return
+      }
+      invalidateCache(`${API_BASE}/api/v2/packs`)
+      await fetchPacks(true)
+      toast.success('Pack reset — click Purchase again')
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
+  // ── Pack action area ────────────────────────────────────────────
+
+  const PackActions = ({ pack }: { pack: Pack }) => {
+    const isFree = pack.price_cents === 0
+    const isPurchasing = purchasingId === pack.id
+    const isRetrying = retryingId === pack.id
+
+    if (isFree) {
+      if (pack.status === 'requested' || pack.status === 'generating') {
+        return (
+          <span className="text-[11px] font-data text-anvx-text-dim inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-full border border-anvx-text-dim border-t-transparent animate-spin" />
+            Generating…
+          </span>
+        )
+      }
+      if (pack.status === 'ready') {
+        return (
+          <>
+            <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download PDF</MacButton>
+            <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download CSV</MacButton>
+          </>
+        )
+      }
+      if (pack.status === 'failed') {
+        return (
+          <span className="text-[11px] font-data text-anvx-danger truncate max-w-[40%]">
+            Generation failed: {pack.error_message ?? 'unknown error'}
+          </span>
+        )
+      }
+      return null
+    }
+
+    // Paid kinds: close_pack, ai_audit_pack
+    if (pack.status === 'requested') {
+      return (
+        <MacButton onClick={() => handlePurchase(pack)} disabled={isPurchasing}>
+          {isPurchasing ? 'Redirecting…' : `Purchase for ${formatPrice(pack.price_cents)}`}
+        </MacButton>
+      )
+    }
+    if (pack.status === 'generating') {
+      return (
+        <span className="text-[11px] font-data text-anvx-text-dim inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border border-anvx-text-dim border-t-transparent animate-spin" />
+          Processing payment + generating…
+        </span>
+      )
+    }
+    if (pack.status === 'ready') {
+      return (
+        <>
+          <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download PDF</MacButton>
+          <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download CSV</MacButton>
+        </>
+      )
+    }
+    if (pack.status === 'failed') {
+      return (
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[11px] font-data text-anvx-danger truncate max-w-[280px]">
+            Generation failed: {pack.error_message ?? 'unknown error'}
+          </span>
+          <MacButton variant="secondary" disabled={isRetrying} onClick={() => handleRetry(pack)}>
+            {isRetrying ? 'Resetting…' : 'Retry'}
+          </MacButton>
+        </div>
+      )
+    }
+    return null
+  }
+
+  // ── Generators ──────────────────────────────────────────────────
 
   const openCloseGenerator = () => {
     setGenKind('close_pack')
@@ -207,7 +408,7 @@ export default function ReportsPage() {
       setPacks((prev) => [newPack, ...prev])
       invalidateCache(`${API_BASE}/api/v2/packs`)
       setGenOpen(null)
-      toast.success(genKind === 'audit_trail_export' ? 'Audit export queued — generating now' : 'Pack requested')
+      toast.success(genKind === 'audit_trail_export' ? 'Audit export queued — generating now' : 'Pack created — purchase to generate')
     } catch (e) {
       setGenError(String(e))
     } finally {
@@ -241,16 +442,11 @@ export default function ReportsPage() {
                   </p>
                   <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">
                     Requested {new Date(pack.created_at).toLocaleDateString()} ·{' '}
-                    {pack.price_cents === 0 ? 'Free' : `$${(pack.price_cents / 100).toFixed(0)}`}
+                    {pack.price_cents === 0 ? 'Free' : formatPrice(pack.price_cents)}
                   </p>
                 </div>
                 <StatusBadge pack={pack} />
-                {pack.status === 'ready' && (
-                  <>
-                    <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download PDF</MacButton>
-                    <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download CSV</MacButton>
-                  </>
-                )}
+                <PackActions pack={pack} />
               </li>
             ))}
           </ul>
@@ -276,16 +472,11 @@ export default function ReportsPage() {
                   </p>
                   <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">
                     Requested {new Date(pack.created_at).toLocaleDateString()} ·{' '}
-                    {pack.price_cents === 0 ? 'Free' : `$${(pack.price_cents / 100).toFixed(0)}`}
+                    {pack.price_cents === 0 ? 'Free' : formatPrice(pack.price_cents)}
                   </p>
                 </div>
                 <StatusBadge pack={pack} />
-                {pack.status === 'ready' && (
-                  <>
-                    <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download PDF</MacButton>
-                    <MacButton variant="secondary" onClick={() => handleDownload(pack.id)}>Download CSV</MacButton>
-                  </>
-                )}
+                <PackActions pack={pack} />
               </li>
             ))}
           </ul>

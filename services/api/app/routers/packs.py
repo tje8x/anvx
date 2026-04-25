@@ -155,3 +155,69 @@ async def cron_generate_pack(request: Request):
     pack_id = candidate[0]["id"]
     generate_close_pack(pack_id)
     return {"processed": True, "pack_id": pack_id}
+
+
+# ─── Internal: paid-pack generation kicked off by Stripe webhook ────
+
+
+class GeneratePaidBody(BaseModel):
+    pack_id: str
+
+
+@router.post("/jobs/generate-pack-paid")
+async def generate_pack_paid(body: GeneratePaidBody, request: Request):
+    """Internal endpoint called by the Stripe webhook handler after a successful
+    checkout. Authenticated via shared INTERNAL_SECRET, NOT a user JWT.
+
+    The webhook flips status from 'requested' → 'generating' before invoking
+    this. We validate that and then run generation. Returns 200 with
+    `processed: false` if state is unexpected so Stripe doesn't retry-loop.
+    """
+    secret = os.environ.get("INTERNAL_SECRET", "")
+    provided = request.headers.get("x-internal-secret", "")
+    if not secret or provided != secret:
+        raise HTTPException(401, "Invalid internal secret")
+
+    sb = sb_service()
+    pack = (
+        sb.from_("packs")
+        .select("id, status")
+        .eq("id", body.pack_id)
+        .single()
+        .execute()
+    ).data
+    if not pack:
+        raise HTTPException(404, "Pack not found")
+    if pack["status"] != "generating":
+        return {"processed": False, "reason": f"pack status is {pack['status']!r}"}
+
+    generate_close_pack(body.pack_id)
+    return {"processed": True, "pack_id": body.pack_id}
+
+
+# ─── Retry: reset a failed paid pack so the user can re-purchase ────
+
+
+@router.post("/packs/{pack_id}/retry")
+async def retry_pack(pack_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
+    sb = sb_service()
+    pack = (
+        sb.from_("packs")
+        .select("id, status")
+        .eq("id", pack_id)
+        .eq("workspace_id", ctx.workspace_id)
+        .single()
+        .execute()
+    ).data
+    if not pack:
+        raise HTTPException(404, "Pack not found")
+    if pack["status"] != "failed":
+        raise HTTPException(409, f"Cannot retry pack in status {pack['status']!r}")
+
+    sb.from_("packs").update({
+        "status": "requested",
+        "error_message": None,
+    }).eq("id", pack_id).eq("workspace_id", ctx.workspace_id).execute()
+
+    _audit(sb, ctx.workspace_id, ctx.user_id, "pack:retry", pack_id, {})
+    return {"ok": True}

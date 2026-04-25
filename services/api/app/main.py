@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import anomalies as anomalies_router
 from .routers import attribution as attribution_router
+from .routers import billing as billing_router
 from .routers import connectors as connectors_router
 from .routers import copilot as copilot_router
 from .routers import dashboard as dashboard_router
@@ -56,6 +57,7 @@ app.include_router(reconcile_router.router, prefix="/api/v2")
 app.include_router(attribution_router.router, prefix="/api/v2")
 app.include_router(dashboard_router.router, prefix="/api/v2")
 app.include_router(packs_router.router, prefix="/api/v2")
+app.include_router(billing_router.router, prefix="/api/v2")
 
 
 @app.get("/health")
