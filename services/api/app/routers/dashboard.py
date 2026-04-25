@@ -18,6 +18,8 @@ _METRICS_CACHE: dict[str, tuple[float, dict]] = {}
 _METRICS_LOCK = Lock()
 _IS_CACHE: dict[tuple[str, int, str], tuple[float, dict]] = {}
 _IS_LOCK = Lock()
+_CASH_CACHE: dict[tuple[str, int, str], tuple[float, dict]] = {}
+_CASH_LOCK = Lock()
 
 
 COGS_CODES = [
@@ -447,6 +449,159 @@ async def income_statement(
 
     with _IS_LOCK:
         _IS_CACHE[cache_key] = (now_ts, payload)
+
+    return payload
+
+
+def _last_n_months_inclusive(end_month_start: date, n: int) -> list[date]:
+    months: list[date] = [end_month_start]
+    cursor = end_month_start
+    for _ in range(n - 1):
+        if cursor.month == 1:
+            cursor = cursor.replace(year=cursor.year - 1, month=12)
+        else:
+            cursor = cursor.replace(month=cursor.month - 1)
+        months.append(cursor)
+    months.reverse()
+    return months
+
+
+def _parse_balance(raw: dict | None) -> int | None:
+    """Extract a closing balance (in cents) from a transaction's raw JSON, if present.
+
+    Bank-statement CSVs typically store Balance as a dollar string like '245000.00'.
+    Convert that to cents. If the raw value is already an integer in cents, the caller
+    must use a 'balance_cents' key to opt in.
+    """
+    if not isinstance(raw, dict):
+        return None
+    if "balance_cents" in raw and raw["balance_cents"] not in (None, ""):
+        try:
+            return int(raw["balance_cents"])
+        except (ValueError, TypeError):
+            pass
+    for key in ("Balance", "balance", "Closing Balance", "closing_balance"):
+        if key in raw and raw[key] not in (None, ""):
+            try:
+                s = str(raw[key]).replace("$", "").replace(",", "").strip()
+                if not s:
+                    continue
+                return int(round(float(s) * 100))
+            except (ValueError, TypeError):
+                continue
+    return None
+
+
+def _cash_balance_for_month(workspace_id: str, month_start: date, month_end_exclusive: date) -> int | None:
+    sb = sb_service()
+    rows = (
+        sb.from_("document_transactions")
+        .select("raw, txn_date, row_index")
+        .eq("workspace_id", workspace_id)
+        .gte("txn_date", month_start.isoformat())
+        .lt("txn_date", month_end_exclusive.isoformat())
+        .order("txn_date", desc=True)
+        .order("row_index", desc=True)
+        .limit(200)
+        .execute()
+    ).data or []
+    for r in rows:
+        bal = _parse_balance(r.get("raw"))
+        if bal is not None:
+            return bal
+    return None
+
+
+@router.get("/dashboard/cash")
+async def cash(
+    months: int = Query(6, ge=1, le=24),
+    end_month: str | None = Query(None, description="rightmost month YYYY-MM; defaults to current month"),
+    ctx: WorkspaceContext = Depends(require_role("member")),
+):
+    cache_key = (ctx.workspace_id, months, end_month or "")
+    now_ts = datetime.now(timezone.utc).timestamp()
+    with _CASH_LOCK:
+        cached = _CASH_CACHE.get(cache_key)
+        if cached and now_ts - cached[0] < CACHE_TTL_SECONDS:
+            return cached[1]
+
+    today = datetime.now(timezone.utc).date()
+    if end_month:
+        try:
+            end_start = datetime.strptime(end_month, "%Y-%m").date()
+        except ValueError:
+            raise HTTPException(400, "end_month must be YYYY-MM")
+    else:
+        end_start = today.replace(day=1)
+
+    month_starts = _last_n_months_inclusive(end_start, months)
+    current_month_start = today.replace(day=1)
+
+    series: list[dict] = []
+    for ms in month_starts:
+        me = _next_month_start(ms)
+        breakdown = attribution_for_period(ctx.workspace_id, ms, me)
+        spend = int(breakdown.get("total_cents") or 0)
+
+        if ms == current_month_start and today < me:
+            days_elapsed = max(1, (today - ms).days + 1)
+            burn = int(round((spend / days_elapsed) * 30))
+        else:
+            burn = spend
+
+        cash_bal = _cash_balance_for_month(ctx.workspace_id, ms, me)
+
+        series.append({
+            "month": ms.strftime("%Y-%m"),
+            "cash_balance_cents": cash_bal,
+            "burn_rate_cents": burn,
+        })
+
+    # ── Burn instability flag (>30% off 3-month rolling avg) ──
+    unstable_burn = False
+    burn_values = [s["burn_rate_cents"] for s in series]
+    if len(burn_values) >= 4:
+        recent = burn_values[-1]
+        prior_three = burn_values[-4:-1]
+        if all(p > 0 for p in prior_three):
+            avg = sum(prior_three) / 3
+            if avg > 0 and abs(recent - avg) / avg > 0.30:
+                unstable_burn = True
+
+    # ── Current runway ──
+    latest_cash = next((s["cash_balance_cents"] for s in reversed(series) if s["cash_balance_cents"] is not None), None)
+    latest_burn = series[-1]["burn_rate_cents"] if series else 0
+    if latest_cash is None or latest_burn <= 0:
+        runway_months: float | None = None
+    else:
+        runway_months = round(latest_cash / latest_burn, 1)
+
+    # ── Runway alert threshold ──
+    runway_alert_months: float | None = None
+    try:
+        policy_rows = (
+            sb_service().from_("budget_policies")
+            .select("runway_alert_months")
+            .eq("workspace_id", ctx.workspace_id)
+            .eq("enabled", True)
+            .not_.is_("runway_alert_months", "null")
+            .execute()
+        ).data or []
+        thresholds = [float(p["runway_alert_months"]) for p in policy_rows if p.get("runway_alert_months") is not None]
+        if thresholds:
+            runway_alert_months = min(thresholds)
+    except Exception:
+        runway_alert_months = None
+
+    payload = {
+        "series": series,
+        "current_runway_months": runway_months,
+        "runway_alert_months": runway_alert_months,
+        "unstable_burn": unstable_burn,
+    }
+
+    with _CASH_LOCK:
+        _CASH_CACHE[cache_key] = (now_ts, payload)
 
     return payload
 

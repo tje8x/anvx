@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import SectionTitle from '@/components/anvx/section-title'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
 import IncomeStatement from '@/components/dashboard/income-statement'
+import CashRunway from '@/components/dashboard/cash-runway'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -277,9 +278,7 @@ export default function DashboardPage() {
 
       <section>
         <SectionTitle>Cash position &amp; runway</SectionTitle>
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">
-          Cash position &amp; runway — Day 29
-        </p>
+        <CashRunway endMonth={selectedMonth} />
       </section>
     </div>
   )
