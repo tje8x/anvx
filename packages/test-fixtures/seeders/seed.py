@@ -36,24 +36,23 @@ def sb_service():
 def seed_routing_usage(sb, workspace_id: str, token_id: str):
     """12 months x ~50 requests/day = ~18k rows. Realistic model mix."""
     models = [
-        ("openai", "gpt-4o-mini", 200, 100, 15, 60),
-        ("openai", "gpt-4o", 400, 200, 300, 1200),
-        ("anthropic", "claude-haiku-3.5", 250, 150, 80, 400),
-        ("anthropic", "claude-sonnet-4", 500, 250, 300, 1500),
-        ("google", "gemini-flash-1.5", 300, 120, 10, 40),
+        # (provider, model, tin_median, tout_median, cost_cents_min, cost_cents_max, weight)
+        ("openai", "gpt-4o-mini", 8000, 2000, 5, 40, 30),          # $0.05-0.40/req, bulk usage
+        ("openai", "gpt-4o", 25000, 8000, 150, 800, 15),            # $1.50-8.00/req, complex tasks
+        ("anthropic", "claude-haiku-3.5", 12000, 4000, 10, 80, 25), # $0.10-0.80/req, classification
+        ("anthropic", "claude-sonnet-4", 30000, 10000, 200, 1200, 10), # $2.00-12.00/req, reasoning
+        ("google", "gemini-flash-1.5", 10000, 3000, 5, 30, 20),     # $0.05-0.30/req, fast tasks
     ]
     rows = []
     now = datetime.now(timezone.utc)
     for day_offset in range(365):
         d = now - timedelta(days=day_offset)
-        n_reqs = RNG.randint(30, 80)
+        n_reqs = RNG.randint(40, 100)
         for _ in range(n_reqs):
-            provider, model, tin_med, tout_med, pin, pout = RNG.choice(models)
-            tin = int(RNG.gauss(tin_med, tin_med * 0.3))
-            tout = int(RNG.gauss(tout_med, tout_med * 0.3))
-            tin = max(10, tin)
-            tout = max(5, tout)
-            cost = (tin * pin + tout * pout) // 1_000_000
+            provider, model, tin_med, tout_med, cost_min, cost_max, weight = RNG.choices(models, weights=[m[6] for m in models], k=1)[0]
+            tin = max(100, int(RNG.gauss(tin_med, tin_med * 0.3)))
+            tout = max(50, int(RNG.gauss(tout_med, tout_med * 0.3)))
+            cost = RNG.randint(cost_min, cost_max)
             rows.append({
                 "workspace_id": workspace_id,
                 "token_id": token_id,
