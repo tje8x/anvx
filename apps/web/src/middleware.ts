@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -8,7 +9,21 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks/stripe',
 ])
 
+// Legacy paths kept routable as 308 permanent redirects so external bookmarks
+// land on the new locations.
+const LEGACY_REDIRECTS: Record<string, string> = {
+  '/data': '/statements',
+  '/data/connectors': '/settings/connections',
+  '/settings/tokens': '/settings/connections',
+}
+
 export default clerkMiddleware(async (auth, req) => {
+  const dest = LEGACY_REDIRECTS[req.nextUrl.pathname]
+  if (dest) {
+    const url = req.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
+  }
   if (!isPublicRoute(req)) {
     await auth.protect()
   }

@@ -3,28 +3,26 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 
 const tabs = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Routing', href: '/routing' },
   { label: 'Reports', href: '/reports' },
-  { label: 'Data', href: '/data' },
-  { label: 'Settings', href: '/settings/notifications', basePath: '/settings' },
+  { label: 'Statements', href: '/statements' },
 ] as const
 
+const SETTINGS_HREF = '/settings/general'
+const SETTINGS_BASE = '/settings'
+
 function tabFromPath(pathname: string): string {
-  const match = tabs.find((t) => {
-    const base = 'basePath' in t ? t.basePath : t.href
-    return pathname === t.href || pathname.startsWith(base + '/') || pathname === base
-  })
+  if (pathname === SETTINGS_BASE || pathname.startsWith(SETTINGS_BASE + '/')) return SETTINGS_HREF
+  const match = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))
   return match?.href ?? tabs[0].href
 }
 
 export default function MenuBar() {
   const pathname = usePathname()
-
-  // Track the *intended* active tab synchronously so a click highlights the
-  // new tab before the route transition finishes compiling/loading.
   const [pending, setPending] = useState<string>(() => tabFromPath(pathname))
 
   useEffect(() => {
@@ -44,8 +42,10 @@ export default function MenuBar() {
     setIndicator({ left: r.left - navRect.left, width: r.width })
   }, [pending])
 
+  const inSettings = pending === SETTINGS_HREF
+
   return (
-    <nav ref={navRef} className="relative flex gap-6 border-b border-anvx-bdr px-4">
+    <nav ref={navRef} className="relative flex items-center gap-6 border-b border-anvx-bdr px-4">
       {tabs.map((tab) => {
         const active = pending === tab.href
         return (
@@ -64,10 +64,28 @@ export default function MenuBar() {
           </Link>
         )
       })}
+
+      {/* Right-side, visually separated gear icon */}
+      <div className="ml-auto flex items-center pl-4 border-l border-anvx-bdr/60">
+        <Link
+          ref={(el) => { itemRefs.current[SETTINGS_HREF] = el }}
+          href={SETTINGS_HREF}
+          onClick={() => setPending(SETTINGS_HREF)}
+          aria-label="Settings"
+          title="Settings"
+          className={`
+            inline-flex items-center justify-center p-1.5 rounded-sm transition-colors duration-150
+            ${inSettings ? 'text-anvx-text bg-anvx-bg' : 'text-anvx-text-dim hover:text-anvx-text hover:bg-anvx-bg/60'}
+          `}
+        >
+          <SettingsIcon className="h-4 w-4" />
+        </Link>
+      </div>
+
       <span
         aria-hidden
         className="absolute -bottom-px h-0.5 bg-anvx-acc transition-all duration-200 ease-out pointer-events-none"
-        style={{ left: indicator.left, width: indicator.width, opacity: indicator.width === 0 ? 0 : 1 }}
+        style={{ left: indicator.left, width: indicator.width, opacity: indicator.width === 0 || inSettings ? 0 : 1 }}
       />
     </nav>
   )

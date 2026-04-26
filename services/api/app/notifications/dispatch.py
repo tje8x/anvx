@@ -66,12 +66,19 @@ def get_or_create_settings(sb, workspace_id: str) -> dict:
 
 
 def _resolve_email_recipient(sb, workspace_id: str, settings_row: dict) -> str | None:
+    """Recipient resolution priority:
+    1. notification_settings.email_recipient (legacy schema)
+    2. workspaces.notification_email (new schema)
+    3. workspace owner's email (final fallback)
+    """
     if settings_row.get("email_recipient"):
         return settings_row["email_recipient"]
     ws = (
-        sb.from_("workspaces").select("owner_user_id, name")
+        sb.from_("workspaces").select("owner_user_id, name, notification_email")
         .eq("id", workspace_id).single().execute()
     ).data or {}
+    if ws.get("notification_email"):
+        return ws["notification_email"]
     owner_id = ws.get("owner_user_id")
     if not owner_id:
         return None
@@ -80,6 +87,35 @@ def _resolve_email_recipient(sb, workspace_id: str, settings_row: dict) -> str |
         .eq("id", owner_id).single().execute()
     ).data or {}
     return user.get("email")
+
+
+def _resolve_slack_url(sb, workspace_id: str, settings_row: dict) -> str | None:
+    """Slack URL priority: workspaces.slack_webhook_url (new schema)
+    falls back to notification_settings.slack_webhook_url (legacy)."""
+    ws = (
+        sb.from_("workspaces").select("slack_webhook_url")
+        .eq("id", workspace_id).single().execute()
+    ).data or {}
+    return ws.get("slack_webhook_url") or settings_row.get("slack_webhook_url")
+
+
+def _resolve_channel_gates(
+    sb, workspace_id: str, kind: str, settings_row: dict,
+) -> tuple[bool, bool]:
+    """Per-event preferences win when present; fall back to legacy
+    notification_settings.email_enabled / .slack_enabled flags otherwise.
+    """
+    pref_rows = (
+        sb.from_("notification_preferences")
+        .select("email_enabled, slack_enabled")
+        .eq("workspace_id", workspace_id)
+        .eq("event_type", kind)
+        .limit(1).execute()
+    ).data or []
+    if pref_rows:
+        p = pref_rows[0]
+        return bool(p.get("email_enabled")), bool(p.get("slack_enabled"))
+    return bool(settings_row.get("email_enabled")), bool(settings_row.get("slack_enabled"))
 
 
 def _workspace_name(sb, workspace_id: str) -> str:
@@ -158,16 +194,17 @@ async def dispatch(kind: str, workspace_id: str, payload: dict) -> dict | None:
             }).eq("id", event["id"]).execute()
             return event
 
-        email_recipient = _resolve_email_recipient(sb, workspace_id, settings_row) if settings_row.get("email_enabled") else None
-        slack_url = settings_row.get("slack_webhook_url") if settings_row.get("slack_enabled") else None
+        email_enabled, slack_enabled = _resolve_channel_gates(sb, workspace_id, kind, settings_row)
+        email_recipient = _resolve_email_recipient(sb, workspace_id, settings_row) if email_enabled else None
+        slack_url = _resolve_slack_url(sb, workspace_id, settings_row) if slack_enabled else None
 
         async def _email_branch() -> tuple[bool, str | None]:
-            if not settings_row.get("email_enabled"):
+            if not email_enabled:
                 return False, "email disabled"
             return await _deliver_email(email_recipient, subject, text, html)
 
         async def _slack_branch() -> tuple[bool, str | None]:
-            if not settings_row.get("slack_enabled"):
+            if not slack_enabled:
                 return False, "slack disabled"
             return await _deliver_slack(slack_url, slack_blocks)
 
@@ -176,11 +213,11 @@ async def dispatch(kind: str, workspace_id: str, payload: dict) -> dict | None:
         update: dict[str, Any] = {}
         if email_ok:
             update["delivered_email_at"] = _now_iso()
-        elif email_err and settings_row.get("email_enabled"):
+        elif email_err and email_enabled:
             update["email_error"] = email_err
         if slack_ok:
             update["delivered_slack_at"] = _now_iso()
-        elif slack_err and settings_row.get("slack_enabled"):
+        elif slack_err and slack_enabled:
             update["slack_error"] = slack_err
 
         if update:

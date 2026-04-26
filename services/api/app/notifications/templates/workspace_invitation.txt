@@ -1,0 +1,8 @@
+You're invited to {{ workspace_name }} on ANVX
+
+{{ inviter_name | default('A teammate') }} has invited you to join {{ workspace_name }} as {{ role_label | default('a team member') }}.
+
+Accept your invitation at:
+https://anvx.io/invite/{{ invitation_id }}
+
+This invitation expires in 7 days.

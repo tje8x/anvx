@@ -214,7 +214,7 @@ export default function ConnectorsPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-8">
       <SectionTitle right={<AdminGate role={role}><MacButton disabled={!isAdmin} onClick={() => { resetConnectForm(); setConnectOpen(true) }}>Connect provider</MacButton></AdminGate>}>
         Connected providers
       </SectionTitle>
@@ -251,6 +251,10 @@ export default function ConnectorsPage() {
           </tbody>
         </table>
       )}
+
+      <AnvxApiKeysSection role={role} />
+
+      <RoutingEndpointPanel />
 
       {/* Connect Dialog */}
       <Dialog open={connectOpen} onOpenChange={setConnectOpen}>
@@ -348,5 +352,181 @@ export default function ConnectorsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+
+// ─── ANVX API keys ──────────────────────────────────────────────
+
+
+type AnvxToken = {
+  id: string
+  label: string
+  prefix: string
+  last_used_at: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+function AnvxApiKeysSection({ role }: { role: string }) {
+  const { getToken } = useAuth()
+  const [tokens, setTokens] = useState<AnvxToken[]>([])
+  const [loading, setLoading] = useState(true)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [label, setLabel] = useState('')
+  const [createdPlaintext, setCreatedPlaintext] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  const isAdmin = role === 'owner' || role === 'admin'
+
+  const authHeaders = useCallback(async () => {
+    const t = await getToken({ template: 'supabase' })
+    return { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }
+  }, [getToken])
+
+  const fetchTokens = useCallback(async () => {
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`${API_BASE}/api/v2/tokens`, { headers: h })
+      if (res.ok) setTokens(await res.json())
+    } finally {
+      setLoading(false)
+    }
+  }, [authHeaders])
+
+  useEffect(() => { fetchTokens() }, [fetchTokens])
+
+  const handleCreate = async () => {
+    setCreating(true)
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`${API_BASE}/api/v2/tokens`, {
+        method: 'POST', headers: h, body: JSON.stringify({ label }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.detail || 'Could not create token')
+        return
+      }
+      const data = await res.json()
+      setCreatedPlaintext(data.plaintext)
+      setLabel('')
+      await fetchTokens()
+    } finally { setCreating(false) }
+  }
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Revoke this API key? This cannot be undone.')) return
+    try {
+      const h = await authHeaders()
+      await fetch(`${API_BASE}/api/v2/tokens/${id}/revoke`, { method: 'POST', headers: h })
+      toast.success('Token revoked')
+      await fetchTokens()
+    } catch { toast.error('Could not revoke') }
+  }
+
+  const active = tokens.filter((t) => !t.revoked_at)
+
+  return (
+    <section>
+      <SectionTitle right={isAdmin ? <MacButton onClick={() => { setLabel(''); setCreatedPlaintext(null); setCreateOpen(true) }}>Create new API key</MacButton> : null}>
+        ANVX API keys
+      </SectionTitle>
+      {loading ? (
+        <p className="text-[11px] font-data text-anvx-text-dim py-4">Loading…</p>
+      ) : active.length === 0 ? (
+        <p className="text-[11px] font-data text-anvx-text-dim py-4">No active API keys.</p>
+      ) : (
+        <table className="w-full text-[11px] font-ui">
+          <thead>
+            <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
+              <th className="py-1.5 pr-4">Label</th>
+              <th className="py-1.5 pr-4">Prefix</th>
+              <th className="py-1.5 pr-4">Created</th>
+              <th className="py-1.5 pr-4">Last used</th>
+              <th className="py-1.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {active.map((t) => (
+              <tr key={t.id} className="border-b border-anvx-bdr/50">
+                <td className="py-2 pr-4 text-anvx-text">{t.label}</td>
+                <td className="py-2 pr-4 font-data text-anvx-text-dim">{t.prefix}…</td>
+                <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(t.created_at).toLocaleDateString()}</td>
+                <td className="py-2 pr-4 font-data text-anvx-text-dim">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : '—'}</td>
+                <td className="py-2 text-right">
+                  {isAdmin && (
+                    <button onClick={() => handleRevoke(t.id)} className="text-[11px] font-ui text-anvx-danger hover:opacity-80">Revoke</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{createdPlaintext ? 'API key created' : 'Create new API key'}</DialogTitle></DialogHeader>
+          {!createdPlaintext ? (
+            <div className="flex flex-col gap-3 py-2">
+              <label className="text-[11px] font-ui text-anvx-text-dim">Label</label>
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. production" maxLength={64} />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 py-2">
+              <p className="text-[11px] font-ui text-anvx-text">Copy this key now — it won&apos;t be shown again.</p>
+              <pre className="text-[10px] font-data bg-anvx-bg border border-anvx-bdr rounded-sm p-2 overflow-x-auto select-all break-all">{createdPlaintext}</pre>
+            </div>
+          )}
+          <DialogFooter>
+            {!createdPlaintext ? (
+              <>
+                <DialogClose asChild><MacButton variant="secondary">Cancel</MacButton></DialogClose>
+                <MacButton disabled={!label || creating} onClick={handleCreate}>{creating ? 'Creating…' : 'Create'}</MacButton>
+              </>
+            ) : (
+              <DialogClose asChild><MacButton onClick={() => setCreatedPlaintext(null)}>Done</MacButton></DialogClose>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  )
+}
+
+
+// ─── Routing engine endpoint panel ──────────────────────────────
+
+
+function RoutingEndpointPanel() {
+  const url = 'https://anvx.io/v1'
+  const example = `OPENAI_BASE_URL=${url}`
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Copied')
+    } catch { toast.error('Copy failed') }
+  }
+
+  return (
+    <section>
+      <SectionTitle>Routing engine endpoint</SectionTitle>
+      <div className="flex flex-col gap-3 max-w-2xl">
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-[11px] font-data bg-anvx-bg border border-anvx-bdr rounded-sm px-3 py-2 select-all">{url}</code>
+          <MacButton variant="secondary" onClick={() => copy(url)}>Copy</MacButton>
+        </div>
+        <div>
+          <p className="text-[10px] font-ui text-anvx-text-dim mb-1">Drop-in replacement for the OpenAI base URL:</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-[11px] font-data bg-anvx-bg border border-anvx-bdr rounded-sm px-3 py-2 select-all">{example}</code>
+            <MacButton variant="secondary" onClick={() => copy(example)}>Copy</MacButton>
+          </div>
+        </div>
+        <a className="text-[11px] font-ui text-anvx-acc underline hover:opacity-80" href="https://anvx.io/docs/integration" target="_blank" rel="noopener noreferrer">Integration docs →</a>
+      </div>
+    </section>
   )
 }

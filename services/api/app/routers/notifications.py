@@ -189,6 +189,20 @@ async def digest_daily(request: Request):
     Auth: x-cron-secret header must match $CRON_SECRET (same pattern as the
     anomaly-scan and generate-pack crons).
     """
+    # ─── TODO: weekly digest mode ────────────────────────────────────────────
+    # When workspaces.autopilot_digest = 'weekly', skip them in this daily run
+    # and process them only on the configured weekday (e.g., Mondays at 17:00 UTC).
+    # Implementation outline:
+    #   1. Filter `digest_workspaces` below by joining `workspaces.autopilot_digest`
+    #      and keeping only rows where it equals 'daily' (or NULL for legacy).
+    #   2. Add a sibling endpoint `POST /jobs/digest-weekly` with the same body but
+    #      filtering `autopilot_digest = 'weekly'`, scheduled `0 17 * * 1` (Mon).
+    #   3. The window for weekly mode is `today_utc_start - 7 days` instead of -1.
+    #   4. Workspaces with `autopilot_digest = 'per_event'` should NOT have their
+    #      events queued in the digestible bucket in the first place — `dispatch.py`
+    #      should deliver immediately when that mode is set. Update `DIGESTIBLE_KINDS`
+    #      gating accordingly (consult workspaces.autopilot_digest before queueing).
+    # ─────────────────────────────────────────────────────────────────────────
     secret = os.environ.get("CRON_SECRET", "")
     provided = request.headers.get("x-cron-secret", "")
     if not secret or provided != secret:

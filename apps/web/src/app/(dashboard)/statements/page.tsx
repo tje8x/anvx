@@ -335,7 +335,9 @@ export default function DataPage() {
       <section>
         <SectionTitle>Uploaded files</SectionTitle>
         {documents.length === 0 ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">No documents uploaded yet.</p>
+          <p className="text-[11px] font-data text-anvx-text-dim py-4">
+            Upload a bank or card statement to reconcile against your provider data.
+          </p>
         ) : (
           <table className="w-full text-[11px] font-ui">
             <thead>
@@ -377,12 +379,6 @@ export default function DataPage() {
       </section>
 
       <ReconciliationSection parsedDocuments={documents.filter((d) => d.status === 'parsed')} />
-
-
-      <section>
-        <SectionTitle>Connected providers</SectionTitle>
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">Connected providers — coming soon</p>
-      </section>
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <DialogContent>

@@ -192,3 +192,71 @@ async def create_subscription(ctx: WorkspaceContext = Depends(require_role("admi
         "subscription_item_id": subscription_item_id,
         "setup_intent_client_secret": setup_intent.client_secret,
     }
+
+
+# ─── Customer portal + period usage ─────────────────────────────
+
+
+@router.post("/billing/portal")
+async def billing_portal(ctx: WorkspaceContext = Depends(require_role("admin"))):
+    """Generate a Stripe Customer Portal session URL for payment-method management."""
+    sb = sb_service()
+    ws = (
+        sb.from_("workspaces").select("stripe_customer_id")
+        .eq("id", ctx.workspace_id).single().execute()
+    ).data or {}
+    customer_id = ws.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(404, "No Stripe customer on file. Add a payment method first.")
+
+    stripe = _stripe()
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{settings.webapp_base_url}/settings/billing",
+        )
+    except Exception as e:
+        raise HTTPException(502, f"Stripe portal session creation failed: {e}")
+    return {"url": session.url}
+
+
+@router.get("/billing/period-usage")
+async def billing_period_usage(ctx: WorkspaceContext = Depends(require_role("member"))):
+    """Aggregate routing usage + ANVX markup for the current billing period.
+
+    Period is the calendar month so far in UTC. Numbers are pulled directly from
+    routing_usage_records — markup_cents is the ANVX fee, provider_cost_cents
+    is what we paid the upstream provider.
+    """
+    from datetime import datetime, timezone
+    sb = sb_service()
+    now = datetime.now(timezone.utc)
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    rows = (
+        sb.from_("routing_usage_records")
+        .select("provider_cost_cents, markup_cents")
+        .eq("workspace_id", ctx.workspace_id)
+        .gte("created_at", start.isoformat())
+        .lt("created_at", now.isoformat())
+        .execute()
+    ).data or []
+
+    requests = len(rows)
+    provider_cost_cents = sum(int(r.get("provider_cost_cents") or 0) for r in rows)
+    markup_cents = sum(int(r.get("markup_cents") or 0) for r in rows)
+
+    # Payment method presence — used to surface the connector limit notice.
+    ws = (
+        sb.from_("workspaces").select("stripe_customer_id, stripe_subscription_id")
+        .eq("id", ctx.workspace_id).single().execute()
+    ).data or {}
+
+    return {
+        "period_start": start.date().isoformat(),
+        "period_end": now.date().isoformat(),
+        "requests": requests,
+        "provider_cost_cents": provider_cost_cents,
+        "markup_cents": markup_cents,
+        "has_payment_method": bool(ws.get("stripe_subscription_id")),
+    }

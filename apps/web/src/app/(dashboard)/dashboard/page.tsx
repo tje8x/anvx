@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import SectionTitle from '@/components/anvx/section-title'
@@ -230,7 +231,10 @@ export default function DashboardPage() {
           <p className="text-[11px] font-data text-anvx-text-dim py-4">Could not load metrics.</p>
         ) : isBrandNew ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">
-            Connect your first source to see metrics.
+            Connect your first provider to see your financial picture.{' '}
+            <Link href="/settings/connections" className="text-anvx-acc underline hover:opacity-80">
+              Go to Settings → Connections
+            </Link>
           </p>
         ) : (
           <div className={`grid grid-cols-4 gap-3 anvx-fade-in ${fadeClass}`}>

@@ -9,8 +9,14 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 import os
 
-Role = Literal["owner", "admin", "member"]
-ROLE_RANK = {"owner": 3, "admin": 2, "member": 1}
+Role = Literal["owner", "admin", "member", "viewer", "accountant_viewer"]
+ROLE_RANK = {
+    "owner": 5,
+    "admin": 4,
+    "member": 3,
+    "viewer": 2,
+    "accountant_viewer": 1,
+}
 
 SUPABASE_JWT_SECRET = os.environ["SUPABASE_JWT_SECRET"]
 
