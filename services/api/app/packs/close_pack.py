@@ -454,6 +454,22 @@ def generate_close_pack(pack_id: str) -> None:
             "error_message": None,
         }).eq("id", pack_id).execute()
 
+        try:
+            from ..notifications.dispatch import dispatch_fire_and_forget
+            kind_label_map = {
+                "close_pack": "Monthly close pack",
+                "quarterly_close": "Quarterly close pack",
+                "annual_tax_prep": "Annual tax prep bundle",
+                "audit_trail_export": "Audit trail export",
+            }
+            dispatch_fire_and_forget("close_pack_ready", workspace_id, {
+                "pack_id": pack_id,
+                "pack_label": kind_label_map.get(kind, "Close pack"),
+                "period_label": f"{period_start.isoformat()} → {period_end.isoformat()}",
+            })
+        except Exception as notify_err:
+            print(f"[NOTIFY_ERR] {notify_err}")
+
     except Exception as e:
         sb.from_("packs").update({
             "status": "failed",

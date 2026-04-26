@@ -1,0 +1,6 @@
+Budget alert: {{ pct | default(80) }}% of {{ scope | default('daily limit') }}
+
+Spend: ${{ '%.2f' | format(spend_cents / 100) }} of ${{ '%.2f' | format(limit_cents / 100) }}
+Workspace: {{ workspace_name }}
+
+Review at {{ webapp_base_url }}/routing

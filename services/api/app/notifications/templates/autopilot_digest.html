@@ -1,0 +1,15 @@
+<h2 style="color:#1a5276;margin:0 0 8px">Daily autopilot digest</h2>
+<p style="color:#555;margin:0 0 16px">
+  {{ event_count }} optimization{{ '' if event_count == 1 else 's' }} from autopilot in the last 24 hours.
+  Window: {{ window_start }} → {{ window_end }}.
+</p>
+<ul style="font-family:'IBM Plex Mono',Menlo,monospace;font-size:12px;line-height:1.5;padding-left:18px">
+  {% for ev in events %}
+  <li>
+    <strong>{{ ev.payload.headline | default('Optimization') }}</strong>
+    {% if ev.payload.detail %}— {{ ev.payload.detail }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+<p style="margin-top:16px"><strong>Total estimated savings:</strong> ${{ '%.2f' | format(total_savings_cents / 100) }}</p>
+<p><a href="{{ webapp_base_url }}/routing">Review in ANVX →</a></p>

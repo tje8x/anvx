@@ -1,0 +1,4 @@
+<h2 style="color:#1a5276;margin:0 0 8px">Incident resolved — {{ provider | default('routing') }} resumed</h2>
+<p>The incident has been resolved and routing is operating normally.</p>
+{% if note %}<p style="color:#555"><strong>Note:</strong> {{ note }}</p>{% endif %}
+<p><a href="{{ webapp_base_url }}/routing">View details →</a></p>

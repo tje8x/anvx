@@ -64,6 +64,26 @@ async def create_pack(
         raise HTTPException(400, f"period must not exceed {MAX_PERIOD_DAYS} days")
 
     sb = sb_service()
+
+    # Duplicate guard for paid kinds: refuse if a live pack already covers
+    # this period for this workspace. Dismissed and failed rows don't block.
+    if body.kind in ("close_pack", "ai_audit_pack"):
+        existing = (
+            sb.from_("packs").select("id, status")
+            .eq("workspace_id", ctx.workspace_id)
+            .eq("kind", body.kind)
+            .eq("period_start", body.period_start.isoformat())
+            .eq("period_end", body.period_end.isoformat())
+            .in_("status", ["requested", "generating", "ready", "delivered"])
+            .limit(1).execute()
+        ).data or []
+        if existing:
+            kind_label = body.kind.replace("_", " ")
+            raise HTTPException(
+                409,
+                f"A {kind_label} already exists for this period (status: {existing[0]['status']})",
+            )
+
     price_cents = _lookup_price(sb, ctx.workspace_id, body.kind)
 
     insert = (
@@ -100,6 +120,7 @@ async def list_packs(ctx: WorkspaceContext = Depends(require_role("member"))):
         sb.from_("packs")
         .select("*")
         .eq("workspace_id", ctx.workspace_id)
+        .neq("status", "dismissed")
         .order("created_at", desc=True)
         .limit(20)
         .execute()
@@ -220,4 +241,60 @@ async def retry_pack(pack_id: str, ctx: WorkspaceContext = Depends(require_role(
     }).eq("id", pack_id).eq("workspace_id", ctx.workspace_id).execute()
 
     _audit(sb, ctx.workspace_id, ctx.user_id, "pack:retry", pack_id, {})
+    return {"ok": True}
+
+
+# ─── Dismiss: soft-cancel an unwanted 'requested' pack ───────────────
+
+
+@router.post("/packs/{pack_id}/dismiss")
+async def dismiss_pack(pack_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
+    """Soft-cancel a pack the user created but doesn't want to generate.
+    Only 'requested' packs can be dismissed — anything past that has either
+    consumed compute or, for paid kinds, been charged.
+    """
+    sb = sb_service()
+    pack = (
+        sb.from_("packs").select("id, kind, status, period_start, period_end")
+        .eq("id", pack_id).eq("workspace_id", ctx.workspace_id)
+        .single().execute()
+    ).data
+    if not pack:
+        raise HTTPException(404, "Pack not found")
+    if pack["status"] != "requested":
+        raise HTTPException(409, f"Cannot dismiss pack in status {pack['status']!r}")
+
+    sb.from_("packs").update({"status": "dismissed"}).eq("id", pack_id).eq("workspace_id", ctx.workspace_id).execute()
+    _audit(sb, ctx.workspace_id, ctx.user_id, "pack:dismiss", pack_id, {
+        "kind": pack["kind"], "period_start": pack["period_start"], "period_end": pack["period_end"],
+    })
+    return {"ok": True}
+
+
+# ─── Design-partner shortcut: paid pack → generate without checkout ──
+
+
+@router.post("/packs/{pack_id}/generate-now")
+async def generate_pack_now(
+    pack_id: str,
+    background: BackgroundTasks,
+    ctx: WorkspaceContext = Depends(require_role("admin")),
+):
+    """Design-partner-mode shortcut: generate a paid pack without going through
+    Stripe checkout. Workspace-scoped, admin-only, only valid on 'requested'.
+    """
+    sb = sb_service()
+    pack = (
+        sb.from_("packs").select("id, status")
+        .eq("id", pack_id).eq("workspace_id", ctx.workspace_id)
+        .single().execute()
+    ).data
+    if not pack:
+        raise HTTPException(404, "Pack not found")
+    if pack["status"] != "requested":
+        raise HTTPException(409, f"Cannot generate pack in status {pack['status']!r}")
+
+    sb.from_("packs").update({"status": "generating"}).eq("id", pack_id).eq("workspace_id", ctx.workspace_id).execute()
+    background.add_task(generate_close_pack, pack_id)
+    _audit(sb, ctx.workspace_id, ctx.user_id, "pack:generate_now", pack_id, {"design_partner_mode": True})
     return {"ok": True}

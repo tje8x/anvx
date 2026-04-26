@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "🚨 Runway: {{ '%.1f' | format(runway_months) }} months" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "Below the *{{ threshold_months }}-month* alert threshold." } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "Review cash" }, "url": "{{ webapp_base_url }}/dashboard" }
+    ]}
+  ]
+}

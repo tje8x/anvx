@@ -1,0 +1,8 @@
+Copilot needs approval: {{ action | default('routing change') }}
+
+{{ headline | default('Copilot proposes a routing decision that needs your review.') }}
+{{ detail | default('') }}
+
+Workspace: {{ workspace_name }}
+
+Approve or override at {{ webapp_base_url }}/routing

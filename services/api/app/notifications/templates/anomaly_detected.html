@@ -1,0 +1,5 @@
+<h2 style="color:#8a6d1b;margin:0 0 8px">Anomaly: {{ anomaly_kind | default('unknown') }}</h2>
+<p>{{ headline | default('A new anomaly was opened by the routing engine.') }}</p>
+{% if detail %}<p style="color:#555">{{ detail }}</p>{% endif %}
+<p><strong>Severity:</strong> {{ severity | default('medium') }}</p>
+<p><a href="{{ webapp_base_url }}/routing">Review in ANVX →</a></p>

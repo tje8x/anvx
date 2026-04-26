@@ -1,0 +1,8 @@
+Circuit breaker opened: {{ provider | default('upstream') }}
+
+Provider {{ provider | default('upstream') }} has been blocked.
+Reason: {{ reason | default('threshold exceeded') }}.
+Workspace: {{ workspace_name }}
+Triggered at {{ triggered_at | default('') }}.
+
+Review at {{ webapp_base_url }}/routing{% if incident_id %}?incident={{ incident_id }}{% endif %}

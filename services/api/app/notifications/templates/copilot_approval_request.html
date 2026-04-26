@@ -1,0 +1,4 @@
+<h2 style="color:#1a5276;margin:0 0 8px">Copilot needs approval</h2>
+<p>{{ headline | default('Copilot proposes a routing decision that needs your review.') }}</p>
+{% if detail %}<p style="color:#555">{{ detail }}</p>{% endif %}
+<p><a href="{{ webapp_base_url }}/routing">Approve or override →</a></p>

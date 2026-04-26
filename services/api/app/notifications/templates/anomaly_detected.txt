@@ -1,0 +1,9 @@
+Anomaly detected: {{ anomaly_kind | default('unknown') }}
+
+{{ headline | default('A new anomaly was opened by the routing engine.') }}
+{{ detail | default('') }}
+
+Severity: {{ severity | default('medium') }}
+Workspace: {{ workspace_name }}
+
+Review at {{ webapp_base_url }}/routing

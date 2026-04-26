@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from ..auth import WorkspaceContext, require_role
 from ..db import sb_service
+from ..notifications.dispatch import dispatch_fire_and_forget
 
 router = APIRouter()
 
@@ -31,4 +32,11 @@ async def resume_incident(incident_id: str, body: ResumeBody, ctx: WorkspaceCont
     if not result.data:
         raise HTTPException(404, "No active incident found with this ID")
     sb.from_("audit_log").insert({"workspace_id": ctx.workspace_id, "actor_user_id": ctx.user_id, "action": "incident:resume", "target_kind": "incident", "target_id": incident_id, "details": {"note": body.note}}).execute()
+
+    incident = (result.data or [{}])[0]
+    dispatch_fire_and_forget("incident_resumed", ctx.workspace_id, {
+        "incident_id": incident_id,
+        "provider": incident.get("provider") or incident.get("scope_provider") or "routing",
+        "note": body.note,
+    })
     return {"ok": True}

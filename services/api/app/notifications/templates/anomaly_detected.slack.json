@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "⚠ Anomaly: {{ anomaly_kind | default('unknown') }}" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "{{ headline | default('A new anomaly was opened.') }}{% if detail %}\n_{{ detail }}_{% endif %}\n*Severity:* {{ severity | default('medium') }}" } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "Review" }, "url": "{{ webapp_base_url }}/routing" }
+    ]}
+  ]
+}

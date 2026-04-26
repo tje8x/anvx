@@ -1,0 +1,22 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Daily autopilot digest — {{ event_count }} optimizations" }
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Window:* {{ window_start }} → {{ window_end }}\n*Total estimated savings:* ${{ '%.2f' | format(total_savings_cents / 100) }}" }
+    }{% if events %},
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "{% for ev in events %}• *{{ ev.payload.headline | default('Optimization') }}*{% if ev.payload.detail %} — {{ ev.payload.detail }}{% endif %}\n{% endfor %}" }
+    }{% endif %},
+    {
+      "type": "actions",
+      "elements": [
+        { "type": "button", "text": { "type": "plain_text", "text": "Review in ANVX" }, "url": "{{ webapp_base_url }}/routing" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+Runway alert: {{ '%.1f' | format(runway_months) }} months
+
+Your projected runway has fallen below the {{ threshold_months }}-month alert threshold.
+Workspace: {{ workspace_name }}
+
+Review cash position at {{ webapp_base_url }}/dashboard

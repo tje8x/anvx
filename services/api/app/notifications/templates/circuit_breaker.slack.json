@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "🚨 Circuit breaker: {{ provider | default('upstream') }}" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "*Reason:* {{ reason | default('threshold exceeded') }}\n*Triggered at:* {{ triggered_at | default('') }}" } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "Review" }, "url": "{{ webapp_base_url }}/routing{% if incident_id %}?incident={{ incident_id }}{% endif %}" }
+    ]}
+  ]
+}

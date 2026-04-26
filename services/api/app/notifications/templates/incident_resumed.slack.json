@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "✅ Incident resolved — {{ provider | default('routing') }} resumed" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "Routing is operating normally.{% if note %}\n_Note: {{ note }}_{% endif %}" } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "View details" }, "url": "{{ webapp_base_url }}/routing" }
+    ]}
+  ]
+}

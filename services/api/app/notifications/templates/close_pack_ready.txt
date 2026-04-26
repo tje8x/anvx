@@ -1,0 +1,6 @@
+{{ pack_label | default('Close pack') }} is ready
+
+Period: {{ period_label | default('') }}
+Workspace: {{ workspace_name }}
+
+Download at {{ webapp_base_url }}/reports{% if pack_id %}?pack_id={{ pack_id }}{% endif %}

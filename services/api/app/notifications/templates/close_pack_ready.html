@@ -1,0 +1,3 @@
+<h2 style="color:#1a5276;margin:0 0 8px">{{ pack_label | default('Close pack') }} is ready</h2>
+<p><strong>Period:</strong> {{ period_label | default('') }}</p>
+<p><a href="{{ webapp_base_url }}/reports{% if pack_id %}?pack_id={{ pack_id }}{% endif %}">Download →</a></p>

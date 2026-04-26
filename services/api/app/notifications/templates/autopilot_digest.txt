@@ -1,0 +1,12 @@
+Daily autopilot digest — {{ event_count }} optimization{{ '' if event_count == 1 else 's' }}
+
+Workspace: {{ workspace_name | default(workspace_id) }}
+Window: {{ window_start }} → {{ window_end }}
+
+{% for ev in events %}
+• {{ ev.payload.headline | default('Optimization') }} — {{ ev.payload.detail | default('') }}
+{% endfor %}
+
+Total estimated savings: ${{ '%.2f' | format(total_savings_cents / 100) }}
+
+Review at {{ webapp_base_url }}/routing

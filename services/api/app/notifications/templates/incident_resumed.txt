@@ -1,0 +1,8 @@
+Incident resolved: {{ provider | default('routing') }} resumed
+
+The incident has been resolved and routing is operating normally.
+{% if note %}Note: {{ note }}{% endif %}
+
+Workspace: {{ workspace_name }}
+
+Details at {{ webapp_base_url }}/routing

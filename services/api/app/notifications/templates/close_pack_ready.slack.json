@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "📦 {{ pack_label | default('Close pack') }} is ready" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "*Period:* {{ period_label | default('') }}" } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "Download" }, "url": "{{ webapp_base_url }}/reports{% if pack_id %}?pack_id={{ pack_id }}{% endif %}" }
+    ]}
+  ]
+}

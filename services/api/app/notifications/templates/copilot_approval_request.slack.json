@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "header", "text": { "type": "plain_text", "text": "🛂 Copilot approval needed" } },
+    { "type": "section", "text": { "type": "mrkdwn", "text": "{{ headline | default('Copilot proposes a routing decision that needs your review.') }}{% if detail %}\n_{{ detail }}_{% endif %}" } },
+    { "type": "actions", "elements": [
+      { "type": "button", "text": { "type": "plain_text", "text": "Review" }, "url": "{{ webapp_base_url }}/routing" }
+    ]}
+  ]
+}

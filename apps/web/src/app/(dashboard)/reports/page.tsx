@@ -17,13 +17,14 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const PACKS_TTL = 30_000
 const PURCHASE_POLL_INTERVAL_MS = 2_000
 const PURCHASE_POLL_TIMEOUT_MS = 60_000
+const DESIGN_PARTNER_MODE = (process.env.NEXT_PUBLIC_DESIGN_PARTNER_MODE ?? 'true').toLowerCase() === 'true'
 
 type Pack = {
   id: string
-  kind: 'close_pack' | 'ai_audit_pack' | 'audit_trail_export'
+  kind: 'close_pack' | 'quarterly_close' | 'annual_tax_prep' | 'audit_trail_export'
   period_start: string
   period_end: string
-  status: 'requested' | 'generating' | 'ready' | 'failed' | 'delivered'
+  status: 'requested' | 'generating' | 'ready' | 'failed' | 'delivered' | 'dismissed'
   storage_path: string | null
   error_message: string | null
   price_cents: number
@@ -35,6 +36,83 @@ type Kind = Pack['kind']
 
 const PENDING_STATUSES: Pack['status'][] = ['requested', 'generating']
 
+// ─── period helpers ────────────────────────────────────────────────
+
+type PeriodOption = { value: string; label: string; start: string; end: string; disabled: boolean }
+
+function lastNMonths(n: number): { value: string; label: string; start: string; end: string }[] {
+  const today = new Date()
+  const out = []
+  for (let i = 1; i <= n; i++) {
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1))
+    const endExclusive = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i + 1, 1))
+    const endInclusive = new Date(endExclusive.getTime() - 24 * 3600 * 1000)
+    out.push({
+      value: start.toISOString().slice(0, 7),
+      label: start.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+      start: start.toISOString().slice(0, 10),
+      end: endInclusive.toISOString().slice(0, 10),
+    })
+  }
+  return out
+}
+
+function lastNQuarters(n: number): { value: string; label: string; start: string; end: string }[] {
+  const today = new Date()
+  const out = []
+  // Walk back from the most recent *complete* quarter.
+  let y = today.getUTCFullYear()
+  let q = Math.floor(today.getUTCMonth() / 3) - 1
+  if (q < 0) { q = 3; y -= 1 }
+  for (let i = 0; i < n; i++) {
+    const startMonth = q * 3
+    const start = new Date(Date.UTC(y, startMonth, 1))
+    const endExclusive = new Date(Date.UTC(y, startMonth + 3, 1))
+    const endInclusive = new Date(endExclusive.getTime() - 24 * 3600 * 1000)
+    out.push({
+      value: `${y}-Q${q + 1}`,
+      label: `Q${q + 1} ${y}`,
+      start: start.toISOString().slice(0, 10),
+      end: endInclusive.toISOString().slice(0, 10),
+    })
+    q -= 1
+    if (q < 0) { q = 3; y -= 1 }
+  }
+  return out
+}
+
+function lastNYearsIncludingCurrent(n: number): { value: string; label: string; start: string; end: string }[] {
+  const today = new Date()
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const y = today.getUTCFullYear() - i
+    out.push({
+      value: String(y),
+      label: String(y),
+      start: `${y}-01-01`,
+      end: `${y}-12-31`,
+    })
+  }
+  return out
+}
+
+function withDuplicateGuard<O extends { value: string; start: string; end: string }>(
+  opts: O[],
+  packs: Pack[],
+  kind: Kind,
+): (O & { disabled: boolean })[] {
+  return opts.map((o) => {
+    const taken = packs.some(
+      (p) =>
+        p.kind === kind &&
+        p.period_start === o.start &&
+        p.period_end === o.end &&
+        ['requested', 'generating', 'ready', 'delivered'].includes(p.status),
+    )
+    return { ...o, disabled: taken }
+  })
+}
+
 function formatPeriod(start: string, end: string): string {
   const s = new Date(start)
   const e = new Date(end)
@@ -45,12 +123,13 @@ function formatPeriod(start: string, end: string): string {
 
 function packTitle(pack: Pack): string {
   if (pack.kind === 'close_pack') return `${formatPeriod(pack.period_start, pack.period_end)} — Monthly close`
-  if (pack.kind === 'ai_audit_pack') return `${formatPeriod(pack.period_start, pack.period_end)} — AI audit pack`
+  if (pack.kind === 'quarterly_close') return `${formatPeriod(pack.period_start, pack.period_end)} — Quarterly close`
+  if (pack.kind === 'annual_tax_prep') return `${formatPeriod(pack.period_start, pack.period_end)} — Annual tax prep`
   return `${formatPeriod(pack.period_start, pack.period_end)} — Audit trail export`
 }
 
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`
+  return `$${(cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 }
 
 function StatusBadge({ pack }: { pack: Pack }) {
@@ -77,23 +156,29 @@ function StatusBadge({ pack }: { pack: Pack }) {
       </TooltipProvider>
     )
   }
+  if (pack.status === 'dismissed') return <span className={`${base} bg-anvx-bg text-anvx-text-dim`}>Dismissed</span>
   return <span className={`${base} bg-purple-100 text-purple-700`}>Delivered</span>
 }
 
-function lastNMonths(n: number): { start: string; end: string; label: string }[] {
-  const today = new Date()
-  const out: { start: string; end: string; label: string }[] = []
-  for (let i = 1; i <= n; i++) {
-    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1))
-    const endExclusive = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i + 1, 1))
-    const endInclusive = new Date(endExclusive.getTime() - 24 * 3600 * 1000)
-    out.push({
-      start: start.toISOString().slice(0, 10),
-      end: endInclusive.toISOString().slice(0, 10),
-      label: start.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-    })
-  }
-  return out
+const PERIOD_PICKER_LABEL: Record<Kind, string> = {
+  close_pack: 'Month',
+  quarterly_close: 'Quarter',
+  annual_tax_prep: 'Year',
+  audit_trail_export: 'Month',
+}
+
+const PERIOD_PLACEHOLDER: Record<Kind, string> = {
+  close_pack: 'Select a month',
+  quarterly_close: 'Select a quarter',
+  annual_tax_prep: 'Select a year',
+  audit_trail_export: 'Select a month',
+}
+
+const KIND_PRICE_LABEL: Record<Kind, string> = {
+  close_pack: '$99',
+  quarterly_close: '$299',
+  annual_tax_prep: '$1,500',
+  audit_trail_export: 'Free',
 }
 
 export default function ReportsPage() {
@@ -107,13 +192,24 @@ export default function ReportsPage() {
   const [purchasingId, setPurchasingId] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
 
-  const [genOpen, setGenOpen] = useState<null | 'close_or_audit_trail' | 'ai_audit_pack'>(null)
-  const monthOptions = useMemo(() => lastNMonths(6), [])
-  const [genPeriodStart, setGenPeriodStart] = useState<string>(monthOptions[0]?.start ?? '')
-  const [genPeriodEnd, setGenPeriodEnd] = useState<string>(monthOptions[0]?.end ?? '')
+  const [genOpen, setGenOpen] = useState(false)
   const [genKind, setGenKind] = useState<Kind>('close_pack')
+  const [genPeriod, setGenPeriod] = useState<string>('')
   const [genError, setGenError] = useState('')
   const [genLoading, setGenLoading] = useState(false)
+
+  const monthOptionsBase = useMemo(() => lastNMonths(12), [])
+  const quarterOptionsBase = useMemo(() => lastNQuarters(8), [])
+  const yearOptionsBase = useMemo(() => lastNYearsIncludingCurrent(3), [])
+
+  // Period options for the active kind, with duplicate-guard markers.
+  // audit_trail_export does NOT block on duplicates — re-runnable utility.
+  const periodOptions: PeriodOption[] = useMemo(() => {
+    if (genKind === 'close_pack') return withDuplicateGuard(monthOptionsBase, packs, 'close_pack')
+    if (genKind === 'quarterly_close') return withDuplicateGuard(quarterOptionsBase, packs, 'quarterly_close')
+    if (genKind === 'annual_tax_prep') return withDuplicateGuard(yearOptionsBase, packs, 'annual_tax_prep')
+    return monthOptionsBase.map((m) => ({ ...m, disabled: false }))
+  }, [genKind, packs, monthOptionsBase, quarterOptionsBase, yearOptionsBase])
 
   const authHeaders = useCallback(async () => {
     const token = await getToken({ template: 'supabase' })
@@ -173,8 +269,6 @@ export default function ReportsPage() {
   }, [authHeaders])
 
   // ── Stripe checkout return-URL handling ─────────────────────────
-  // ?purchased=true → poll up to 60s, auto-download on ready
-  // ?canceled=true  → toast and clear
   useEffect(() => {
     const packId = searchParams.get('pack_id')
     const purchased = searchParams.get('purchased') === 'true'
@@ -231,7 +325,7 @@ export default function ReportsPage() {
     return () => { clearInterval(interval) }
   }, [searchParams, router, authHeaders, handleDownload])
 
-  // ── Purchase / retry ────────────────────────────────────────────
+  // ── Purchase / retry / dismiss ──────────────────────────────────
 
   const handlePurchase = async (pack: Pack) => {
     setPurchasingId(pack.id)
@@ -286,14 +380,35 @@ export default function ReportsPage() {
     }
   }
 
+  const handleDismiss = async (pack: Pack) => {
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`${API_BASE}/api/v2/packs/${pack.id}/dismiss`, {
+        method: 'POST',
+        headers: h,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.detail || 'Could not dismiss')
+        return
+      }
+      invalidateCache(`${API_BASE}/api/v2/packs`)
+      setPacks((prev) => prev.filter((p) => p.id !== pack.id))
+      toast.success('Pack dismissed')
+    } catch (e) {
+      toast.error(String(e))
+    }
+  }
+
   // ── Pack action area ────────────────────────────────────────────
 
   const PackActions = ({ pack }: { pack: Pack }) => {
     const isFree = pack.price_cents === 0
+    const treatAsFree = isFree || DESIGN_PARTNER_MODE
     const isPurchasing = purchasingId === pack.id
     const isRetrying = retryingId === pack.id
 
-    if (isFree) {
+    if (treatAsFree) {
       if (pack.status === 'requested' || pack.status === 'generating') {
         return (
           <span className="text-[11px] font-data text-anvx-text-dim inline-flex items-center gap-1.5">
@@ -320,7 +435,6 @@ export default function ReportsPage() {
       return null
     }
 
-    // Paid kinds: close_pack, ai_audit_pack
     if (pack.status === 'requested') {
       return (
         <MacButton onClick={() => handlePurchase(pack)} disabled={isPurchasing}>
@@ -359,46 +473,70 @@ export default function ReportsPage() {
     return null
   }
 
-  // ── Generators ──────────────────────────────────────────────────
-
-  const openCloseGenerator = () => {
-    setGenKind('close_pack')
-    setGenPeriodStart(monthOptions[0]?.start ?? '')
-    setGenPeriodEnd(monthOptions[0]?.end ?? '')
-    setGenError('')
-    setGenOpen('close_or_audit_trail')
+  const PriceLine = ({ pack }: { pack: Pack }) => {
+    const isFree = pack.price_cents === 0
+    const dateText = `Requested ${new Date(pack.created_at).toLocaleDateString()}`
+    if (isFree) {
+      return <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">{dateText} · Free</p>
+    }
+    if (DESIGN_PARTNER_MODE) {
+      return (
+        <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">
+          {dateText} ·{' '}
+          <span className="line-through opacity-60">{formatPrice(pack.price_cents)}</span>{' '}
+          <span className="text-emerald-700">Free during design-partner phase</span>
+        </p>
+      )
+    }
+    return (
+      <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">{dateText} · {formatPrice(pack.price_cents)}</p>
+    )
   }
 
-  const openAuditPackGenerator = () => {
-    const today = new Date()
-    const m = today.getUTCMonth()
-    const lastQuarterEndMonth = (Math.floor(m / 3) * 3) - 1
-    const yearShift = lastQuarterEndMonth < 0 ? 1 : 0
-    const endMonth = ((lastQuarterEndMonth % 12) + 12) % 12
-    const year = today.getUTCFullYear() - yearShift
-    const startMonth = endMonth - 2
-    const start = new Date(Date.UTC(year, startMonth, 1))
-    const endExclusive = new Date(Date.UTC(year, endMonth + 1, 1))
-    const endInclusive = new Date(endExclusive.getTime() - 24 * 3600 * 1000)
+  const DismissButton = ({ pack }: { pack: Pack }) => {
+    if (pack.status !== 'requested') return null
+    return (
+      <button
+        onClick={() => handleDismiss(pack)}
+        title="Dismiss"
+        aria-label="Dismiss pack"
+        className="text-anvx-text-dim hover:text-anvx-danger text-base leading-none px-1.5 py-1 rounded-sm hover:bg-anvx-danger-light/40 transition-colors duration-150"
+      >
+        ×
+      </button>
+    )
+  }
 
-    setGenKind('ai_audit_pack')
-    setGenPeriodStart(start.toISOString().slice(0, 10))
-    setGenPeriodEnd(endInclusive.toISOString().slice(0, 10))
+  // ── Generate dialog ─────────────────────────────────────────────
+
+  const openGenerator = () => {
+    setGenKind('close_pack')
+    setGenPeriod('')
     setGenError('')
-    setGenOpen('ai_audit_pack')
+    setGenOpen(true)
+  }
+
+  const onKindChange = (next: Kind) => {
+    setGenKind(next)
+    setGenPeriod('') // values aren't comparable across pickers
+    setGenError('')
   }
 
   const submitGenerate = async () => {
     setGenError(''); setGenLoading(true)
     try {
+      const opt = periodOptions.find((o) => o.value === genPeriod)
+      if (!opt) { setGenError('Pick a period'); return }
+      if (opt.disabled) {
+        const kindLabel = genKind.replace(/_/g, ' ')
+        setGenError(`A ${kindLabel} already exists for that period`)
+        return
+      }
+
       const h = await authHeaders()
       const res = await fetch(`${API_BASE}/api/v2/packs`, {
         method: 'POST', headers: h,
-        body: JSON.stringify({
-          kind: genKind,
-          period_start: genPeriodStart,
-          period_end: genPeriodEnd,
-        }),
+        body: JSON.stringify({ kind: genKind, period_start: opt.start, period_end: opt.end }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -407,7 +545,18 @@ export default function ReportsPage() {
       const newPack: Pack = await res.json()
       setPacks((prev) => [newPack, ...prev])
       invalidateCache(`${API_BASE}/api/v2/packs`)
-      setGenOpen(null)
+      setGenOpen(false)
+
+      if (DESIGN_PARTNER_MODE && genKind !== 'audit_trail_export') {
+        const kickRes = await fetch(`${API_BASE}/api/v2/packs/${newPack.id}/generate-now`, {
+          method: 'POST', headers: h,
+        })
+        if (!kickRes.ok) { toast.error('Could not start generation'); return }
+        toast.success('Generating now (design-partner phase — free)')
+        await fetchPacks(true)
+        return
+      }
+
       toast.success(genKind === 'audit_trail_export' ? 'Audit export queued — generating now' : 'Pack created — purchase to generate')
     } catch (e) {
       setGenError(String(e))
@@ -416,72 +565,58 @@ export default function ReportsPage() {
     }
   }
 
-  const closePacks = packs.filter((p) => p.kind === 'close_pack' || p.kind === 'audit_trail_export')
-  const auditPacks = packs.filter((p) => p.kind === 'ai_audit_pack')
+  // ── Render ──────────────────────────────────────────────────────
+
+  const monthlyPacks = packs.filter((p) => p.kind === 'close_pack')
+  const quarterlyPacks = packs.filter((p) => p.kind === 'quarterly_close')
+  const annualPacks = packs.filter((p) => p.kind === 'annual_tax_prep')
+  const auditTrailPacks = packs.filter((p) => p.kind === 'audit_trail_export')
+
+  const renderSection = (title: string, kind: Kind, list: Pack[], emptyText: string) => (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <SectionTitle>{title}</SectionTitle>
+      </div>
+      {loading && list.length === 0 ? (
+        <SkeletonTable rows={2} columns={[60, 15, 15, 10]} />
+      ) : list.length === 0 ? (
+        <p className="text-[11px] font-data text-anvx-text-dim py-4">{emptyText}</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-anvx-bdr/50">
+          {list.map((pack) => (
+            <li key={pack.id} className="py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider font-ui text-anvx-text">
+                  {packTitle(pack)}
+                </p>
+                <PriceLine pack={pack} />
+              </div>
+              <StatusBadge pack={pack} />
+              <PackActions pack={pack} />
+              <DismissButton pack={pack} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 
   return (
     <div className="flex flex-col gap-8">
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <SectionTitle>Close packs</SectionTitle>
-          <MacButton onClick={openCloseGenerator}>Generate close pack</MacButton>
-        </div>
-        {loading ? (
-          <SkeletonTable rows={3} columns={[60, 15, 15, 10]} />
-        ) : closePacks.length === 0 ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">
-            No close packs yet. Generate one to lock in a month.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-anvx-bdr/50">
-            {closePacks.map((pack) => (
-              <li key={pack.id} className="py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-wider font-ui text-anvx-text">
-                    {packTitle(pack)}
-                  </p>
-                  <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">
-                    Requested {new Date(pack.created_at).toLocaleDateString()} ·{' '}
-                    {pack.price_cents === 0 ? 'Free' : formatPrice(pack.price_cents)}
-                  </p>
-                </div>
-                <StatusBadge pack={pack} />
-                <PackActions pack={pack} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-[11px] font-data text-anvx-text-dim max-w-3xl">
+          ANVX generates structured financial packages at three cadences — monthly, quarterly,
+          and annual — each building on the previous. All packs bridge accrual-basis and
+          cash-basis accounting so your accountant gets the complete picture without manual
+          consolidation.
+        </p>
+        <MacButton onClick={openGenerator}>Generate pack</MacButton>
+      </div>
 
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <SectionTitle>AI audit packs</SectionTitle>
-          <MacButton onClick={openAuditPackGenerator}>Generate AI audit pack ($149)</MacButton>
-        </div>
-        {auditPacks.length === 0 ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">
-            No AI audit packs yet. Generate one quarterly to capture full LLM provenance.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-anvx-bdr/50">
-            {auditPacks.map((pack) => (
-              <li key={pack.id} className="py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-wider font-ui text-anvx-text">
-                    {packTitle(pack)}
-                  </p>
-                  <p className="text-[11px] font-data text-anvx-text-dim mt-0.5">
-                    Requested {new Date(pack.created_at).toLocaleDateString()} ·{' '}
-                    {pack.price_cents === 0 ? 'Free' : formatPrice(pack.price_cents)}
-                  </p>
-                </div>
-                <StatusBadge pack={pack} />
-                <PackActions pack={pack} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {renderSection('Monthly close', 'close_pack', monthlyPacks, 'No monthly close packs yet.')}
+      {renderSection('Quarterly close', 'quarterly_close', quarterlyPacks, 'No quarterly close packs yet.')}
+      {renderSection('Annual tax prep', 'annual_tax_prep', annualPacks, 'No annual tax prep bundles yet.')}
+      {renderSection('Audit trail exports', 'audit_trail_export', auditTrailPacks, 'No audit trail exports yet.')}
 
       <section>
         <SectionTitle>Handoff settings</SectionTitle>
@@ -512,42 +647,58 @@ export default function ReportsPage() {
         </div>
       </section>
 
-      <Dialog open={genOpen != null} onOpenChange={(open) => { if (!open) setGenOpen(null) }}>
+      <Dialog open={genOpen} onOpenChange={setGenOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {genOpen === 'ai_audit_pack' ? 'Generate AI audit pack' : 'Generate close pack'}
-            </DialogTitle>
+            <DialogTitle>Generate pack</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            {genOpen === 'close_or_audit_trail' && (
-              <div>
-                <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Kind</label>
-                <Select value={genKind} onValueChange={(v) => setGenKind(v as Kind)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="close_pack">Monthly close pack ($49)</SelectItem>
-                    <SelectItem value="audit_trail_export">Audit trail export (free)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div>
-              <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Period start</label>
-              <Input type="date" value={genPeriodStart} onChange={(e) => setGenPeriodStart(e.target.value)} />
+
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-ui text-anvx-text-dim">Kind</label>
+              <Select value={genKind} onValueChange={(v) => onKindChange(v as Kind)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="close_pack">
+                    {DESIGN_PARTNER_MODE
+                      ? `Monthly close (${KIND_PRICE_LABEL.close_pack} → free for design partners)`
+                      : `Monthly close (${KIND_PRICE_LABEL.close_pack})`}
+                  </SelectItem>
+                  <SelectItem value="quarterly_close">
+                    {DESIGN_PARTNER_MODE
+                      ? `Quarterly close (${KIND_PRICE_LABEL.quarterly_close} → free for design partners)`
+                      : `Quarterly close (${KIND_PRICE_LABEL.quarterly_close})`}
+                  </SelectItem>
+                  <SelectItem value="annual_tax_prep">
+                    {DESIGN_PARTNER_MODE
+                      ? `Annual tax prep (${KIND_PRICE_LABEL.annual_tax_prep} → free for design partners)`
+                      : `Annual tax prep (${KIND_PRICE_LABEL.annual_tax_prep})`}
+                  </SelectItem>
+                  <SelectItem value="audit_trail_export">Audit trail export (free)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Period end</label>
-              <Input type="date" value={genPeriodEnd} onChange={(e) => setGenPeriodEnd(e.target.value)} />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-ui text-anvx-text-dim">{PERIOD_PICKER_LABEL[genKind]}</label>
+              <Select value={genPeriod} onValueChange={setGenPeriod}>
+                <SelectTrigger><SelectValue placeholder={PERIOD_PLACEHOLDER[genKind]} /></SelectTrigger>
+                <SelectContent>
+                  {periodOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+                      {o.label}{o.disabled ? ' (already generated)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
             {genError && <p className="text-[11px] text-anvx-danger">{genError}</p>}
           </div>
+
           <DialogFooter>
             <DialogClose asChild><MacButton variant="secondary">Cancel</MacButton></DialogClose>
-            <MacButton
-              disabled={!genPeriodStart || !genPeriodEnd || genLoading}
-              onClick={submitGenerate}
-            >
+            <MacButton disabled={genLoading || !genPeriod} onClick={submitGenerate}>
               {genLoading ? 'Submitting…' : 'Generate'}
             </MacButton>
           </DialogFooter>

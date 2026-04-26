@@ -40,6 +40,16 @@ def _insert_if_new(sb, workspace_id: str, anomaly: Anomaly) -> bool:
             "payload": {**anomaly.payload, "dedupe_key": anomaly.dedupe_key},
         }).execute()
         print(f"[INSERT_OK] workspace={workspace_id} kind={anomaly.kind}")
+        try:
+            from .notifications.dispatch import dispatch_fire_and_forget
+            dispatch_fire_and_forget("anomaly_detected", workspace_id, {
+                "anomaly_kind": anomaly.kind,
+                "severity": anomaly.severity,
+                "headline": (anomaly.payload or {}).get("headline") or f"Anomaly: {anomaly.kind}",
+                "detail": (anomaly.payload or {}).get("detail") or "",
+            })
+        except Exception as notify_err:
+            print(f"[NOTIFY_ERR] {notify_err}")
         return True
     except Exception as e:
         print(f"[INSERT_ERROR] {str(e)}")

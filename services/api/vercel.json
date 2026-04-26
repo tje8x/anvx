@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/v2/jobs/digest-daily", "schedule": "0 17 * * *" },
+    { "path": "/api/v2/jobs/anomaly-scan", "schedule": "*/5 * * * *" },
+    { "path": "/api/v2/jobs/generate-pack", "schedule": "*/2 * * * *" },
+    { "path": "/api/v2/jobs/generate-pack-paid", "schedule": "*/2 * * * *" }
+  ]
+}

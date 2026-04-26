@@ -9,10 +9,14 @@ const tabs = [
   { label: 'Routing', href: '/routing' },
   { label: 'Reports', href: '/reports' },
   { label: 'Data', href: '/data' },
+  { label: 'Settings', href: '/settings/notifications', basePath: '/settings' },
 ] as const
 
 function tabFromPath(pathname: string): string {
-  const match = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))
+  const match = tabs.find((t) => {
+    const base = 'basePath' in t ? t.basePath : t.href
+    return pathname === t.href || pathname.startsWith(base + '/') || pathname === base
+  })
   return match?.href ?? tabs[0].href
 }
 

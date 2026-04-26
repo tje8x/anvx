@@ -1,0 +1,5 @@
+<h2 style="color:#a33228;margin:0 0 8px">Circuit breaker opened — {{ provider | default('upstream') }}</h2>
+<p>Provider <strong>{{ provider | default('upstream') }}</strong> has been blocked.</p>
+<p><strong>Reason:</strong> {{ reason | default('threshold exceeded') }}<br>
+<strong>Triggered at:</strong> {{ triggered_at | default('') }}</p>
+<p><a href="{{ webapp_base_url }}/routing{% if incident_id %}?incident={{ incident_id }}{% endif %}">Review in ANVX →</a></p>
