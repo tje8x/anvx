@@ -1,0 +1,2 @@
+Audit log append-only triggers verified at Mon Apr 27 03:42:18 UTC 2026
+Required fields: total=31, missing_actor=2 (1 test entry, 1 routing engine system event), missing_workspace=0, missing_action=0

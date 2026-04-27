@@ -1,0 +1,16 @@
+packages/core/src/anvx_core/utils.py:26:	"anthropic": ["sk-ant-test-anthropic-12345", "sk-ant-test-demo"],
+skill/engine/utils.py:26:	"anthropic": ["sk-ant-test-anthropic-12345", "sk-ant-test-demo"],
+packages/core/src/anvx_core/testing/test_onboarding_mode.py:38:    ("anthropic", AnthropicBillingConnector, {"api_key": "sk-ant-test-anthropic-12345"}),
+apps/routing-engine/tests/log-hygiene.test.ts:6:process.env.ANVX_DEV_OPENAI_KEY = 'sk-secretkey1234567890abcdef'
+apps/routing-engine/tests/log-hygiene.test.ts:67:const VALID_TOKEN = 'anvx_live_testtoken1234567890abcdefghijklmnopq'
+apps/routing-engine/tests/smoke.test.ts:49:const VALID_TOKEN = 'anvx_live_testtoken1234567890abcdefghijklmnopq'
+apps/routing-engine/tests/smoke.test.ts:90:    const otherToken = 'anvx_live_differentworkspacetoken123456789ab'
+apps/routing-engine/tests/fail-modes.test.ts:79:    headers: { authorization: 'Bearer anvx_live_testtoken1234567890abcdefgh', 'content-type': 'application/json', ...overrides.headers },
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:1:packages/core/src/anvx_core/utils.py:26:	"anthropic": ["sk-ant-test-anthropic-12345", "sk-ant-test-demo"],
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:2:skill/engine/utils.py:26:	"anthropic": ["sk-ant-test-anthropic-12345", "sk-ant-test-demo"],
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:3:packages/core/src/anvx_core/testing/test_onboarding_mode.py:38:    ("anthropic", AnthropicBillingConnector, {"api_key": "sk-ant-test-anthropic-12345"}),
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:4:apps/routing-engine/tests/log-hygiene.test.ts:6:process.env.ANVX_DEV_OPENAI_KEY = 'sk-secretkey1234567890abcdef'
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:5:apps/routing-engine/tests/log-hygiene.test.ts:67:const VALID_TOKEN = 'anvx_live_testtoken1234567890abcdefghijklmnopq'
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:6:apps/routing-engine/tests/smoke.test.ts:49:const VALID_TOKEN = 'anvx_live_testtoken1234567890abcdefghijklmnopq'
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:7:apps/routing-engine/tests/smoke.test.ts:90:    const otherToken = 'anvx_live_differentworkspacetoken123456789ab'
+docs/security/v2-launch/evidence/02b_plaintext_grep.txt:8:apps/routing-engine/tests/fail-modes.test.ts:79:    headers: { authorization: 'Bearer anvx_live_testtoken1234567890abcdefgh', 'content-type': 'application/json', ...overrides.headers },
