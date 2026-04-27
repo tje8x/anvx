@@ -373,3 +373,26 @@ async def patch_notif_prefs(body: NotifPrefsUpdate, ctx: WorkspaceContext = Depe
     }).execute()
 
     return await get_notif_prefs(ctx)
+
+
+# ─── Routing status (used by onboarding step 4) ───────────────────────────
+
+
+@router.get("/workspace/routing-status")
+async def routing_status(ctx: WorkspaceContext = Depends(require_role("member"))):
+    """Report whether the workspace has yet observed any routing usage.
+
+    The onboarding flow polls this after the user pastes the routing snippet
+    into their app — first detection means shadow mode is live.
+    """
+    sb = sb_service()
+    rows = (
+        sb.from_("routing_usage_records").select("id, created_at")
+        .eq("workspace_id", ctx.workspace_id)
+        .order("created_at", desc=True)
+        .limit(1).execute()
+    ).data or []
+    return {
+        "has_recorded_routing": len(rows) > 0,
+        "first_seen_at": rows[0]["created_at"] if rows else None,
+    }

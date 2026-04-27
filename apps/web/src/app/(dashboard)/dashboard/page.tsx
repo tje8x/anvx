@@ -1,12 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import SectionTitle from '@/components/anvx/section-title'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
 import IncomeStatement from '@/components/dashboard/income-statement'
 import CashRunway from '@/components/dashboard/cash-runway'
+import EmptyState from '@/components/empty-state'
 import { cachedFetch, getCached } from '@/lib/api-cache'
 import { SkeletonChart, SkeletonMetricCardRow } from '@/components/anvx/skeleton'
 
@@ -197,6 +197,16 @@ export default function DashboardPage() {
   // Visual loading hint that does NOT unmount content
   const fadeClass = isRefetching && !initialLoading ? 'opacity-60 transition-opacity' : 'opacity-100 transition-opacity'
 
+  if (!initialLoading && isBrandNew) {
+    return (
+      <EmptyState
+        title="Connect your first provider to see your financial picture."
+        description="Routing data flows in within minutes once you're connected."
+        cta={{ label: 'Connect providers', href: '/onboarding/connect' }}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 relative">
       {/* Thin progress bar — visible whenever a refetch is in flight */}
@@ -229,13 +239,6 @@ export default function DashboardPage() {
           <SkeletonMetricCardRow count={4} />
         ) : !cur ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">Could not load metrics.</p>
-        ) : isBrandNew ? (
-          <p className="text-[11px] font-data text-anvx-text-dim py-4">
-            Connect your first provider to see your financial picture.{' '}
-            <Link href="/settings/connections" className="text-anvx-acc underline hover:opacity-80">
-              Go to Settings → Connections
-            </Link>
-          </p>
         ) : (
           <div className={`grid grid-cols-4 gap-3 anvx-fade-in ${fadeClass}`}>
             <MetricCard

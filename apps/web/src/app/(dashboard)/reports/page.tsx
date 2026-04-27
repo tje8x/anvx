@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 import { SkeletonTable } from '@/components/anvx/skeleton'
+import EmptyState from '@/components/empty-state'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const PACKS_TTL = 30_000
@@ -600,6 +601,16 @@ export default function ReportsPage() {
       )}
     </section>
   )
+
+  if (!loading && packs.length === 0) {
+    return (
+      <EmptyState
+        title="Connect providers and route traffic to generate your first close pack."
+        description="Reports use your reconciled data to build accountant-ready packages."
+        cta={{ label: 'See onboarding checklist', href: '/onboarding/workspace' }}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8">

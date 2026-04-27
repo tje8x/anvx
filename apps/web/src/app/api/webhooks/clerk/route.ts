@@ -177,6 +177,13 @@ export async function POST(req: NextRequest) {
             defaultCoa.map((a) => ({ workspace_id: workspace.id, ...a })),
             { onConflict: 'workspace_id,code', ignoreDuplicates: true }
           )
+
+          // Seed onboarding_state at step 1 for the new workspace.
+          // Idempotent: a redelivered webhook won't reset progress.
+          await sb.from('onboarding_state').upsert(
+            { workspace_id: workspace.id, current_step: 1 },
+            { onConflict: 'workspace_id', ignoreDuplicates: true }
+          )
         }
         break
       }

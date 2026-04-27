@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cachedFetch, invalidateCache } from '@/lib/api-cache'
+import EmptyState from '@/components/empty-state'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const ROUTING_TTL = 30_000
@@ -274,6 +275,16 @@ export default function RoutingPage() {
   }
 
   if (loading) return <p className="text-[11px] font-data text-anvx-text-dim">Loading...</p>
+
+  if (spend.day_cents === 0 && spend.month_cents === 0 && recs.length === 0 && approvals.length === 0) {
+    return (
+      <EmptyState
+        title="Point your application to anvx.io/v1 to start seeing routing recommendations."
+        description="Shadow mode runs first — no risk, just observation."
+        cta={{ label: 'Setup instructions', href: '/onboarding/routing' }}
+      />
+    )
+  }
 
   const modeDescriptions: Record<Mode, string> = {
     shadow: 'Shadow mode observes all traffic and generates recommendations without affecting live requests. No routing changes are made.',
