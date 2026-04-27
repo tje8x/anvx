@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServiceRole } from '@/lib/supabase'
+import { captureServer } from '@/lib/analytics/server'
 
 // The installed Stripe SDK's TS defs pin a newer apiVersion literal, but
 // '2024-10-28.acacia' is the deliberate runtime pin (matches the account).
@@ -53,6 +54,14 @@ export async function POST(req: NextRequest) {
                 headers: { 'x-internal-secret': process.env.INTERNAL_SECRET!, 'content-type': 'application/json' },
                 body: JSON.stringify({ pack_id: packId }),
                }).catch(e => console.error('pack gen kick failed', e))
+
+               const { data: packRow } = await sb.from('packs').select('kind, workspace_id').eq('id', packId).maybeSingle()
+               if (packRow) {
+                 await captureServer(packRow.workspace_id, 'pack_purchased', {
+                   kind: packRow.kind,
+                   amount_cents: session.amount_total ?? 0,
+                 })
+               }
             }
             break
         }

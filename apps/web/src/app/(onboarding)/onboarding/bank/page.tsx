@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import MacButton from '@/components/anvx/mac-button'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -53,10 +54,12 @@ export default function OnboardingBankStep() {
   }, [getToken])
 
   const log = (action: 'completed' | 'skipped') => {
-    console.log({
-      event: `onboarding_step_5_${action}`,
-      ms_in_step: Date.now() - startedAt.current,
-    })
+    const elapsed_seconds = Math.round((Date.now() - startedAt.current) / 1000)
+    if (action === 'completed') {
+      capture('onboarding_step_completed', { step: 5, elapsed_seconds })
+    } else {
+      capture('onboarding_step_skipped', { step: 5 })
+    }
   }
 
   const advance = async (action: 'completed' | 'skipped') => {

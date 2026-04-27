@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import MacButton from '@/components/anvx/mac-button'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -69,10 +70,12 @@ export default function OnboardingRoutingStep() {
   }, [authHeaders])
 
   const log = (action: 'completed' | 'skipped') => {
-    console.log({
-      event: `onboarding_step_4_${action}`,
-      ms_in_step: Date.now() - startedAt.current,
-    })
+    const elapsed_seconds = Math.round((Date.now() - startedAt.current) / 1000)
+    if (action === 'completed') {
+      capture('onboarding_step_completed', { step: 4, elapsed_seconds })
+    } else {
+      capture('onboarding_step_skipped', { step: 4 })
+    }
   }
 
   const startWaitingForRouting = async () => {

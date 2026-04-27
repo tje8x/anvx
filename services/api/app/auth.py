@@ -9,6 +9,8 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 import os
 
+import structlog
+
 Role = Literal["owner", "admin", "member", "viewer", "accountant_viewer"]
 ROLE_RANK = {
     "owner": 5,
@@ -59,7 +61,7 @@ async def get_context(request: Request) -> WorkspaceContext:
 	if not row:
 		raise HTTPException(403, "User is not a member of this workspace")
 
-	return WorkspaceContext(
+	ctx = WorkspaceContext(
 		user_id=row["user_id"],
 		clerk_user_id=clerk_user_id,
 		workspace_id=row["workspace_id"],
@@ -67,6 +69,23 @@ async def get_context(request: Request) -> WorkspaceContext:
 		role=row["role"],
 		email=claims.get("email", ""),
 	)
+
+	structlog.contextvars.bind_contextvars(
+		workspace_id=ctx.workspace_id,
+		user_id=ctx.user_id,
+	)
+
+	try:
+		import sentry_sdk
+		sentry_sdk.set_tag("workspace_id", ctx.workspace_id)
+		req_id = request.headers.get("x-request-id")
+		if req_id:
+			sentry_sdk.set_tag("request_id", req_id)
+			sentry_sdk.set_extra("request_id", req_id)
+	except Exception:
+		pass
+
+	return ctx
 
 def require_role(min_role: Role):
     """FastAPI dependency: enforces the caller has at least min_role."""

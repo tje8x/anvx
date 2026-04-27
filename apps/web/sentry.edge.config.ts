@@ -1,0 +1,57 @@
+// This file configures the initialization of Sentry for edge features (middleware, edge routes, and so on).
+// The config you add here will be used whenever one of the edge features is loaded.
+// Note that this config is unrelated to the Vercel Edge Runtime and is also required when running locally.
+// https://docs.sentry.io/platforms/javascript/guides/nextjs/
+
+import * as Sentry from "@sentry/nextjs";
+
+const SECRET_RE = /(sk[-_](live|test)?[A-Za-z0-9_-]{16,}|anvx_(live|test)_[A-Za-z0-9_-]{16,}|whsec_[A-Za-z0-9]{16,})/g;
+
+const SCRUB_HEADERS = new Set([
+  "authorization", "cookie", "x-anvx-token",
+  "stripe-signature", "svix-signature",
+]);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function walk(o: any): any {
+  if (typeof o === "string") return o.replace(SECRET_RE, "***SCRUBBED***");
+  if (Array.isArray(o)) return o.map(walk);
+  if (o && typeof o === "object") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const out: any = {};
+    for (const k of Object.keys(o)) out[k] = walk(o[k]);
+    return out;
+  }
+  return o;
+}
+
+Sentry.init({
+  dsn: "https://46f0318fc5019872458e36c7dbfe63c2@o4511290337460224.ingest.de.sentry.io/4511290361249872",
+  tracesSampleRate: 0.1,
+  enableLogs: true,
+  sendDefaultPii: false,
+  environment: process.env.ENV ?? "development",
+  beforeSend(event) {
+    const headers = event.request?.headers as Record<string, string> | undefined;
+    if (headers) {
+      for (const k of Object.keys(headers)) {
+        if (SCRUB_HEADERS.has(k.toLowerCase())) {
+          headers[k] = "***SCRUBBED***";
+        }
+      }
+    }
+    const extra = (event.extra ?? {}) as Record<string, unknown>;
+    const contexts = (event.contexts ?? {}) as Record<string, Record<string, unknown>>;
+    const workspace_id =
+      (extra.workspace_id as string | undefined) ??
+      (contexts.workspace?.id as string | undefined);
+    const request_id =
+      (extra.request_id as string | undefined) ??
+      (headers?.["x-request-id"] as string | undefined) ??
+      (headers?.["X-Request-ID"] as string | undefined);
+    event.tags = event.tags ?? {};
+    if (workspace_id) event.tags.workspace_id = workspace_id;
+    if (request_id) event.tags.request_id = request_id;
+    return walk(event);
+  },
+});

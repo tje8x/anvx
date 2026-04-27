@@ -1,5 +1,9 @@
 {
   "devDependencies": {
     "supabase": "^2.93.0"
+  },
+  "dependencies": {
+    "posthog-js": "^1.372.1",
+    "posthog-node": "^5.30.4"
   }
 }

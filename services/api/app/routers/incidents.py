@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from ..analytics import capture as analytics_capture
 from ..auth import WorkspaceContext, require_role
 from ..db import sb_service
 from ..notifications.dispatch import dispatch_fire_and_forget
@@ -39,4 +40,14 @@ async def resume_incident(incident_id: str, body: ResumeBody, ctx: WorkspaceCont
         "provider": incident.get("provider") or incident.get("scope_provider") or "routing",
         "note": body.note,
     })
+
+    duration_minutes = 0
+    opened_at = incident.get("opened_at")
+    if opened_at:
+        try:
+            opened_dt = datetime.fromisoformat(str(opened_at).replace("Z", "+00:00"))
+            duration_minutes = max(0, int((datetime.now(timezone.utc) - opened_dt).total_seconds() // 60))
+        except Exception:
+            pass
+    analytics_capture(ctx.workspace_id, "incident_resumed", {"duration_minutes": duration_minutes})
     return {"ok": True}

@@ -454,6 +454,9 @@ def generate_close_pack(pack_id: str) -> None:
             "error_message": None,
         }).eq("id", pack_id).execute()
 
+        from ..analytics import capture as analytics_capture
+        analytics_capture(workspace_id, "pack_generated", {"kind": kind})
+
         try:
             from ..notifications.dispatch import dispatch_fire_and_forget
             kind_label_map = {

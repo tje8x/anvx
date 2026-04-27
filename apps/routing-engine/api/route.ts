@@ -1,3 +1,5 @@
+import './src/sentry'
+import { Sentry } from './src/sentry'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -63,6 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     workspaceId = tokenRow.workspace_id as string
     tokenId = tokenRow.id as string
     supabase.from('anvx_api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', tokenId).then(() => {})
+
+    Sentry.setTag('workspace_id', workspaceId)
+    Sentry.setTag('request_id', request_id)
 
     console.log("ENG_1 auth_complete", { request_id, workspaceId })
 

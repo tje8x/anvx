@@ -6,6 +6,7 @@ import { useOrganizationList } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import MacButton from '@/components/anvx/mac-button'
 import { Input } from '@/components/ui/input'
+import { capture } from '@/lib/analytics/posthog-client'
 
 export default function OnboardingWorkspaceStep() {
   const router = useRouter()
@@ -22,10 +23,12 @@ export default function OnboardingWorkspaceStep() {
   }, [])
 
   const log = (action: 'completed' | 'skipped') => {
-    console.log({
-      event: `onboarding_step_1_${action}`,
-      ms_in_step: Date.now() - startedAt.current,
-    })
+    const elapsed_seconds = Math.round((Date.now() - startedAt.current) / 1000)
+    if (action === 'completed') {
+      capture('onboarding_step_completed', { step: 1, elapsed_seconds })
+    } else {
+      capture('onboarding_step_skipped', { step: 1 })
+    }
   }
 
   const handleSubmit = async () => {

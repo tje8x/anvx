@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 import EmptyState from '@/components/empty-state'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const ROUTING_TTL = 30_000
@@ -219,7 +220,7 @@ export default function RoutingPage() {
     const h = await authHeaders()
     invalidateCache(`${API_BASE}/api/v2/workspace/me`)
     const res = await fetch(`${API_BASE}/api/v2/workspace/me`, { method: 'PATCH', headers: h, body: JSON.stringify({ routing_mode: pendingMode }) })
-    if (res.ok) { setMode(pendingMode); setModeSwitchOpen(false); toast.success(`Switched to ${pendingMode} mode`); await fetchAll() }
+    if (res.ok) { capture('routing_mode_changed', { from: mode, to: pendingMode }); setMode(pendingMode); setModeSwitchOpen(false); toast.success(`Switched to ${pendingMode} mode`); await fetchAll() }
     else { toast.error('Failed to switch mode') }
   }
 
@@ -227,6 +228,8 @@ export default function RoutingPage() {
   const handleRespond = async (id: string, response: 'accepted' | 'dismissed') => {
     const h = await authHeaders()
     await fetch(`${API_BASE}/api/v2/shadow/recommendations/${id}/respond`, { method: 'POST', headers: h, body: JSON.stringify({ response }) })
+    const rec = recs.find((r) => r.id === id)
+    capture('shadow_recommendation_response', { kind: rec?.kind ?? 'unknown', response })
     setRecs((prev) => prev.filter((r) => r.id !== id)); toast.success(response === 'accepted' ? 'Rule accepted' : 'Dismissed')
   }
 
@@ -249,7 +252,7 @@ export default function RoutingPage() {
   const handleSaveRule = async () => {
     setRuleError(''); setRuleLoading(true)
     const payload = { name: ruleName, description: ruleDesc || null, approved_models: ruleModels, quality_priority: ruleQuality, cost_priority: 100 - ruleQuality, ...(editingRule ? { enabled: editingRule.enabled } : {}) }
-    try { const h = await authHeaders(); const res = await fetch(editingRule ? `${API_BASE}/api/v2/routing-rules/${editingRule.id}` : `${API_BASE}/api/v2/routing-rules`, { method: editingRule ? 'PATCH' : 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setRuleError(d.detail || 'Failed'); return }; invalidateCache(`${API_BASE}/api/v2/routing-rules`); setRuleModalOpen(false); await fetchAll(); toast.success(editingRule ? 'Rule updated' : 'Rule created') } catch (e) { setRuleError(String(e)) } finally { setRuleLoading(false) }
+    try { const h = await authHeaders(); const res = await fetch(editingRule ? `${API_BASE}/api/v2/routing-rules/${editingRule.id}` : `${API_BASE}/api/v2/routing-rules`, { method: editingRule ? 'PATCH' : 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setRuleError(d.detail || 'Failed'); return }; if (!editingRule) capture('routing_rule_created', { models_count: ruleModels.length }); invalidateCache(`${API_BASE}/api/v2/routing-rules`); setRuleModalOpen(false); await fetchAll(); toast.success(editingRule ? 'Rule updated' : 'Rule created') } catch (e) { setRuleError(String(e)) } finally { setRuleLoading(false) }
   }
   const handleToggle = async (rule: Rule) => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/routing-rules/${rule.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ enabled: !rule.enabled }) }); invalidateCache(`${API_BASE}/api/v2/routing-rules`); await fetchAll(); toast.success(rule.enabled ? 'Disabled' : 'Enabled') }
   const toggleModel = (m: string) => setRuleModels((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m])
@@ -263,7 +266,7 @@ export default function RoutingPage() {
     if (!hasAnyLimit()) { setPError('At least one limit is required'); return }
     setPError(''); setPLoading(true)
     const payload = { name: pName, scope_provider: orNull(pProvider), scope_project_tag: orNull(pProject), scope_user_hint: orNull(pUser), daily_limit_cents: orNullNum(pDaily) != null ? Math.round(Number(pDaily) * 100) : null, monthly_limit_cents: orNullNum(pMonthly) != null ? Math.round(Number(pMonthly) * 100) : null, per_request_limit_cents: orNullNum(pPerReq) != null ? Math.round(Number(pPerReq) * 100) : null, circuit_breaker_multiplier: orNullNum(pCB), runway_alert_months: orNullNum(pRunway), alert_at_pcts: pAlerts, action: pAction, fail_mode: pFailMode }
-    try { const h = await authHeaders(); const res = await fetch(`${API_BASE}/api/v2/policies`, { method: 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setPError(d.detail || 'Failed'); return }; invalidateCache(`${API_BASE}/api/v2/policies`); invalidateCache(`${API_BASE}/api/v2/routing/spend`); setPolicyModalOpen(false); await fetchAll(); toast.success('Policy created') } catch (e) { setPError(String(e)) } finally { setPLoading(false) }
+    try { const h = await authHeaders(); const res = await fetch(`${API_BASE}/api/v2/policies`, { method: 'POST', headers: h, body: JSON.stringify(payload) }); if (!res.ok) { const d = await res.json(); setPError(d.detail || 'Failed'); return }; const scope_kind = pProvider ? 'provider' : pProject ? 'project' : pUser ? 'user' : 'workspace'; capture('policy_created', { action: pAction, scope_kind }); invalidateCache(`${API_BASE}/api/v2/policies`); invalidateCache(`${API_BASE}/api/v2/routing/spend`); setPolicyModalOpen(false); await fetchAll(); toast.success('Policy created') } catch (e) { setPError(String(e)) } finally { setPLoading(false) }
   }
   const handleDelete = async () => { const h = await authHeaders(); await fetch(`${API_BASE}/api/v2/${deleteType === 'rule' ? 'routing-rules' : 'policies'}/${deleteId}`, { method: 'DELETE', headers: h }); invalidateCache(`${API_BASE}/api/v2/${deleteType === 'rule' ? 'routing-rules' : 'policies'}`); setDeleteOpen(false); await fetchAll(); toast.success('Deleted') }
   const toggleAlert = (n: number) => setPAlerts((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b))

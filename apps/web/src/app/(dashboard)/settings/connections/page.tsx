@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -164,6 +165,7 @@ export default function ConnectorsPage() {
         body: JSON.stringify({ provider: connectProvider, label: connectLabel, api_key: buildPayload() }),
       })
       if (!res.ok) { const data = await res.json(); setConnectError(data.detail || 'Failed to connect'); return }
+      capture('connector_connected', { provider: connectProvider })
       setConnectOpen(false); resetConnectForm(); await fetchKeys(); toast.success('Provider connected')
     } catch (e) { setConnectError(String(e)) }
     finally { setConnectLoading(false) }

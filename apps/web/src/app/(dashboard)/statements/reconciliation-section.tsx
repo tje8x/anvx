@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 import { SkeletonTable } from '@/components/anvx/skeleton'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -164,6 +165,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
       })
       if (res.status === 409) { toast.error('Already resolved — refresh'); await fetchQueue(true); return }
       if (!res.ok) { toast.error('Confirm failed'); return }
+      capture('reconciliation_action', { kind: 'confirm' })
       toast.success('Confirmed')
       await fetchQueue(true)
     } catch {
@@ -193,6 +195,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
         const data = await res.json().catch(() => ({}))
         setCatError(data.detail || 'Categorize failed'); return
       }
+      capture('reconciliation_action', { kind: 'categorize' })
       setCatTarget(null); toast.success('Categorized'); await fetchQueue(true)
     } catch (e) {
       setCatError(String(e))
@@ -224,6 +227,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
         const data = await res.json().catch(() => ({}))
         setFlagError(data.detail || 'Flag failed'); return
       }
+      capture('reconciliation_action', { kind: 'flag' })
       setFlagTarget(null); toast.success('Flagged'); await fetchQueue(true)
     } catch (e) {
       setFlagError(String(e))

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import MacButton from '@/components/anvx/mac-button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -82,11 +83,12 @@ export default function OnboardingConnectStep() {
   const connectedCount = Object.keys(keysByProvider).length
 
   const log = (action: 'completed' | 'skipped') => {
-    console.log({
-      event: `onboarding_step_2_${action}`,
-      ms_in_step: Date.now() - startedAt.current,
-      connected_count: connectedCount,
-    })
+    const elapsed_seconds = Math.round((Date.now() - startedAt.current) / 1000)
+    if (action === 'completed') {
+      capture('onboarding_step_completed', { step: 2, elapsed_seconds })
+    } else {
+      capture('onboarding_step_skipped', { step: 2 })
+    }
   }
 
   const openTile = (p: ProviderTile) => {
@@ -109,6 +111,7 @@ export default function OnboardingConnectStep() {
         return
       }
       toast.success(`Connected ${open.display} ✓`)
+      capture('connector_connected', { provider: open.id })
       setApiKey(''); setLabel('production')
       const hadKeys = (keysByProvider[open.id]?.length ?? 0) > 0
       await refreshConnections()

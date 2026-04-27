@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.13.3",
     "pydantic-settings>=2.14.0",
     "python-jose>=3.5.0",
+    "posthog>=3.7.0",
+    "sentry-sdk[fastapi]>=2.18.0",
     "structlog>=25.5.0",
     "supabase==2.*",
     "tenacity>=9.1.4",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import MacButton from '@/components/anvx/mac-button'
+import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -32,10 +33,12 @@ export default function OnboardingInsightStep() {
   }, [getToken])
 
   const log = (action: 'completed' | 'skipped') => {
-    console.log({
-      event: `onboarding_step_3_${action}`,
-      ms_in_step: Date.now() - startedAt.current,
-    })
+    const elapsed_seconds = Math.round((Date.now() - startedAt.current) / 1000)
+    if (action === 'completed') {
+      capture('onboarding_step_completed', { step: 3, elapsed_seconds })
+    } else {
+      capture('onboarding_step_skipped', { step: 3 })
+    }
   }
 
   useEffect(() => {
@@ -95,7 +98,10 @@ export default function OnboardingInsightStep() {
             detail: 'Connector synced. Spend insight will appear once data is fully ingested.',
           })
         }
-        if (!cancelled) setPhase('ready')
+        if (!cancelled) {
+          capture('insight_viewed', { insight_type: 'llm_savings_estimate' })
+          setPhase('ready')
+        }
       } catch {
         if (!cancelled) setPhase('ready')
       }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import PostHogProvider from "./PostHogProvider";
 import localFont from "next/font/local";
 import { Space_Mono, IBM_Plex_Mono } from 'next/font/google'
 import "./globals.css";
@@ -44,7 +45,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
+          <PostHogProvider>{children}</PostHogProvider>
         </body>
       </html>
     </ClerkProvider>
