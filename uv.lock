@@ -129,6 +129,7 @@ source = { virtual = "services/api" }
 dependencies = [
     { name = "anvx-core" },
     { name = "cryptography" },
+    { name = "email-validator" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jinja2" },
@@ -156,6 +157,7 @@ dev = [
 requires-dist = [
     { name = "anvx-core", editable = "packages/core" },
     { name = "cryptography", specifier = ">=46.0.7" },
+    { name = "email-validator", specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.136.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
