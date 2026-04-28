@@ -34,7 +34,48 @@ const SECONDARY: ProviderTile[] = [
   { id: 'replicate', display: 'Replicate' },
 ]
 
-const FIVE_MIN = 5 * 60_000
+const ADDITIONAL_BY_CATEGORY: { label: string; providers: ProviderTile[] }[] = [
+  { label: 'LLM Providers', providers: [
+    { id: 'mistral', display: 'Mistral' },
+    { id: 'xai', display: 'xAI' },
+    { id: 'perplexity', display: 'Perplexity' },
+    { id: 'together', display: 'Together' },
+    { id: 'openrouter', display: 'OpenRouter' },
+  ]},
+  { label: 'AI Developer Tools', providers: [
+    { id: 'replit', display: 'Replit' },
+    { id: 'langsmith', display: 'LangSmith' },
+    { id: 'pinecone', display: 'Pinecone' },
+    { id: 'tavily', display: 'Tavily' },
+  ]},
+  { label: 'Cloud Infrastructure', providers: [
+    { id: 'gcp', display: 'GCP' },
+    { id: 'supabase', display: 'Supabase' },
+    { id: 'render', display: 'Render' },
+    { id: 'fly', display: 'Fly.io' },
+  ]},
+  { label: 'Payments & Revenue', providers: [
+    { id: 'paypal', display: 'PayPal' },
+    { id: 'wise', display: 'Wise' },
+    { id: 'mercury', display: 'Mercury' },
+  ]},
+  { label: 'Crypto & Wallets', providers: [
+    { id: 'coinbase', display: 'Coinbase' },
+    { id: 'binance', display: 'Binance' },
+    { id: 'crypto_wallet', display: 'Crypto Wallet' },
+  ]},
+  { label: 'Advertising', providers: [
+    { id: 'meta_ads', display: 'Meta Ads' },
+    { id: 'google_ads', display: 'Google Ads' },
+  ]},
+  { label: 'Communications & Utility', providers: [
+    { id: 'twilio', display: 'Twilio' },
+    { id: 'sendgrid', display: 'SendGrid' },
+    { id: 'datadog', display: 'Datadog' },
+    { id: 'notion', display: 'Notion' },
+    { id: 'slack', display: 'Slack' },
+  ]},
+]
 
 type ProviderKeyRow = { id: string; provider: string; label: string; created_at: string; last_used_at: string | null }
 
@@ -49,14 +90,10 @@ export default function OnboardingConnectStep() {
   const [label, setLabel] = useState('production')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [now, setNow] = useState(Date.now())
+  const [showAll, setShowAll] = useState(false)
   const startedAt = useRef<number>(Date.now())
 
   useEffect(() => { startedAt.current = Date.now() }, [])
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 5_000)
-    return () => clearInterval(t)
-  }, [])
 
   const authHeaders = useCallback(async () => {
     const token = await getToken({ template: 'supabase' })
@@ -107,7 +144,20 @@ export default function OnboardingConnectStep() {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        setError(d.detail || `Failed (${res.status})`)
+        const detail = (d.detail ?? '').toString()
+        const detailLc = detail.toLowerCase()
+        if (
+          res.status === 401 ||
+          res.status === 403 ||
+          detailLc.includes('not a member') ||
+          detailLc.includes('membership')
+        ) {
+          setError('Unable to connect — please try signing out and back in, or contact support@anvx.io')
+        } else if (res.status === 409) {
+          setError('This API key is already connected to another workspace. Each key can only be tracked once.')
+        } else {
+          setError(detail || `Failed (${res.status})`)
+        }
         return
       }
       toast.success(`Connected ${open.display} ✓`)
@@ -149,8 +199,6 @@ export default function OnboardingConnectStep() {
     router.push('/onboarding/insight')
   }
 
-  const elapsed = now - startedAt.current
-  const continueIsPrimary = connectedCount >= 3 || elapsed >= FIVE_MIN
   const hasAnyConnection = connectedCount > 0
 
   const existingKeysForOpen = open ? (keysByProvider[open.id] ?? []) : []
@@ -169,7 +217,7 @@ export default function OnboardingConnectStep() {
           Connect your highest-spend providers first.
         </h1>
         <p className="text-[11px] font-data text-anvx-text-dim">
-          {connectedCount} of 3 connected · the more you connect, the better your insight.
+          {connectedCount} connected · the more you connect, the better your insight.
         </p>
       </div>
 
@@ -199,20 +247,44 @@ export default function OnboardingConnectStep() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* Show all providers toggle */}
+      <div>
         <button
           type="button"
-          onClick={() => advance('skipped')}
-          className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline underline-offset-2"
         >
-          Skip for now
+          {showAll ? 'Show fewer ▴' : 'Show all providers ▾'}
         </button>
-        {continueIsPrimary ? (
+
+        {showAll && (
+          <div className="flex flex-col gap-4 mt-4">
+            {ADDITIONAL_BY_CATEGORY.map((group) => (
+              <div key={group.label}>
+                <p className="text-[10px] uppercase tracking-wider font-bold font-ui text-anvx-text-dim mb-2">
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {group.providers.map((p) => (
+                    <ProviderTileCard
+                      key={p.id}
+                      provider={p}
+                      keys={keysByProvider[p.id] ?? []}
+                      onClick={() => openTile(p)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-end">
+        {hasAnyConnection ? (
           <MacButton onClick={() => advance('completed')}>Continue →</MacButton>
-        ) : hasAnyConnection ? (
-          <MacButton variant="secondary" onClick={() => advance('completed')}>Continue →</MacButton>
         ) : (
-          <MacButton variant="secondary" onClick={() => advance('skipped')}>Skip &amp; continue →</MacButton>
+          <MacButton onClick={() => advance('skipped')}>Skip →</MacButton>
         )}
       </div>
 
