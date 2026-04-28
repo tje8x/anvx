@@ -96,7 +96,7 @@ export function ReconciliationSection({ parsedDocuments }: { parsedDocuments: Pa
   const [flagLoading, setFlagLoading] = useState(false)
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

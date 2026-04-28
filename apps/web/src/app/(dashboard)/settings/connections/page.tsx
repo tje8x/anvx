@@ -109,7 +109,7 @@ export default function ConnectorsPage() {
   const connectKind = kindFor(connectProvider)
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 
@@ -382,7 +382,7 @@ function AnvxApiKeysSection({ role }: { role: string }) {
   const isAdmin = role === 'owner' || role === 'admin'
 
   const authHeaders = useCallback(async () => {
-    const t = await getToken({ template: 'supabase' })
+    const t = await getToken()
     return { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

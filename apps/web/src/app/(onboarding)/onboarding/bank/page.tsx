@@ -49,7 +49,7 @@ export default function OnboardingBankStep() {
   const startedAt = useRef<number>(Date.now())
 
   const authHeaders = useCallback(async () => {
-    const t = await getToken({ template: 'supabase' })
+    const t = await getToken()
     return { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

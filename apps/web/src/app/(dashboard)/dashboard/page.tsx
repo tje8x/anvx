@@ -134,7 +134,7 @@ export default function DashboardPage() {
   const fetchSeq = useRef(0) // guards against out-of-order responses
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

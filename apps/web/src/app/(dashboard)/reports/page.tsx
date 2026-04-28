@@ -214,7 +214,7 @@ export default function ReportsPage() {
   }, [genKind, packs, monthOptionsBase, quarterOptionsBase, yearOptionsBase])
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

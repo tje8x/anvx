@@ -21,7 +21,7 @@ export default function IncidentBanner() {
 
   const poll = useCallback(async () => {
     try {
-      const token = await getToken({ template: 'supabase' })
+      const token = await getToken()
       const res = await fetch(`${API_BASE}/api/v2/incidents?only_active=true`, { headers: { Authorization: `Bearer ${token}` } })
       if (res.ok) setIncidents(await res.json())
     } catch { /* ignore */ }

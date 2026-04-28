@@ -130,7 +130,7 @@ export default function DataPage() {
   const isAdmin = role === 'owner' || role === 'admin'
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

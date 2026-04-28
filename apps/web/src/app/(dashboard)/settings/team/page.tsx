@@ -74,7 +74,7 @@ export default function TeamSettingsPage() {
   const isAdmin = me?.role === 'owner' || me?.role === 'admin'
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

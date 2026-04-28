@@ -41,7 +41,7 @@ export default function IncomeStatement({ endMonth }: { endMonth?: string }) {
   const fetchSeq = useRef(0)
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

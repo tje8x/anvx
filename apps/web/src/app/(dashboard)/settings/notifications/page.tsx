@@ -90,7 +90,7 @@ export default function NotificationsSettingsPage() {
   const dirty = useMemo(() => JSON.stringify(data) !== JSON.stringify(draft), [data, draft])
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

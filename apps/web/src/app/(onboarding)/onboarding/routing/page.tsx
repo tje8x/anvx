@@ -26,7 +26,7 @@ export default function OnboardingRoutingStep() {
   const startedAt = useRef<number>(Date.now())
 
   const authHeaders = useCallback(async () => {
-    const tk = await getToken({ template: 'supabase' })
+    const tk = await getToken()
     return { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

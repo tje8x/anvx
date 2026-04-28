@@ -44,7 +44,7 @@ export default function TreasuryInsights({ endMonth }: { endMonth?: string }) {
   const [interested, setInterested] = useState<Set<string>>(new Set())
 
   const authHeaders = useCallback(async () => {
-    const token = await getToken({ template: 'supabase' })
+    const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
 

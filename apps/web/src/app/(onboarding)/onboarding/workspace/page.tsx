@@ -81,7 +81,7 @@ export default function OnboardingWorkspaceStep() {
   const handleSkip = async () => {
     log('skipped')
     try {
-      const token = await getToken({ template: 'supabase' })
+      const token = await getToken()
       const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
