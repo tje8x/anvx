@@ -162,7 +162,7 @@ const response = await client.chat.completions.create({
           Step 4 — Route your AI traffic through ANVX
         </h1>
         <p className="text-[11px] font-data text-anvx-text-dim">
-          Route your AI provider traffic through ANVX. Shadow mode observes your spend and
+          Route your AI provider traffic through ANVX. Observer mode observes your spend and
           suggests optimizations — nothing is changed until you activate copilot.
         </p>
       </div>
@@ -249,7 +249,7 @@ const response = await client.chat.completions.create({
 
           {routingDetected && (
             <div className="border border-emerald-300 bg-emerald-50 rounded-sm p-4 flex items-center justify-between">
-              <p className="text-[12px] font-data text-emerald-700 font-bold">✓ Shadow mode is live.</p>
+              <p className="text-[12px] font-data text-emerald-700 font-bold">✓ Observer mode is live.</p>
               <MacButton onClick={() => advance('completed')}>Continue →</MacButton>
             </div>
           )}

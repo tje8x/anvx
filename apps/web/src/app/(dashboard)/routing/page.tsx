@@ -26,7 +26,7 @@ type Spend = { day_cents: number; month_cents: number }
 type CopilotApproval = { id: string; kind: string; policy_id: string | null; status: string; created_at: string; user_response: string | null }
 
 const MODES: { id: Mode; name: string; desc: string; trustDots: number }[] = [
-  { id: 'shadow', name: 'Shadow', desc: 'Observe and suggest. No changes to live traffic.', trustDots: 1 },
+  { id: 'shadow', name: 'Observer', desc: 'Observe and suggest. No changes to live traffic.', trustDots: 1 },
   { id: 'copilot', name: 'Copilot', desc: 'Suggest and apply with one-click approval.', trustDots: 2 },
   { id: 'autopilot', name: 'Autopilot', desc: 'Fully autonomous within policy guardrails.', trustDots: 3 },
 ]
@@ -283,14 +283,14 @@ export default function RoutingPage() {
     return (
       <EmptyState
         title="Point your application to anvx.io/v1 to start seeing routing recommendations."
-        description="Shadow mode runs first — no risk, just observation."
+        description="Observer mode runs first — no risk, just observation."
         cta={{ label: 'Setup instructions', href: '/onboarding/routing' }}
       />
     )
   }
 
   const modeDescriptions: Record<Mode, string> = {
-    shadow: 'Shadow mode observes all traffic and generates recommendations without affecting live requests. No routing changes are made.',
+    shadow: 'Observer mode observes all traffic and generates recommendations without affecting live requests. No routing changes are made.',
     copilot: 'Copilot mode pauses requests that exceed policy limits and waits for admin approval before proceeding. Downgrades require one-click confirmation.',
     autopilot: 'Autopilot mode enforces all policies autonomously. Requests are blocked, downgraded, or rerouted without human confirmation. Circuit breakers and fail modes apply.',
   }
@@ -305,7 +305,7 @@ export default function RoutingPage() {
       {mode === 'shadow' && (
         <>
           <SectionTitle>Recommendations</SectionTitle>
-          {recs.length === 0 ? (<p className="text-[11px] font-data text-anvx-text-dim py-4 mb-4">No recommendations yet. Shadow mode is observing your traffic.</p>) : (
+          {recs.length === 0 ? (<p className="text-[11px] font-data text-anvx-text-dim py-4 mb-4">No recommendations yet. Observer mode is observing your traffic.</p>) : (
             <div className="mb-6">{recs.map((r) => (
               <div key={r.id} className="bg-anvx-info-light border border-anvx-info rounded p-3 mb-2">
                 <div className="flex justify-between items-center mb-1"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.kind === 'routing_opportunity' ? 'text-anvx-info bg-anvx-info-light' : 'text-anvx-warn bg-anvx-warn-light'}`}>{r.kind === 'routing_opportunity' ? 'ROUTING' : 'BUDGET'}</span><span className="text-[12px] font-bold text-anvx-acc font-data">${((r.estimated_value_cents ?? 0) / 100).toFixed(0)}/mo saved</span></div>
