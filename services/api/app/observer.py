@@ -1,4 +1,4 @@
-"""Shadow-mode recommendation engine — computes routing opportunities and budget protections."""
+"""Observer-mode recommendation engine — computes routing opportunities and budget protections."""
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -156,12 +156,12 @@ def compute_budget_protections(workspace_id: str, window_days: int = 7) -> list[
 
 
 def refresh_recommendations(workspace_id: str) -> None:
-    """Generate new recommendations and insert into shadow_recommendations, deduplicating against unresponded rows."""
+    """Generate new recommendations and insert into observer_recommendations, deduplicating against unresponded rows."""
     sb = sb_service()
 
     # Get existing unresponded recommendation kinds
     try:
-        existing = sb.from_("shadow_recommendations").select("kind").eq("workspace_id", workspace_id).is_("user_response", "null").execute()
+        existing = sb.from_("observer_recommendations").select("kind").eq("workspace_id", workspace_id).is_("user_response", "null").execute()
         existing_kinds = {r["kind"] for r in (existing.data or [])}
     except Exception:
         existing_kinds = set()
@@ -173,7 +173,7 @@ def refresh_recommendations(workspace_id: str) -> None:
         except Exception:
             opps = []
         for opp in opps:
-            sb.from_("shadow_recommendations").insert({
+            sb.from_("observer_recommendations").insert({
                 "workspace_id": workspace_id,
                 "kind": RecommendationKind.ROUTING_OPPORTUNITY.value,
                 "headline": f"{opp.simple_count} simple {opp.model_routed} calls could use {opp.suggested_model} — est. ${opp.monthly_savings_cents / 100:.0f}/mo saved",
@@ -189,7 +189,7 @@ def refresh_recommendations(workspace_id: str) -> None:
         except Exception:
             bps = []
         for bp in bps:
-            sb.from_("shadow_recommendations").insert({
+            sb.from_("observer_recommendations").insert({
                 "workspace_id": workspace_id,
                 "kind": RecommendationKind.BUDGET_PROTECTION.value,
                 "headline": f"{bp.spike_count} spike events. Circuit breaker would have saved ~${bp.prevented_cost_cents / 100:.0f}",
@@ -200,10 +200,10 @@ def refresh_recommendations(workspace_id: str) -> None:
 
 
 def list_for_workspace(workspace_id: str) -> list[dict]:
-    """Return unresponded shadow_recommendations ordered by estimated_value_cents desc."""
+    """Return unresponded observer_recommendations ordered by estimated_value_cents desc."""
     try:
         sb = sb_service()
-        result = sb.from_("shadow_recommendations").select("id, kind, headline, detail, estimated_value_cents, metadata, created_at").eq("workspace_id", workspace_id).is_("user_response", "null").order("estimated_value_cents", desc=True).execute()
+        result = sb.from_("observer_recommendations").select("id, kind, headline, detail, estimated_value_cents, metadata, created_at").eq("workspace_id", workspace_id).is_("user_response", "null").order("estimated_value_cents", desc=True).execute()
         return result.data or []
     except Exception:
         return []

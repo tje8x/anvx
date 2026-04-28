@@ -20,8 +20,11 @@ export type AnalyticsEvent =
   | { name: 'policy_created'; props: { action: string; scope_kind: string } }
   | { name: 'routing_mode_changed'; props: { from: string; to: string } }
   | { name: 'routing_rule_created'; props: { models_count: number } }
-  | { name: 'shadow_recommendation_response'; props: { kind: string; response: string } }
+  | { name: 'observer_recommendation_response'; props: { kind: string; response: string } }
   | { name: 'reconciliation_action'; props: { kind: 'confirm' | 'categorize' | 'flag' } }
+  | { name: 'treasury_insights_shown'; props: { count: number } }
+  | { name: 'treasury_insight_interest_click'; props: { insight_type: string; insight_id: string; projected_runway_impact: number } }
+  | { name: 'treasury_insight_dismissed'; props: { insight_type: string; insight_id: string } }
 
 export function capture<E extends AnalyticsEvent>(event: E['name'], props: E['props']): void {
   if (typeof window === 'undefined') return

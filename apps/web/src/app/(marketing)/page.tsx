@@ -1,20 +1,58 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import HeroDiagram from "./HeroDiagram";
-import LogoStrip from "./LogoStrip";
 import WaitlistButton from "./WaitlistButton";
 
 export const metadata: Metadata = {
-  title: "ANVX — The only routing engine that knows your entire financial position",
+  title: "ANVX — Financial Autopilot for AI-native companies",
   description:
-    "Reduce AI spend without reducing AI efficiency. Route based on budget, runway, and priorities — not just per-request pricing.",
+    "Route LLM traffic intelligently. Prevent cost disasters. Close your books in minutes.",
   openGraph: {
     title: "ANVX — Financial Autopilot for AI-native companies",
     description:
-      "Reduce AI spend without reducing AI efficiency. Route based on budget, runway, and priorities — not just per-request pricing.",
+      "Route LLM traffic intelligently. Prevent cost disasters. Close your books in minutes.",
     images: ["/og.png"],
   },
 };
+
+const ROUTING_PROVIDERS = [
+  "OpenAI", "Anthropic", "Google AI", "Mistral", "xAI", "Perplexity", "OpenRouter", "Together",
+];
+
+const MONITOR_GROUPS: { label: string; providers: string[] }[] = [
+  { label: "Cloud & dev tools",   providers: ["AWS", "GCP", "Vercel", "Cloudflare", "Cursor", "GitHub", "Replit", "Supabase"] },
+  { label: "Payments & revenue",  providers: ["Stripe", "PayPal", "Wise"] },
+  { label: "Crypto & wallets",    providers: ["Coinbase", "Binance", "Mercury"] },
+  { label: "Communications",      providers: ["Twilio", "SendGrid"] },
+  { label: "Observability",       providers: ["Datadog", "LangSmith", "Pinecone", "Notion"] },
+];
+
+const PACKS = [
+  {
+    name: "Monthly close",
+    price: "$99",
+    cadence: "per month",
+    body: "Accrual-basis P&L, bank statement reconciliation, categorized expenses, anomaly log. Everything your accountant needs to close the month.",
+  },
+  {
+    name: "Quarterly close",
+    price: "$299",
+    cadence: "per quarter",
+    body: "Monthly close contents plus quarter-over-quarter trends, routing efficiency, estimated tax support data, and an investor-ready summary.",
+  },
+  {
+    name: "Annual tax prep",
+    price: "$1,500",
+    cadence: "per year",
+    body: "Full-year consolidation with tax-category mapping, R&D credit documentation, crypto transaction reporting, and a supporting documentation index.",
+  },
+];
+
+const ICP_PROOF = [
+  '"A single recursive agent loop can burn $1,400 in 6 hours."',
+  '"96% of organizations report AI costs exceeded expectations at scale."',
+  '"The average AI-native startup manages 15–30 provider invoices per month."',
+];
 
 export default function LandingPage() {
   return (
@@ -33,14 +71,15 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      {/* ── HERO ────────────────────────────────── */}
       <section className="bg-[var(--anvx-win)]">
         <div className="min-h-[calc(100vh-65px)] max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-[1fr_1.2fr] gap-10 md:gap-14 items-center">
           <div className="flex flex-col gap-6">
             <h1 className="font-ui text-[32px] md:text-[48px] leading-[1.05] font-bold tracking-tight text-[var(--anvx-text)] max-w-3xl">
-              The only routing engine that knows your entire financial position.
+              Financial Autopilot for AI-native companies.
             </h1>
             <p className="font-data text-[16px] md:text-[18px] text-[var(--anvx-text-dim)] leading-snug">
-              Reduce AI spend without reducing AI efficiency.
+              Route LLM traffic intelligently. Prevent cost disasters. Close your books in minutes.
             </p>
             <div className="flex flex-col gap-2 mt-2">
               <Link
@@ -59,7 +98,46 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Combined: Your Financial Autopilot + Built on Trust */}
+      {/* ── ONE LINE OF CODE ────────────────────── */}
+      <section className="bg-[var(--anvx-win)] border-t border-[var(--anvx-bdr)]">
+        <div className="max-w-5xl mx-auto px-6 py-20">
+          <div className="text-center mb-10">
+            <h2 className="font-ui text-[22px] md:text-[30px] font-bold leading-tight text-[var(--anvx-text)]">
+              One line of code. Full financial control.
+            </h2>
+            <p className="font-data text-[14px] md:text-[16px] text-[var(--anvx-text-dim)] mt-3 max-w-2xl mx-auto leading-snug">
+              Point your applications at <code className="font-data text-[var(--anvx-text)] bg-[var(--anvx-bg)] border border-[var(--anvx-bdr)] rounded-sm px-1.5 py-0.5">anvx.io/v1</code> instead of calling providers directly. Every API request flows through ANVX, where the routing brain optimizes cost within your quality boundaries — informed by your complete financial position.
+            </p>
+          </div>
+
+          <div className="border-2 border-[var(--anvx-bdr)] bg-[var(--anvx-bg)] rounded-sm shadow-[4px_4px_0_var(--anvx-bdr)] max-w-2xl mx-auto">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--anvx-bdr)] bg-[var(--anvx-win)]">
+              <div className="flex gap-1.5">
+                <span className="w-3 h-3 rounded-full border border-[var(--anvx-bdr)] bg-[#fc6058]" />
+                <span className="w-3 h-3 rounded-full border border-[var(--anvx-bdr)] bg-[#fcbb40]" />
+                <span className="w-3 h-3 rounded-full border border-[var(--anvx-bdr)] bg-[#34c84a]" />
+              </div>
+              <span className="font-ui text-[11px] text-[var(--anvx-text-dim)] mx-auto">.env</span>
+            </div>
+            <div className="p-5 font-data text-[13px] leading-relaxed">
+              <p className="text-[var(--anvx-text-dim)]"># Before</p>
+              <p className="text-[var(--anvx-text-dim)]">
+                OPENAI_BASE_URL=<span className="text-[var(--anvx-text)]">https://api.openai.com/v1</span>
+              </p>
+              <p className="mt-4 text-[var(--anvx-acc)] font-bold"># After</p>
+              <p className="text-[var(--anvx-acc)] font-bold">
+                OPENAI_BASE_URL=<span className="underline underline-offset-2">https://anvx.io/v1</span>
+              </p>
+            </div>
+          </div>
+
+          <p className="font-data text-[13px] md:text-[14px] text-[var(--anvx-text-dim)] text-center mt-8 max-w-xl mx-auto">
+            That&apos;s it. Your app calls the same API. ANVX handles the rest.
+          </p>
+        </div>
+      </section>
+
+      {/* ── YOUR FINANCIAL AUTOPILOT ────────────── */}
       <section className="bg-[var(--anvx-bg)]">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="mb-12 text-center pb-3 border-b border-[var(--anvx-bdr)]">
@@ -71,21 +149,22 @@ export default function LandingPage() {
             <ValueCard
               icon={<RouteIcon />}
               title="Route intelligently"
-              body="Every request routed based on your budget, runway, and priorities."
+              body="Every LLM request routed based on your budget, runway, and model quality requirements — not just per-request price."
             />
             <ValueCard
               icon={<ShieldIcon />}
-              title="Catch disasters in real time"
-              body="Circuit breakers kill runaway costs before they escalate."
+              title="Prevent cost disasters"
+              body="Circuit breakers detect runaway agent loops and kill them before a $1,400 bill becomes a $14,000 bill."
             />
             <ValueCard
               icon={<DocCheckIcon />}
               title="Close your books in minutes"
-              body="28 provider invoices consolidated into one accountant-ready pack."
+              body="28 providers consolidated into accountant-ready close packs with accrual-basis P&L and bank statement reconciliation."
             />
           </div>
         </div>
 
+        {/* ── BUILT ON TRUST ────────────────────── */}
         <div className="max-w-6xl mx-auto px-6 pb-20">
           <div className="mb-3 text-center pb-3 border-b border-[var(--anvx-bdr)]">
             <h2 className="font-ui text-[14px] md:text-[16px] uppercase tracking-[0.18em] text-[var(--anvx-text)] font-bold">
@@ -96,51 +175,208 @@ export default function LandingPage() {
             Start by watching. Upgrade when you&apos;re ready.
           </p>
           <div className="grid md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-5 md:gap-3 items-stretch">
-            <TrustStep
-              number={1}
-              name="Observer"
-              badge="Zero risk"
-              desc="ANVX watches your traffic and shows what it would change. Nothing is rerouted."
-            >
+            <TrustStep number={1} name="Observer" badge="Zero risk" desc="ANVX watches your traffic and shows what it would change. Nothing is rerouted.">
               <ObserverMock />
             </TrustStep>
             <StepArrow />
-            <TrustStep
-              number={2}
-              name="Copilot"
-              badge="You approve"
-              desc="Policies enforce budgets. Major decisions surface for your approval."
-            >
+            <TrustStep number={2} name="Copilot" badge="You approve" desc="Policies enforce budgets. Major decisions surface for your approval.">
               <CopilotMock />
             </TrustStep>
             <StepArrow />
-            <TrustStep
-              number={3}
-              name="Autopilot"
-              badge="Hands-off"
-              desc="Optimization runs within your boundaries. Full audit trail."
-            >
+            <TrustStep number={3} name="Autopilot" badge="Hands-off" desc="Optimization runs within your boundaries. Full audit trail.">
               <AutopilotMock />
             </TrustStep>
           </div>
         </div>
       </section>
 
+      {/* ── WHAT ANVX SEES ──────────────────────── */}
+      <section className="bg-[var(--anvx-win)] border-y border-[var(--anvx-bdr)]">
+        <div className="max-w-6xl mx-auto px-6 py-20">
+          <div className="mb-14 text-center pb-3 border-b border-[var(--anvx-bdr)]">
+            <h2 className="font-ui text-[14px] md:text-[16px] uppercase tracking-[0.18em] text-[var(--anvx-text)] font-bold">
+              What ANVX sees
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-10 md:gap-14">
+            {/* Routes your LLM traffic */}
+            <div className="flex flex-col gap-5">
+              <div>
+                <h3 className="font-ui text-[18px] md:text-[20px] font-bold text-[var(--anvx-text)] leading-tight mb-2">
+                  Routes your LLM traffic
+                </h3>
+                <p className="font-data text-[14px] text-[var(--anvx-text-dim)] leading-relaxed">
+                  ANVX sits in the execution path for your programmatic API calls. It routes requests to the optimal model within your approved groups, enforces budgets, and kills runaway costs in real time.
+                </p>
+              </div>
+
+              <div className="border-2 border-[var(--anvx-acc)] bg-[var(--anvx-acc-light)] rounded-sm p-4 shadow-[3px_3px_0_var(--anvx-acc)]">
+                <p className="font-ui text-[10px] uppercase tracking-wider text-[var(--anvx-acc)] font-bold mb-3">
+                  Traffic routed through anvx.io/v1
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ROUTING_PROVIDERS.map((p) => (
+                    <span
+                      key={p}
+                      className="font-data text-[12px] text-[var(--anvx-text)] bg-[var(--anvx-win)] border border-[var(--anvx-bdr)] rounded-sm px-2.5 py-1"
+                    >
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Monitors your full financial picture */}
+            <div className="flex flex-col gap-5">
+              <div>
+                <h3 className="font-ui text-[18px] md:text-[20px] font-bold text-[var(--anvx-text)] leading-tight mb-2">
+                  Monitors your full financial picture
+                </h3>
+                <p className="font-data text-[14px] text-[var(--anvx-text-dim)] leading-relaxed">
+                  Read-only connectors pull spend, revenue, and balance data from your entire stack. This is the context that makes routing decisions financially intelligent — not just price-based.
+                </p>
+              </div>
+
+              <div className="border border-[var(--anvx-bdr)] bg-[var(--anvx-bg)] rounded-sm p-4 shadow-[2px_2px_0_var(--anvx-bdr)]">
+                <p className="font-ui text-[10px] uppercase tracking-wider text-[var(--anvx-text-dim)] font-bold mb-3">
+                  Read-only visibility — spend, revenue, balances
+                </p>
+                <div className="flex flex-col gap-3">
+                  {MONITOR_GROUPS.map((g) => (
+                    <div key={g.label}>
+                      <p className="font-ui text-[9px] uppercase tracking-wider text-[var(--anvx-text-dim)] mb-1">
+                        {g.label}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.providers.map((p) => (
+                          <span
+                            key={p}
+                            className="font-data text-[11px] text-[var(--anvx-text)] bg-[var(--anvx-win)] border border-[var(--anvx-bdr)] rounded-sm px-2 py-0.5"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── BUILT FOR AI-NATIVE TEAMS ──────────── */}
+      <section className="bg-[var(--anvx-bg)]">
+        <div className="max-w-6xl mx-auto px-6 py-20">
+          <div className="mb-12 text-center pb-3 border-b border-[var(--anvx-bdr)]">
+            <h2 className="font-ui text-[14px] md:text-[16px] uppercase tracking-[0.18em] text-[var(--anvx-text)] font-bold">
+              Built for 1–15 person AI-native teams
+            </h2>
+          </div>
+
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <p className="font-data text-[14px] md:text-[16px] text-[var(--anvx-text)] leading-relaxed mb-4">
+              You spend $1K–$50K/month on AI infrastructure across dozens of providers. Your largest cost line is volatile and unpredictable. Month-end means manually consolidating 15 invoices into something your accountant can understand.
+            </p>
+            <p className="font-ui text-[16px] md:text-[18px] font-bold text-[var(--anvx-text)]">
+              ANVX was built for you.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {ICP_PROOF.map((q) => (
+              <div
+                key={q}
+                className="border border-[var(--anvx-bdr)] bg-[var(--anvx-win)] rounded-sm p-5 shadow-[2px_2px_0_var(--anvx-bdr)] flex items-center"
+              >
+                <p className="font-data text-[13px] text-[var(--anvx-text)] leading-relaxed italic">
+                  {q}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PACK PRICING ────────────────────────── */}
+      <section className="bg-[var(--anvx-win)] border-y border-[var(--anvx-bdr)]">
+        <div className="max-w-6xl mx-auto px-6 py-20">
+          <div className="mb-3 text-center pb-3 border-b border-[var(--anvx-bdr)]">
+            <h2 className="font-ui text-[14px] md:text-[16px] uppercase tracking-[0.18em] text-[var(--anvx-text)] font-bold">
+              Accountant-ready reports at every cadence
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 mt-12">
+            {PACKS.map((p) => (
+              <div
+                key={p.name}
+                className="border border-[var(--anvx-bdr)] bg-[var(--anvx-bg)] rounded-sm p-6 shadow-[2px_2px_0_var(--anvx-bdr)] flex flex-col gap-4"
+              >
+                <div>
+                  <p className="font-ui text-[11px] uppercase tracking-wider text-[var(--anvx-text-dim)] mb-1">
+                    {p.name}
+                  </p>
+                  <p className="font-data text-[36px] md:text-[42px] font-bold text-[var(--anvx-acc)] leading-none">
+                    {p.price}
+                  </p>
+                  <p className="font-data text-[11px] text-[var(--anvx-text-dim)] mt-1">
+                    {p.cadence}
+                  </p>
+                </div>
+                <p className="font-data text-[13px] text-[var(--anvx-text)] leading-relaxed">
+                  {p.body}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p className="font-data text-[13px] text-[var(--anvx-text-dim)] text-center mt-10 max-w-2xl mx-auto">
+            Routing markup (1–3%) is the only other cost. Observer mode is free.
+          </p>
+        </div>
+      </section>
+
+      {/* ── BEYOND ROUTING TEASER ───────────────── */}
+      <section className="bg-[var(--anvx-bg)]">
+        <div className="max-w-3xl mx-auto px-6 py-20 text-center flex flex-col items-center gap-4">
+          <h2 className="font-ui text-[22px] md:text-[28px] font-bold leading-tight text-[var(--anvx-text)] max-w-2xl">
+            The brain sees more than inference costs
+          </h2>
+          <p className="font-data text-[14px] md:text-[15px] text-[var(--anvx-text)] leading-relaxed max-w-2xl">
+            ANVX knows your Coinbase balance, your Stripe pending payouts, your projected provider bills, and your cash runway. Today it uses that context to route LLM traffic intelligently. Tomorrow it tells you where to move money.
+          </p>
+          <div className="mt-2 inline-flex items-center gap-2">
+            <span className="font-data text-[13px] text-[var(--anvx-text-dim)]">
+              Treasury orchestration
+            </span>
+            <span className="font-ui text-[10px] uppercase tracking-wider px-2 py-0.5 bg-[var(--anvx-info-light)] text-[var(--anvx-info)] border border-[var(--anvx-info)] rounded-sm font-bold">
+              v2.5
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── DESIGN PARTNER CTA ──────────────────── */}
       <section className="bg-[var(--anvx-acc)] text-white">
         <div className="max-w-3xl mx-auto px-6 py-20 text-center flex flex-col items-center gap-4">
           <h2 className="font-ui text-[24px] md:text-[32px] font-bold leading-tight">
-            We&apos;re onboarding design partners.
+            We&apos;re onboarding design partners
           </h2>
           <p className="font-data text-[15px] md:text-[16px] opacity-90 leading-snug max-w-xl">
-            Full access, free during the partner phase.
+            10–20 AI-native teams. Full access. All packs included. Weekly spend review calls. Direct founder access.
+          </p>
+          <p className="font-data text-[14px] md:text-[15px] opacity-85 leading-snug max-w-xl">
+            You commit to honest feedback. We commit to building what you need.
           </p>
           <WaitlistButton className="mt-3 inline-flex items-center justify-center px-7 py-3 bg-white text-[var(--anvx-acc)] font-ui text-[14px] font-bold uppercase tracking-wider border-2 border-white rounded-sm shadow-[3px_3px_0_rgba(0,0,0,0.3)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_rgba(0,0,0,0.3)] transition">
             Apply for early access →
           </WaitlistButton>
         </div>
       </section>
-
-      <LogoStrip />
 
       <footer className="bg-[var(--anvx-bg)]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-3">
@@ -352,7 +588,4 @@ html { scroll-behavior: smooth; }
 
 @keyframes stepArrow { 0%, 100% { opacity: 0.5 } 50% { opacity: 1 } }
 .step-arrow { animation: stepArrow 3s ease-in-out infinite; }
-
-@keyframes anvx-marquee { 0% { transform: translateX(0) } 100% { transform: translateX(-50%) } }
-.anvx-marquee { animation: anvx-marquee 60s linear infinite; }
 `;

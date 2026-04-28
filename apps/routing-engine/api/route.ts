@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { data: closedRow } = await supabase.from('budget_policies').select('id').eq('workspace_id', workspaceId).eq('fail_mode', 'closed').eq('enabled', true).limit(1).single()
 
       if (closedRow) {
-        await bestEffortUsage({ ...usageBase, model_routed: requestedModel, tokens_in: 0, tokens_out: 0, decision: 'failed_closed', shadow_suggestion: null, reasoning: 'Context load failed — fail-closed policy active.', policy_triggered: null, upstream_latency_ms: 0, total_latency_ms: Date.now() - startedAt })
+        await bestEffortUsage({ ...usageBase, model_routed: requestedModel, tokens_in: 0, tokens_out: 0, decision: 'failed_closed', observer_suggestion: null, reasoning: 'Context load failed — fail-closed policy active.', policy_triggered: null, upstream_latency_ms: 0, total_latency_ms: Date.now() - startedAt })
         await auditLog(workspaceId, 'anvx_unavailable', request_id)
         sendError(res, 'anvx_unavailable', request_id, { error_stage: 'context_load' })
         return
@@ -114,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!ctx) {
-      dec = { decision: 'failed_open', model_routed: requestedModel, provider_routed: 'openai', reasoning: 'Context load failed — failed open.', policy_triggered_id: null, shadow_suggestion: null }
+      dec = { decision: 'failed_open', model_routed: requestedModel, provider_routed: 'openai', reasoning: 'Context load failed — failed open.', policy_triggered_id: null, observer_suggestion: null }
     } else {
       console.log("ENG_2 context_loaded", { request_id, routing_mode: ctx.routing_mode })
       const messagesStr = body?.messages ? JSON.stringify(body.messages) : ''
@@ -129,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Blocked
     if (dec.decision === 'blocked') {
       const totalLatencyMs = Date.now() - startedAt
-      await bestEffortUsage({ ...usageBase, model_routed: dec.model_routed, tokens_in: 0, tokens_out: 0, decision: dec.decision, shadow_suggestion: dec.shadow_suggestion, reasoning: dec.reasoning, policy_triggered: dec.policy_triggered_id, upstream_latency_ms: 0, total_latency_ms: totalLatencyMs })
+      await bestEffortUsage({ ...usageBase, model_routed: dec.model_routed, tokens_in: 0, tokens_out: 0, decision: dec.decision, observer_suggestion: dec.observer_suggestion, reasoning: dec.reasoning, policy_triggered: dec.policy_triggered_id, upstream_latency_ms: 0, total_latency_ms: totalLatencyMs })
       await auditLog(workspaceId, 'policy_exceeded', request_id)
 
       if (ctx?.routing_mode === 'copilot' && dec.policy_triggered_id) {
@@ -167,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clearTimeout(timeout)
       if (fetchErr?.name === 'AbortError') {
         console.error("ENG_ERR upstream_timeout", { request_id })
-        await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', shadow_suggestion: null, reasoning: 'Upstream timeout.', policy_triggered: null, upstream_latency_ms: UPSTREAM_TIMEOUT_MS, total_latency_ms: Date.now() - startedAt })
+        await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream timeout.', policy_triggered: null, upstream_latency_ms: UPSTREAM_TIMEOUT_MS, total_latency_ms: Date.now() - startedAt })
         await auditLog(workspaceId, 'upstream_timeout', request_id)
         sendError(res, 'upstream_timeout', request_id, { provider: 'openai', model: upstreamModel })
         return
@@ -182,14 +182,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Upstream error mapping
     if (upstreamRes.status === 429) {
       const retryAfter = upstreamRes.headers.get('retry-after')
-      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', shadow_suggestion: null, reasoning: 'Upstream rate limited.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream rate limited.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
       await auditLog(workspaceId, 'upstream_rate_limit', request_id)
       sendError(res, 'upstream_rate_limit', request_id, { upstream_retry_after: retryAfter })
       return
     }
 
     if (upstreamRes.status >= 500) {
-      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', shadow_suggestion: null, reasoning: `Upstream ${upstreamRes.status}.`, policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: `Upstream ${upstreamRes.status}.`, policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
       await auditLog(workspaceId, 'upstream_error', request_id)
       sendError(res, 'upstream_error', request_id, { upstream_status: upstreamRes.status })
       return
@@ -209,7 +209,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log("PARSED_USAGE", { request_id, tokensIn, tokensOut })
 
     const totalLatencyMs = Date.now() - startedAt
-    await bestEffortUsage({ ...usageBase, model_routed: dec.model_routed, tokens_in: tokensIn, tokens_out: tokensOut, decision: dec.decision, shadow_suggestion: dec.shadow_suggestion, reasoning: dec.reasoning, policy_triggered: dec.policy_triggered_id, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: totalLatencyMs })
+    await bestEffortUsage({ ...usageBase, model_routed: dec.model_routed, tokens_in: tokensIn, tokens_out: tokensOut, decision: dec.decision, observer_suggestion: dec.observer_suggestion, reasoning: dec.reasoning, policy_triggered: dec.policy_triggered_id, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: totalLatencyMs })
 
     res.status(upstreamRes.status).setHeader('content-type', 'application/json').send(upstreamText)
   } catch (err: any) {

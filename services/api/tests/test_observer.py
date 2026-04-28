@@ -1,9 +1,9 @@
-"""Tests for shadow recommendation engine."""
+"""Tests for observer recommendation engine."""
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.shadow import compute_routing_opportunities, compute_budget_protections, _FALLBACK_PRICE
+from app.observer import compute_routing_opportunities, compute_budget_protections, _FALLBACK_PRICE
 
 WS = "ws-test-123"
 
@@ -30,7 +30,7 @@ def _make_usage(model: str, tokens_in: int, tokens_out: int, cost_cents: int, ts
 # ── Routing opportunities ────────────────────────────────────────
 
 
-@patch("app.shadow.sb_service")
+@patch("app.observer.sb_service")
 def test_premium_cluster_detected(mock_sb):
     """GPT-4o cluster with >50% simple calls should produce a routing opportunity."""
     # 10 calls: 8 simple (tokens_in<500, tokens_out<200), 2 complex
@@ -62,7 +62,7 @@ def test_premium_cluster_detected(mock_sb):
     assert opps[0].savings_cents > 0
 
 
-@patch("app.shadow.sb_service")
+@patch("app.observer.sb_service")
 def test_insufficient_data_returns_empty(mock_sb):
     """No usage records should return empty list."""
     sb = MagicMock()
@@ -73,7 +73,7 @@ def test_insufficient_data_returns_empty(mock_sb):
     assert opps == []
 
 
-@patch("app.shadow.sb_service")
+@patch("app.observer.sb_service")
 def test_price_lookup_fallback(mock_sb):
     """When models table has no row, fallback prices should be used."""
     simple_calls = [_make_usage("claude-sonnet-4", 200, 100, 100) for _ in range(20)]
@@ -103,7 +103,7 @@ def test_price_lookup_fallback(mock_sb):
 # ── Budget protections ───────────────────────────────────────────
 
 
-@patch("app.shadow.sb_service")
+@patch("app.observer.sb_service")
 def test_spike_cluster_detected(mock_sb):
     """Hours with >3x average spend and >$1 should be flagged as spikes."""
     # 20 normal hours at 50 cents each, 2 spike hours at 500 cents each

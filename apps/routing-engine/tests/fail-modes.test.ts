@@ -40,7 +40,7 @@ vi.mock('@supabase/supabase-js', () => {
       rpc: () => ({
         single: () => {
           if (state.contextShouldTimeout) return new Promise(() => {}) // never resolves
-          return Promise.resolve(state.contextResult ?? { data: { routing_mode: 'shadow', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }, error: null })
+          return Promise.resolve(state.contextResult ?? { data: { routing_mode: 'observer', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }, error: null })
         },
       }),
     }),
@@ -55,7 +55,7 @@ vi.mock('../api/src/decide', async () => {
       if (state.contextShouldTimeout) {
         await new Promise((_, rej) => setTimeout(() => rej(new Error('context_timeout')), 50))
       }
-      return state.contextResult?.data ?? { routing_mode: 'shadow', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }
+      return state.contextResult?.data ?? { routing_mode: 'observer', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }
     },
   }
 })
@@ -94,7 +94,7 @@ describe('fail modes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     state.tokenLookup = { data: { id: 'tok-1', workspace_id: 'ws-1' }, error: null }
-    state.contextResult = { data: { routing_mode: 'shadow', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }, error: null }
+    state.contextResult = { data: { routing_mode: 'observer', policies: [], rules: [], period_spend: { day_cents: 0, month_cents: 0, hourly_baseline_cents: 100 } }, error: null }
     state.contextShouldTimeout = false
     state.closedPolicyExists = false
     state.upstreamStatus = 200

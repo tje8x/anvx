@@ -13,7 +13,7 @@ function sb(): SupabaseClient {
 }
 
 export type RoutingContext = {
-  routing_mode: 'shadow' | 'copilot' | 'autopilot'
+  routing_mode: 'observer' | 'copilot' | 'autopilot'
   policies: any[]
   rules: any[]
   period_spend: { day_cents: number; month_cents: number; hourly_baseline_cents: number }
@@ -26,7 +26,7 @@ export type DecisionResult = {
   provider_routed: string
   reasoning: string
   policy_triggered_id: string | null
-  shadow_suggestion: any | null
+  observer_suggestion: any | null
   blocked_http_status?: number
   blocked_body?: object
 }
@@ -80,7 +80,7 @@ function applyAction(
   const base = {
     policy_triggered_id: policy.id,
     reasoning: `Policy '${policy.name}' triggered: ${info.reason}. Action=${policy.action}.`,
-    shadow_suggestion: null,
+    observer_suggestion: null,
   }
   if (policy.action === 'alert_only') {
     return { ...base, decision: 'passthrough', model_routed: info.model, provider_routed: info.provider }
@@ -130,7 +130,7 @@ export async function decide(
     if (incidentMatches(inc, provider, req.project_tag)) {
       return {
         decision: 'blocked', model_routed: model, provider_routed: provider,
-        policy_triggered_id: null, shadow_suggestion: null,
+        policy_triggered_id: null, observer_suggestion: null,
         reasoning: `Incident ${inc.id} active (${inc.trigger_kind}) — routing paused.`,
         blocked_http_status: 503,
         blocked_body: {
@@ -145,15 +145,15 @@ export async function decide(
   const defaultPass: DecisionResult = {
     decision: 'passthrough', model_routed: model, provider_routed: provider,
     reasoning: 'No matching policy; passthrough.',
-    policy_triggered_id: null, shadow_suggestion: null,
+    policy_triggered_id: null, observer_suggestion: null,
   }
 
-  if (ctx.routing_mode === 'shadow') {
+  if (ctx.routing_mode === 'observer') {
     const applicable = ctx.policies.filter(p => scopeMatches(p, provider, req.project_tag, req.user_hint))
     return {
       ...defaultPass,
-      shadow_suggestion: { applicable_policy_ids: applicable.map(p => p.id), would_simulate: true },
-      reasoning: 'Shadow mode — passthrough with simulated suggestion.',
+      observer_suggestion: { applicable_policy_ids: applicable.map(p => p.id), would_simulate: true },
+      reasoning: 'Observer mode — passthrough with simulated suggestion.',
     }
   }
 

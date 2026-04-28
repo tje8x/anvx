@@ -54,7 +54,7 @@ export type MeterInput = {
   tokens_in: number
   tokens_out: number
   decision: 'passthrough'|'rerouted'|'blocked'|'downgraded'|'failed_open'|'failed_closed'
-  shadow_suggestion?: unknown
+  observer_suggestion?: unknown
   policy_triggered?: string | null
   reasoning?: string
   upstream_latency_ms: number
@@ -84,7 +84,7 @@ export async function writeUsage(input: MeterInput): Promise<void> {
     provider_cost_cents,
     markup_cents,
     decision: input.decision,
-    shadow_suggestion: input.shadow_suggestion ?? null,
+    observer_suggestion: input.observer_suggestion ?? null,
     policy_triggered: input.policy_triggered ?? null,
     reasoning: input.reasoning ?? null,
     upstream_latency_ms: input.upstream_latency_ms,
@@ -98,6 +98,6 @@ export async function writeUsage(input: MeterInput): Promise<void> {
     if (error) throw error
   } catch (err) {
     console.error("meter.write.failed", JSON.stringify(err))
-    console.error("meter.write.row", JSON.stringify({ ...row, shadow_suggestion: '[redacted]' }))
+    console.error("meter.write.row", JSON.stringify({ ...row, observer_suggestion: '[redacted]' }))
   }
 }

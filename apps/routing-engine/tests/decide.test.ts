@@ -62,12 +62,12 @@ const scopedPolicy = {
 }
 
 describe('decide()', () => {
-  it('shadow mode always returns passthrough with shadow_suggestion', async () => {
-    const ctx = makeCtx({ routing_mode: 'shadow', policies: [pausePolicy], period_spend: { day_cents: 9999, month_cents: 9999, hourly_baseline_cents: 100 } })
+  it('observer mode always returns passthrough with observer_suggestion', async () => {
+    const ctx = makeCtx({ routing_mode: 'observer', policies: [pausePolicy], period_spend: { day_cents: 9999, month_cents: 9999, hourly_baseline_cents: 100 } })
     const dec = await decide(ctx, baseReq, {})
     expect(dec.decision).toBe('passthrough')
-    expect(dec.shadow_suggestion).not.toBeNull()
-    expect(dec.shadow_suggestion.applicable_policy_ids).toContain('pol-1')
+    expect(dec.observer_suggestion).not.toBeNull()
+    expect(dec.observer_suggestion.applicable_policy_ids).toContain('pol-1')
   })
 
   it('copilot + per_request_limit exceeded + pause → blocked 429', async () => {

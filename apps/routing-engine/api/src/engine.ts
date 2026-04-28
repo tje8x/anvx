@@ -38,7 +38,7 @@ engine.post('/chat/completions', async (c) => {
     const ctx = await loadRoutingContext(workspaceId)
     console.log("ENG_2 context_loaded", { request_id, workspaceId })
 
-    // Decide (shadow mode — always passthrough)
+    // Decide (observer mode — always passthrough)
     const decision = decide(ctx, requestedModel)
 
     // Get provider key (stub: uses dev env var)
@@ -81,7 +81,7 @@ engine.post('/chat/completions', async (c) => {
       tokens_in: tokensIn,
       tokens_out: tokensOut,
       decision: decision.action,
-      shadow_suggestion: decision.suggestedModel,
+      observer_suggestion: decision.suggestedModel,
       reasoning: decision.reason ?? undefined,
       upstream_latency_ms: upstreamLatencyMs,
       total_latency_ms: totalLatencyMs,

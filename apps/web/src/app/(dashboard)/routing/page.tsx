@@ -17,7 +17,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 const ROUTING_TTL = 30_000
 const ROUTING_MODE_STORAGE_KEY = 'anvx:routing_mode'
 
-type Mode = 'shadow' | 'copilot' | 'autopilot'
+type Mode = 'observer' | 'copilot' | 'autopilot'
 type Recommendation = { id: string; kind: string; headline: string; detail: string; estimated_value_cents: number }
 type Rule = { id: string; name: string; description: string | null; approved_models: string[]; quality_priority: number; cost_priority: number; enabled: boolean }
 type ModelGroup = { provider: string; models: { model: string; pool_hint: string | null }[] }
@@ -26,7 +26,7 @@ type Spend = { day_cents: number; month_cents: number }
 type CopilotApproval = { id: string; kind: string; policy_id: string | null; status: string; created_at: string; user_response: string | null }
 
 const MODES: { id: Mode; name: string; desc: string; trustDots: number }[] = [
-  { id: 'shadow', name: 'Observer', desc: 'Observe and suggest. No changes to live traffic.', trustDots: 1 },
+  { id: 'observer', name: 'Observer', desc: 'Observe and suggest. No changes to live traffic.', trustDots: 1 },
   { id: 'copilot', name: 'Copilot', desc: 'Suggest and apply with one-click approval.', trustDots: 2 },
   { id: 'autopilot', name: 'Autopilot', desc: 'Fully autonomous within policy guardrails.', trustDots: 3 },
 ]
@@ -131,9 +131,9 @@ export default function RoutingPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [mode, setModeRaw] = useState<Mode>(() => {
-    if (typeof window === 'undefined') return 'shadow'
+    if (typeof window === 'undefined') return 'observer'
     const stored = window.sessionStorage.getItem(ROUTING_MODE_STORAGE_KEY)
-    return stored === 'copilot' || stored === 'autopilot' || stored === 'shadow' ? stored : 'shadow'
+    return stored === 'copilot' || stored === 'autopilot' || stored === 'observer' ? stored : 'observer'
   })
   const setMode = useCallback((m: Mode) => {
     setModeRaw(m)
@@ -167,7 +167,7 @@ export default function RoutingPage() {
 
   // Delete + mode switch + incident
   const [deleteOpen, setDeleteOpen] = useState(false); const [deleteId, setDeleteId] = useState(''); const [deleteType, setDeleteType] = useState<'rule' | 'policy'>('rule')
-  const [modeSwitchOpen, setModeSwitchOpen] = useState(false); const [pendingMode, setPendingMode] = useState<Mode>('shadow')
+  const [modeSwitchOpen, setModeSwitchOpen] = useState(false); const [pendingMode, setPendingMode] = useState<Mode>('observer')
   const [incidentModalOpen, setIncidentModalOpen] = useState(false); const [incidentId, setIncidentId] = useState(''); const [incidentNote, setIncidentNote] = useState(''); const [incidentLoading, setIncidentLoading] = useState(false)
   // Override modal
   const [overrideOpen, setOverrideOpen] = useState(false); const [overrideId, setOverrideId] = useState(''); const [overrideReason, setOverrideReason] = useState('')
@@ -184,7 +184,7 @@ export default function RoutingPage() {
     const tryFetch = <T,>(path: string, ttl = ROUTING_TTL): Promise<T | null> =>
       cachedFetch<T>(`${API_BASE}${path}`, { headers: h }, ttl).catch(() => null)
     const [recs, rulesData, modelsData, meData, policiesData, spendData, approvalsData] = await Promise.all([
-      tryFetch<Recommendation[]>('/api/v2/shadow/recommendations'),
+      tryFetch<Recommendation[]>('/api/v2/observer/recommendations'),
       tryFetch<Rule[]>('/api/v2/routing-rules'),
       tryFetch<ModelGroup[]>('/api/v2/models', 300_000),
       tryFetch<{ role: string; routing_mode?: Mode }>('/api/v2/workspace/me', 60_000),
@@ -198,7 +198,7 @@ export default function RoutingPage() {
     if (meData) {
       setRole(meData.role)
       // Workspace's persisted mode wins over sessionStorage when present.
-      if (meData.routing_mode === 'shadow' || meData.routing_mode === 'copilot' || meData.routing_mode === 'autopilot') {
+      if (meData.routing_mode === 'observer' || meData.routing_mode === 'copilot' || meData.routing_mode === 'autopilot') {
         setMode(meData.routing_mode)
       }
     }
@@ -227,9 +227,9 @@ export default function RoutingPage() {
   // Recommendations
   const handleRespond = async (id: string, response: 'accepted' | 'dismissed') => {
     const h = await authHeaders()
-    await fetch(`${API_BASE}/api/v2/shadow/recommendations/${id}/respond`, { method: 'POST', headers: h, body: JSON.stringify({ response }) })
+    await fetch(`${API_BASE}/api/v2/observer/recommendations/${id}/respond`, { method: 'POST', headers: h, body: JSON.stringify({ response }) })
     const rec = recs.find((r) => r.id === id)
-    capture('shadow_recommendation_response', { kind: rec?.kind ?? 'unknown', response })
+    capture('observer_recommendation_response', { kind: rec?.kind ?? 'unknown', response })
     setRecs((prev) => prev.filter((r) => r.id !== id)); toast.success(response === 'accepted' ? 'Rule accepted' : 'Dismissed')
   }
 
@@ -290,7 +290,7 @@ export default function RoutingPage() {
   }
 
   const modeDescriptions: Record<Mode, string> = {
-    shadow: 'Observer mode observes all traffic and generates recommendations without affecting live requests. No routing changes are made.',
+    observer: 'Observer mode observes all traffic and generates recommendations without affecting live requests. No routing changes are made.',
     copilot: 'Copilot mode pauses requests that exceed policy limits and waits for admin approval before proceeding. Downgrades require one-click confirmation.',
     autopilot: 'Autopilot mode enforces all policies autonomously. Requests are blocked, downgraded, or rerouted without human confirmation. Circuit breakers and fail modes apply.',
   }
@@ -302,7 +302,7 @@ export default function RoutingPage() {
       <div className="flex gap-2 mb-6">{MODES.map((m) => (<ModeCard key={m.id} mode={m} selected={mode === m.id} onSelect={() => handleModeClick(m.id)} />))}</div>
 
       {/* Mode-specific feed */}
-      {mode === 'shadow' && (
+      {mode === 'observer' && (
         <>
           <SectionTitle>Recommendations</SectionTitle>
           {recs.length === 0 ? (<p className="text-[11px] font-data text-anvx-text-dim py-4 mb-4">No recommendations yet. Observer mode is observing your traffic.</p>) : (

@@ -150,6 +150,21 @@ function DashboardView() {
           <p className="font-data text-[16px] font-semibold text-[var(--anvx-text)]">$5.7K/mo</p>
         </div>
       </div>
+
+      <div className="treasury-fade border border-[var(--anvx-info)] bg-[var(--anvx-info-light)] rounded-sm p-2">
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-ui text-[9px] uppercase tracking-wider text-[var(--anvx-info)] font-bold">
+            Treasury insight (preview)
+          </p>
+          <span className="font-ui text-[8px] uppercase tracking-wider px-1.5 py-0.5 bg-[var(--anvx-info)] text-white rounded-sm">
+            Coming in v2.5
+          </span>
+        </div>
+        <p className="font-data text-[10px] text-[var(--anvx-text)] leading-snug">
+          Move $3.2K USDC from Coinbase → Mercury to fund projected OpenAI bill.
+          <span className="text-[var(--anvx-acc)] font-bold"> +1.3mo runway.</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -283,6 +298,7 @@ const HERO_CSS = `
 
 @keyframes cashIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
 .cash-fade { opacity: 0; animation: cashIn 0.5s forwards ease-out; animation-delay: 1.4s; }
+.treasury-fade { opacity: 0; animation: cashIn 0.5s forwards ease-out; animation-delay: 1.9s; }
 
 @keyframes lineIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
 .audit-line { opacity: 0; animation: lineIn 0.4s forwards ease-out; }

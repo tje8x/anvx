@@ -93,7 +93,7 @@ from .routers import packs as packs_router
 from .routers import policies as policies_router
 from .routers import routing as routing_router
 from .routers import routing_rules as routing_rules_router
-from .routers import shadow as shadow_router
+from .routers import observer as observer_router
 from .routers import tokens as tokens_router
 from .routers import workspace as workspace_router
 
@@ -151,7 +151,7 @@ app.include_router(workspace_router.router, prefix="/api/v2")
 app.include_router(connectors_router.router, prefix="/api/v2")
 app.include_router(insights_router.router, prefix="/api/v2")
 app.include_router(tokens_router.router, prefix="/api/v2")
-app.include_router(shadow_router.router, prefix="/api/v2")
+app.include_router(observer_router.router, prefix="/api/v2")
 app.include_router(routing_rules_router.router, prefix="/api/v2")
 app.include_router(models_router.router, prefix="/api/v2")
 app.include_router(policies_router.router, prefix="/api/v2")

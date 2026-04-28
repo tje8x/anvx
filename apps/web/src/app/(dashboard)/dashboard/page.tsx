@@ -6,6 +6,7 @@ import SectionTitle from '@/components/anvx/section-title'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
 import IncomeStatement from '@/components/dashboard/income-statement'
 import CashRunway from '@/components/dashboard/cash-runway'
+import TreasuryInsights from '@/components/dashboard/treasury-insights'
 import EmptyState from '@/components/empty-state'
 import { cachedFetch, getCached } from '@/lib/api-cache'
 import { SkeletonChart, SkeletonMetricCardRow } from '@/components/anvx/skeleton'
@@ -301,6 +302,8 @@ export default function DashboardPage() {
         <SectionTitle>Cash position &amp; runway</SectionTitle>
         <CashRunway endMonth={selectedMonth} />
       </section>
+
+      <TreasuryInsights endMonth={selectedMonth} />
     </div>
   )
 }

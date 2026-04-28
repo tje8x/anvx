@@ -105,7 +105,7 @@ def _send_invitation_email(sb, ctx: WorkspaceContext, invite_row: dict, body) ->
 
 
 class WorkspaceUpdate(BaseModel):
-    routing_mode: Literal["shadow", "copilot", "autopilot"]
+    routing_mode: Literal["observer", "copilot", "autopilot"]
 
 
 @router.get("/workspace/me")
@@ -401,7 +401,7 @@ async def routing_status(ctx: WorkspaceContext = Depends(require_role("member"))
     """Report whether the workspace has yet observed any routing usage.
 
     The onboarding flow polls this after the user pastes the routing snippet
-    into their app — first detection means shadow mode is live.
+    into their app — first detection means observer mode is live.
     """
     sb = sb_service()
     rows = (
