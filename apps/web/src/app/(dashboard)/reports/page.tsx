@@ -182,6 +182,7 @@ const KIND_PRICE_LABEL: Record<Kind, string> = {
   audit_trail_export: 'Free',
 }
 
+
 export default function ReportsPage() {
   const { getToken } = useAuth()
   const searchParams = useSearchParams()
@@ -198,6 +199,7 @@ export default function ReportsPage() {
   const [genPeriod, setGenPeriod] = useState<string>('')
   const [genError, setGenError] = useState('')
   const [genLoading, setGenLoading] = useState(false)
+
 
   const monthOptionsBase = useMemo(() => lastNMonths(12), [])
   const quarterOptionsBase = useMemo(() => lastNQuarters(8), [])
@@ -231,6 +233,7 @@ export default function ReportsPage() {
   }, [authHeaders])
 
   useEffect(() => { fetchPacks() }, [fetchPacks])
+
 
   // Background pollers for any pack still requested/generating.
   useEffect(() => {
@@ -629,34 +632,6 @@ export default function ReportsPage() {
       {renderSection('Annual tax prep', 'annual_tax_prep', annualPacks, 'No annual tax prep bundles yet.')}
       {renderSection('Audit trail exports', 'audit_trail_export', auditTrailPacks, 'No audit trail exports yet.')}
 
-      <section>
-        <SectionTitle>Handoff settings</SectionTitle>
-        <p className="text-[11px] font-data text-anvx-text-dim mb-2">Coming soon — Day 31</p>
-        <div className="flex flex-col gap-3 max-w-md">
-          <div>
-            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Auto-generate on</label>
-            <Select disabled value="1st" onValueChange={() => {}}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1st">1st of each month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Email to accountant</label>
-            <Input disabled placeholder="accountant@example.com" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Pack format</label>
-            <Select disabled value="pdf_csv" onValueChange={() => {}}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pdf_csv">PDF + CSV attachments</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </section>
 
       <Dialog open={genOpen} onOpenChange={setGenOpen}>
         <DialogContent>

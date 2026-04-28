@@ -144,8 +144,8 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
       ) : !data || data.series.length === 0 ? (
         <p className="text-[11px] font-data text-anvx-text-dim py-4">No cash data yet.</p>
       ) : (
-        <div className={`w-full anvx-fade-in ${fadeClass}`} style={{ height: 280 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div className={`w-full min-w-0 anvx-fade-in ${fadeClass}`} style={{ minHeight: 280 }}>
+          <ResponsiveContainer width="100%" height={280} minWidth={300}>
             <ComposedChart data={data.series} margin={{ top: 10, right: 24, bottom: 10, left: 8 }}>
               <CartesianGrid stroke="var(--anvx-bdr, #8e8a7e)" strokeDasharray="2 3" strokeOpacity={0.4} />
               <XAxis

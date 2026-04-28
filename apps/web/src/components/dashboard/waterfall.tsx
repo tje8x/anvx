@@ -15,7 +15,20 @@ type Props = {
 
 const VB_W = 700
 const VB_H = 300
-const PADDING = { top: 30, right: 16, bottom: 60, left: 48 }
+const PADDING = { top: 30, right: 16, bottom: 88, left: 48 }
+
+const LABEL_SHORT: Record<string, string> = {
+  'LLM inference': 'LLM',
+  'Third-party APIs': '3rd-party',
+  'Cloud infrastructure': 'Cloud',
+  'Payment processing': 'Payments',
+  'Other SaaS': 'SaaS',
+  'Rent & office': 'Rent',
+  'Dev tools': 'Dev tools',
+  'Monitoring': 'Monitor',
+  'Communications': 'Comms',
+  'Search/data': 'Search',
+}
 
 function formatShort(cents: number): string {
   const sign = cents < 0
@@ -106,7 +119,7 @@ export default function Waterfall({ stages, revenueCents }: Props) {
 
   if (stages.length === 0) return null
 
-  const rotateLabels = stages.length > 10
+  const rotateLabels = stages.length > 4
 
   const zeroY = yMin < 0 && yMax > 0
     ? PADDING.top + (yMax / (yMax - yMin)) * (VB_H - PADDING.top - PADDING.bottom)
@@ -180,21 +193,22 @@ export default function Waterfall({ stages, revenueCents }: Props) {
         {/* X-axis labels */}
         {layouts.map((l) => {
           const labelY = VB_H - PADDING.bottom + 14
+          const shortLabel = LABEL_SHORT[l.stage.label] ?? l.stage.label
           const transform = rotateLabels
-            ? `rotate(20 ${l.cx} ${labelY})`
+            ? `rotate(-45 ${l.cx} ${labelY})`
             : undefined
           return (
             <text
               key={`lbl-${l.index}`}
               x={l.cx}
               y={labelY}
-              textAnchor={rotateLabels ? 'start' : 'middle'}
+              textAnchor={rotateLabels ? 'end' : 'middle'}
               fontFamily="var(--font-data, 'IBM Plex Mono', monospace)"
               fontSize={9}
               fill="var(--anvx-text-dim, #6b6a64)"
               transform={transform}
             >
-              {l.stage.label}
+              {shortLabel}
             </text>
           )
         })}

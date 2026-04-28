@@ -12,6 +12,8 @@ import { SkeletonChart, SkeletonMetricCardRow } from '@/components/anvx/skeleton
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
+const STRUCTURAL_LABELS = new Set(['Revenue', 'Gross Profit', 'EBITDA', 'Tax', 'Net Income'])
+
 type Metrics = {
   anvx_savings_realized_cents: number
 }
@@ -209,11 +211,14 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 relative">
-      {/* Thin progress bar — visible whenever a refetch is in flight */}
-      <div
-        className={`absolute top-0 left-0 right-0 h-0.5 bg-anvx-acc pointer-events-none ${isRefetching ? 'opacity-100 animate-pulse' : 'opacity-0'} transition-opacity`}
-        aria-hidden
-      />
+      {/* Refetch hint — only shown when we already have data and are revalidating.
+          Neutral gray so it doesn't read as a status banner during initial load. */}
+      {!initialLoading && (
+        <div
+          className={`absolute top-0 left-0 right-0 h-0.5 bg-anvx-text-dim pointer-events-none ${isRefetching ? 'opacity-60 animate-pulse' : 'opacity-0'} transition-opacity`}
+          aria-hidden
+        />
+      )}
 
 
       <section>
@@ -278,7 +283,12 @@ export default function DashboardPage() {
                 No revenue data yet. Connect Stripe or categorize revenue rows in Reconciliation to see your waterfall.
               </p>
             )}
-            <Waterfall stages={waterfall.stages} revenueCents={cur?.revenue ?? 0} />
+            <Waterfall
+              stages={waterfall.stages.filter(
+                (s) => STRUCTURAL_LABELS.has(s.label) || s.value_cents !== 0
+              )}
+              revenueCents={cur?.revenue ?? 0}
+            />
           </div>
         )}
       </section>

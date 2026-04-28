@@ -1,8 +1,11 @@
 import asyncio
+import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 from fastapi import APIRouter, Depends, HTTPException
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -110,7 +113,7 @@ async def workspace_me(ctx: WorkspaceContext = Depends(require_role("accountant_
     sb = sb_service()
     ws = (
         sb.from_("workspaces")
-        .select("id, name, slug, timezone, fiscal_year_start_month, default_currency, copilot_approvers, slack_webhook_url, notification_email, autopilot_digest, routing_mode")
+        .select("id, name, slug, timezone, fiscal_year_start_month, default_currency, copilot_approvers, slack_webhook_url, notification_email, autopilot_digest, routing_mode, handoff_schedule, handoff_email, handoff_format")
         .eq("id", ctx.workspace_id).single().execute()
     ).data or {}
     return {
@@ -139,11 +142,26 @@ class GeneralSettingsBody(BaseModel):
     fiscal_year_start_month: int | None = Field(default=None, ge=1, le=12)
     default_currency: str | None = None
     copilot_approvers: Literal["admins_only", "admins_and_members"] | None = None
+    handoff_schedule: Literal["1st", "last", "custom", "disabled"] | None = None
+    handoff_email: str | None = None
+    handoff_format: Literal["pdf_csv", "pdf_only", "csv_only"] | None = None
 
 
 @router.patch("/workspace/settings")
 async def patch_workspace_settings(body: GeneralSettingsBody, ctx: WorkspaceContext = Depends(require_role("admin"))):
-    update = {k: v for k, v in body.dict(exclude_unset=True).items() if v is not None}
+    raw = body.dict(exclude_unset=True)
+
+    if "handoff_email" in raw:
+        e = raw["handoff_email"]
+        if e is not None and e != "" and not _EMAIL_RE.match(e):
+            raise HTTPException(400, "invalid email format")
+
+    update: dict = {}
+    for k, v in raw.items():
+        if k == "handoff_email":
+            update[k] = None if (v is None or v == "") else v
+        elif v is not None:
+            update[k] = v
     if not update:
         raise HTTPException(400, "no fields provided")
     update["updated_at"] = datetime.now(timezone.utc).isoformat()

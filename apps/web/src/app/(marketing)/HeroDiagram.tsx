@@ -69,12 +69,6 @@ export default function HeroDiagram() {
 }
 
 function DashboardView() {
-  const providers = [
-    { name: "Anthropic", pct: 45, color: "#b8714a", cls: "pv-bar-1" },
-    { name: "OpenAI", pct: 30, color: "#2d5a27", cls: "pv-bar-2" },
-    { name: "AWS", pct: 15, color: "#1a5276", cls: "pv-bar-3" },
-    { name: "Other", pct: 10, color: "#8a6d1b", cls: "pv-bar-4" },
-  ];
   return (
     <div className="flex flex-col gap-3 h-full">
       <p className="font-ui text-[11px] uppercase tracking-wider text-[var(--anvx-text-dim)]">
@@ -111,23 +105,36 @@ function DashboardView() {
 
       <div className="flex-1 border border-[var(--anvx-bdr)] bg-[var(--anvx-bg)] rounded-sm p-3">
         <p className="font-ui text-[10px] uppercase tracking-wider text-[var(--anvx-text-dim)] mb-2">
-          Spend by provider
+          Revenue waterfall — Q1 2026
         </p>
-        <div className="space-y-2">
-          {providers.map((p) => (
-            <div key={p.name} className="flex items-center gap-3">
-              <span className="font-data text-[10px] w-20 text-[var(--anvx-text-dim)]">
-                {p.name}
-              </span>
-              <div className="flex-1 h-3 bg-[var(--anvx-win)] border border-[var(--anvx-bdr)] rounded-sm overflow-hidden">
+        <div className="flex items-end gap-3 px-2 h-28">
+          {[
+            { label: "Revenue", amt: "$25K",  bottom: 0,  height: 100, kind: "gain" as const, delay: "wf-d1" },
+            { label: "COGS",    amt: "−$8K",  bottom: 68, height: 32,  kind: "loss" as const, delay: "wf-d2" },
+            { label: "Gross",   amt: "$17K",  bottom: 0,  height: 68,  kind: "gain" as const, delay: "wf-d3" },
+            { label: "OpEx",    amt: "−$6K",  bottom: 44, height: 24,  kind: "loss" as const, delay: "wf-d4" },
+            { label: "Net",     amt: "$11K",  bottom: 0,  height: 44,  kind: "gain" as const, delay: "wf-d5" },
+          ].map((b) => (
+            <div key={b.label} className="flex-1 flex flex-col items-center h-full">
+              <div className="relative w-full flex-1">
                 <div
-                  className={`pv-bar ${p.cls} h-full rounded-sm`}
-                  style={{ ["--target-w" as string]: `${p.pct}%`, background: p.color }}
+                  className={`wf-${b.kind} ${b.delay} absolute left-0 right-0 rounded-sm`}
+                  style={{
+                    bottom: `${b.bottom}%`,
+                    height: `${b.height}%`,
+                    background: b.kind === "gain" ? "var(--anvx-info)" : "var(--anvx-danger)",
+                  }}
                 />
               </div>
-              <span className="font-data text-[10px] w-9 text-right text-[var(--anvx-text-dim)]">
-                {p.pct}%
-              </span>
+              <div className="flex flex-col items-center mt-1">
+                <span className="font-data text-[9px] text-[var(--anvx-text-dim)]">{b.label}</span>
+                <span
+                  className="font-data text-[9px] font-bold"
+                  style={{ color: b.kind === "gain" ? "var(--anvx-info)" : "var(--anvx-danger)" }}
+                >
+                  {b.amt}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -257,12 +264,15 @@ function ReportsView() {
 }
 
 const HERO_CSS = `
-@keyframes barFill { from { width: 0 } to { width: var(--target-w) } }
-.pv-bar { width: 0; animation: barFill 0.7s forwards ease-out; }
-.pv-bar-1 { animation-delay: 0.2s; }
-.pv-bar-2 { animation-delay: 0.5s; }
-.pv-bar-3 { animation-delay: 0.8s; }
-.pv-bar-4 { animation-delay: 1.1s; }
+@keyframes wfGain { from { opacity: 0; transform: scaleY(0) } to { opacity: 1; transform: scaleY(1) } }
+@keyframes wfLoss { from { opacity: 0; transform: scaleY(0) } to { opacity: 1; transform: scaleY(1) } }
+.wf-gain { transform-origin: bottom; opacity: 0; animation: wfGain 0.5s forwards ease-out; }
+.wf-loss { transform-origin: top;    opacity: 0; animation: wfLoss 0.5s forwards ease-out; }
+.wf-d1 { animation-delay: 0.2s; }
+.wf-d2 { animation-delay: 0.7s; }
+.wf-d3 { animation-delay: 1.2s; }
+.wf-d4 { animation-delay: 1.7s; }
+.wf-d5 { animation-delay: 2.2s; }
 
 @keyframes metricIn { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
 .metric-fade { opacity: 0; animation: metricIn 0.4s forwards ease-out; }

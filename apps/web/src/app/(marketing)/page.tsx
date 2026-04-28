@@ -34,18 +34,21 @@ export default function LandingPage() {
       </nav>
 
       <section className="bg-[var(--anvx-win)]">
-        <div className="min-h-[calc(100vh-65px)] max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-[1fr_1.5fr] gap-10 md:gap-14 items-center">
+        <div className="min-h-[calc(100vh-65px)] max-w-6xl mx-auto px-6 py-16 md:py-20 grid md:grid-cols-[1fr_1.2fr] gap-10 md:gap-14 items-center">
           <div className="flex flex-col gap-6">
-            <h1 className="font-ui text-[32px] md:text-[48px] leading-[1.05] font-bold tracking-tight text-[var(--anvx-text)]">
+            <h1 className="font-ui text-[32px] md:text-[48px] leading-[1.05] font-bold tracking-tight text-[var(--anvx-text)] max-w-3xl">
               The only routing engine that knows your entire financial position.
             </h1>
             <p className="font-data text-[16px] md:text-[18px] text-[var(--anvx-text-dim)] leading-snug">
               Reduce AI spend without reducing AI efficiency.
             </p>
             <div className="flex flex-col gap-2 mt-2">
-              <WaitlistButton className="inline-flex items-center justify-center w-full sm:w-auto px-7 py-3 bg-[var(--anvx-acc)] text-white font-ui text-[14px] font-bold uppercase tracking-wider border-2 border-[var(--anvx-acc)] rounded-sm shadow-[3px_3px_0_var(--anvx-bdr)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_var(--anvx-bdr)] transition">
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center justify-center w-full sm:w-auto px-7 py-3 bg-[var(--anvx-acc)] text-white font-ui text-[14px] font-bold uppercase tracking-wider border-2 border-[var(--anvx-acc)] rounded-sm shadow-[3px_3px_0_var(--anvx-bdr)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_var(--anvx-bdr)] transition"
+              >
                 Sign up →
-              </WaitlistButton>
+              </Link>
               <p className="font-data text-[14px] text-[var(--anvx-text-dim)]">
                 Observer mode is always free. No credit card.
               </p>

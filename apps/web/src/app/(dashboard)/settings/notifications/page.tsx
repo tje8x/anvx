@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import SectionTitle from '@/components/anvx/section-title'
 import MacButton from '@/components/anvx/mac-button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cachedFetch, invalidateCache } from '@/lib/api-cache'
 import { SkeletonTable } from '@/components/anvx/skeleton'
 
@@ -24,9 +25,21 @@ type PrefsResponse = {
   autopilot_digest: 'per_event' | 'daily' | 'weekly' | null
 }
 
+type HandoffSchedule = '1st' | 'last' | 'disabled'
+type HandoffFormat = 'pdf_csv' | 'pdf_only' | 'csv_only'
+
 type WorkspaceMe = {
   role: 'owner' | 'admin' | 'member' | 'viewer' | 'accountant_viewer'
   email?: string
+  handoff_schedule: HandoffSchedule | null
+  handoff_email: string | null
+  handoff_format: HandoffFormat | null
+}
+
+type SettingsDraft = PrefsResponse & {
+  handoff_schedule: HandoffSchedule
+  handoff_email: string
+  handoff_format: HandoffFormat
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -65,8 +78,8 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 
 export default function NotificationsSettingsPage() {
   const { getToken } = useAuth()
-  const [data, setData] = useState<PrefsResponse | null>(null)
-  const [draft, setDraft] = useState<PrefsResponse | null>(null)
+  const [data, setData] = useState<SettingsDraft | null>(null)
+  const [draft, setDraft] = useState<SettingsDraft | null>(null)
   const [role, setRole] = useState<WorkspaceMe['role']>('member')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -93,7 +106,13 @@ export default function NotificationsSettingsPage() {
         const ordered = [...prefs.preferences].sort(
           (a, b) => EVENT_ORDER.indexOf(a.event_type) - EVENT_ORDER.indexOf(b.event_type),
         )
-        const seeded = { ...prefs, preferences: ordered }
+        const seeded: SettingsDraft = {
+          ...prefs,
+          preferences: ordered,
+          handoff_schedule: (me.handoff_schedule ?? 'disabled') as HandoffSchedule,
+          handoff_email: me.handoff_email ?? '',
+          handoff_format: (me.handoff_format ?? 'pdf_csv') as HandoffFormat,
+        }
         setData(seeded); setDraft(seeded); setRole(me.role)
       } finally {
         setLoading(false)
@@ -118,28 +137,63 @@ export default function NotificationsSettingsPage() {
     setData(draft)
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/workspace/notification-preferences`, {
-        method: 'PATCH', headers: h,
-        body: JSON.stringify({
-          preferences: draft.preferences,
-          slack_webhook_url: draft.slack_webhook_url,
-          notification_email: draft.notification_email,
-          autopilot_digest: draft.autopilot_digest,
-        }),
-      })
-      if (!res.ok) {
-        setData(previous); setDraft(previous)
-        const d = await res.json().catch(() => ({}))
-        toast.error(d.detail || 'Could not save')
-        return
+
+      const prefsChanged =
+        JSON.stringify(data.preferences) !== JSON.stringify(draft.preferences) ||
+        data.slack_webhook_url !== draft.slack_webhook_url ||
+        data.notification_email !== draft.notification_email ||
+        data.autopilot_digest !== draft.autopilot_digest
+
+      const handoffChanged =
+        data.handoff_schedule !== draft.handoff_schedule ||
+        data.handoff_email !== draft.handoff_email ||
+        data.handoff_format !== draft.handoff_format
+
+      let nextSeeded: SettingsDraft = draft
+
+      if (prefsChanged) {
+        const res = await fetch(`${API_BASE}/api/v2/workspace/notification-preferences`, {
+          method: 'PATCH', headers: h,
+          body: JSON.stringify({
+            preferences: draft.preferences,
+            slack_webhook_url: draft.slack_webhook_url,
+            notification_email: draft.notification_email,
+            autopilot_digest: draft.autopilot_digest,
+          }),
+        })
+        if (!res.ok) {
+          setData(previous); setDraft(previous)
+          const d = await res.json().catch(() => ({}))
+          toast.error(d.detail || 'Could not save')
+          return
+        }
+        const updated: PrefsResponse = await res.json()
+        const ordered = [...updated.preferences].sort(
+          (a, b) => EVENT_ORDER.indexOf(a.event_type) - EVENT_ORDER.indexOf(b.event_type),
+        )
+        nextSeeded = { ...nextSeeded, ...updated, preferences: ordered }
+        invalidateCache(`${API_BASE}/api/v2/workspace/notification-preferences`)
       }
-      const updated: PrefsResponse = await res.json()
-      const ordered = [...updated.preferences].sort(
-        (a, b) => EVENT_ORDER.indexOf(a.event_type) - EVENT_ORDER.indexOf(b.event_type),
-      )
-      const seeded = { ...updated, preferences: ordered }
-      setData(seeded); setDraft(seeded)
-      invalidateCache(`${API_BASE}/api/v2/workspace/notification-preferences`)
+
+      if (handoffChanged) {
+        const res = await fetch(`${API_BASE}/api/v2/workspace/settings`, {
+          method: 'PATCH', headers: h,
+          body: JSON.stringify({
+            handoff_schedule: draft.handoff_schedule,
+            handoff_email: draft.handoff_email,
+            handoff_format: draft.handoff_format,
+          }),
+        })
+        if (!res.ok) {
+          setData(previous); setDraft(previous)
+          const d = await res.json().catch(() => ({}))
+          toast.error(d.detail || 'Could not save report delivery')
+          return
+        }
+        invalidateCache(`${API_BASE}/api/v2/workspace/me`)
+      }
+
+      setData(nextSeeded); setDraft(nextSeeded)
       toast.success('Saved')
     } catch (e) {
       setData(previous); setDraft(previous)
@@ -252,6 +306,57 @@ export default function NotificationsSettingsPage() {
                 </label>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle>Report delivery</SectionTitle>
+        <div className="flex flex-col gap-4 max-w-xl">
+          <div>
+            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Auto-generate close packs</label>
+            <Select
+              value={draft.handoff_schedule}
+              onValueChange={(v) => setDraft({ ...draft, handoff_schedule: v as HandoffSchedule })}
+              disabled={!isAdmin}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1st">1st of each month</SelectItem>
+                <SelectItem value="last">Last day of month</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Email to accountant</label>
+            <Input
+              type="email"
+              placeholder="accountant@example.com"
+              value={draft.handoff_email}
+              disabled={!isAdmin}
+              onChange={(e) => setDraft({ ...draft, handoff_email: e.target.value })}
+            />
+            <p className="text-[10px] font-ui text-anvx-text-dim mt-1">
+              Auto-generated packs are emailed here on the schedule above.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-ui text-anvx-text-dim mb-1">Pack format</label>
+            <Select
+              value={draft.handoff_format}
+              onValueChange={(v) => setDraft({ ...draft, handoff_format: v as HandoffFormat })}
+              disabled={!isAdmin}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pdf_csv">PDF + CSV attachments</SelectItem>
+                <SelectItem value="pdf_only">PDF only</SelectItem>
+                <SelectItem value="csv_only">CSV export only</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </section>
