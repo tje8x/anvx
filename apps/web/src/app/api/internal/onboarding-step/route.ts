@@ -7,20 +7,17 @@ export const runtime = 'nodejs'
 /**
  * Internal lookup hit by middleware to gate dashboard access on onboarding state.
  *
- * Returns `{step: 1..6}`. A response of `6` means "let the user through" —
- * either fully onboarded, or no row exists (workspaces created before the
- * onboarding flow shipped should be treated as already onboarded).
- *
- * Fails open: any lookup error returns `6` so a transient Supabase blip
- * doesn't gate users out of the dashboard.
+ * Returns `{step: 1..6}`. `6` means "let the user through" — fully onboarded.
+ * Anything else (including a missing workspace, missing onboarding_state row,
+ * or a Supabase lookup error) returns `1` so the middleware redirects the user
+ * to /onboarding/workspace. Fail-closed: a transient blip should NOT slip a
+ * not-yet-onboarded user past the gate.
  */
 export async function GET() {
   const { userId, orgId } = await auth()
   if (!userId || !orgId) {
-    // No active session/org — middleware shouldn't be calling us in that
-    // case, but if it does, treat as "let through" since the dashboard
-    // layout already handles auth/org redirects.
-    return NextResponse.json({ step: 6 })
+    // No active session/org — fail closed so middleware bounces to onboarding.
+    return NextResponse.json({ step: 1 })
   }
 
   try {
@@ -32,7 +29,7 @@ export async function GET() {
       .eq('clerk_org_id', orgId)
       .maybeSingle()
 
-    if (!ws) return NextResponse.json({ step: 6 })
+    if (!ws) return NextResponse.json({ step: 1 })
 
     const { data: state } = await sb
       .from('onboarding_state')
@@ -40,14 +37,14 @@ export async function GET() {
       .eq('workspace_id', ws.id)
       .maybeSingle()
 
-    if (!state) return NextResponse.json({ step: 6 })
+    if (!state) return NextResponse.json({ step: 1 })
 
     const step = Number(state.current_step)
     return NextResponse.json({
-      step: Number.isFinite(step) && step >= 1 && step <= 6 ? step : 6,
+      step: Number.isFinite(step) && step >= 1 && step <= 6 ? step : 1,
     })
   } catch (err) {
     console.error('[onboarding-step] lookup failed', err)
-    return NextResponse.json({ step: 6 })
+    return NextResponse.json({ step: 1 })
   }
 }

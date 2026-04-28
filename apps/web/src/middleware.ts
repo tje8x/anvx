@@ -8,8 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/docs',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/api/webhooks/clerk',
-  '/api/webhooks/stripe',
+  '/api/webhooks/(.*)',
+  '/api/internal/(.*)',
 ])
 
 // Legacy paths kept routable as 308 permanent redirects so external bookmarks
@@ -67,32 +67,36 @@ function writeOnbCookie(res: NextResponse, step: number) {
 
 async function lookupOnboardingStep(req: NextRequest): Promise<number> {
   // Hits the Node-runtime internal route which talks to Supabase via the
-  // service-role key. Returns 6 if no row, on any error, or on missing org.
+  // service-role key. Fail-closed: any error / missing workspace returns 1
+  // so the user is bounced into onboarding rather than slipping past the gate.
   try {
     const url = new URL('/api/internal/onboarding-step', req.url)
     const res = await fetch(url, {
       headers: { cookie: req.headers.get('cookie') ?? '' },
       cache: 'no-store',
     })
-    if (!res.ok) return 6
+    if (!res.ok) return 1
     const data = (await res.json()) as { step?: number }
     const step = Number(data.step)
-    return Number.isFinite(step) && step >= 1 && step <= 6 ? step : 6
+    return Number.isFinite(step) && step >= 1 && step <= 6 ? step : 1
   } catch {
-    return 6
+    return 1
   }
 }
 
 export default clerkMiddleware(async (auth, req) => {
-  // 0. Webhook endpoints — never redirect, never auth-gate. Must come before
-  //    the legacy-redirects map and the public-route matcher so that signature
-  //    verification on the upstream webhook payload is never disturbed.
-  if (req.nextUrl.pathname.startsWith('/api/webhooks/')) {
+  const { pathname } = req.nextUrl
+
+  // 0. Webhook + internal API endpoints — never redirect, never auth-gate.
+  //    Must be the first check so signature verification on webhook payloads
+  //    is never disturbed and the internal onboarding lookup can recurse
+  //    without being intercepted by the auth/onboarding gates below.
+  if (pathname.startsWith('/api/webhooks/') || pathname.startsWith('/api/internal/')) {
     return NextResponse.next()
   }
 
   // 1. Legacy redirects (tokens/data) — pre-auth, fast path.
-  const dest = LEGACY_REDIRECTS[req.nextUrl.pathname]
+  const dest = LEGACY_REDIRECTS[pathname]
   if (dest) {
     const url = req.nextUrl.clone()
     url.pathname = dest
@@ -106,7 +110,7 @@ export default clerkMiddleware(async (auth, req) => {
   await auth.protect()
 
   // 4. Onboarding gate — only for protected, non-exempt routes.
-  if (isOnboardingExempt(req.nextUrl.pathname)) return
+  if (isOnboardingExempt(pathname)) return
 
   const { userId, orgId } = await auth()
   if (!userId) return
@@ -128,7 +132,7 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   if (step >= 6) {
-    // Onboarded (or treated-as-onboarded). Let through, refresh cookie if needed.
+    // Onboarded. Let through, refresh cookie if needed.
     if (!cached) {
       const res = NextResponse.next()
       writeOnbCookie(res, step)
