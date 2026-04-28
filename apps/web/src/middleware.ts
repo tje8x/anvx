@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
   '/',
+  '/privacy',
+  '/terms',
+  '/docs',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks/clerk',
@@ -81,6 +84,13 @@ async function lookupOnboardingStep(req: NextRequest): Promise<number> {
 }
 
 export default clerkMiddleware(async (auth, req) => {
+  // 0. Webhook endpoints — never redirect, never auth-gate. Must come before
+  //    the legacy-redirects map and the public-route matcher so that signature
+  //    verification on the upstream webhook payload is never disturbed.
+  if (req.nextUrl.pathname.startsWith('/api/webhooks/')) {
+    return NextResponse.next()
+  }
+
   // 1. Legacy redirects (tokens/data) — pre-auth, fast path.
   const dest = LEGACY_REDIRECTS[req.nextUrl.pathname]
   if (dest) {
