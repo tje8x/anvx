@@ -6,6 +6,8 @@ export async function GET() {
     const ctx = await getWorkspaceContext()
     return NextResponse.json(ctx)
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 401 })
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[workspace/me] resolve failed', msg)
+    return NextResponse.json({ error: msg }, { status: 401 })
   }
 }

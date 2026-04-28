@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str
     anvx_master_encryption_key: str | None = None
 
+    # ── Clerk auth ────────────────────────────────────
+    clerk_jwks_url: str = "https://clerk.anvx.io/.well-known/jwks.json"
+
     # ── Stripe / billing ──────────────────────────────
     stripe_secret_key: str | None = None
     stripe_close_pack_price_id: str | None = None
