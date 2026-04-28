@@ -126,6 +126,13 @@ async def get_context(request: Request) -> WorkspaceContext:
             row = single
 
     if not row:
+        structlog.get_logger("anvx.auth").warning(
+            "workspace_membership_not_found",
+            clerk_user_id=clerk_user_id,
+            clerk_org_id=clerk_org_id,
+            claim_keys=sorted(claims.keys()),
+            o_in_claims="o" in claims,
+        )
         raise HTTPException(403, "User is not a member of this workspace")
 
     ctx = WorkspaceContext(
