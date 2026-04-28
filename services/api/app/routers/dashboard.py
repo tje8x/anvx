@@ -625,3 +625,134 @@ async def waterfall(
         _CACHE[key] = (now, payload)
 
     return payload
+
+
+# ─── Treasury insights — account balances + projected bills ──────────
+
+
+_BANK_NAME_HINTS: list[tuple[str, str, str]] = [
+    # (substring, slug, display)
+    ("mercury",         "mercury", "Mercury"),
+    ("chase",           "chase",   "Chase"),
+    ("wells fargo",     "wells",   "Wells Fargo"),
+    ("wellsfargo",      "wells",   "Wells Fargo"),
+    ("wells_fargo",     "wells",   "Wells Fargo"),
+    ("sofi",            "sofi",    "SoFi"),
+    ("brex",            "brex",    "Brex"),
+    ("ramp",            "ramp",    "Ramp"),
+    ("silicon valley",  "svb",     "SVB"),
+    ("svb",             "svb",     "SVB"),
+    ("bank of america", "boa",     "Bank of America"),
+    ("boa",             "boa",     "Bank of America"),
+]
+
+
+def _infer_bank_provider(file_name: str) -> tuple[str, str]:
+    """Best-effort attribution from the upload's file name. Returns (slug, label)."""
+    name_lc = file_name.lower()
+    for substr, slug, display in _BANK_NAME_HINTS:
+        if substr in name_lc:
+            return slug, f"{display} Checking"
+    base = file_name.rsplit(".", 1)[0]
+    return "bank", f"{base[:40]} Statement"
+
+
+def _accounts_from_statements(sb, workspace_id: str) -> list[dict]:
+    """Most recent parsed bank statement per inferred provider — final balance row."""
+    docs = (
+        sb.from_("documents")
+        .select("id, file_name, file_kind, created_at")
+        .eq("workspace_id", workspace_id)
+        .in_("file_kind", ["bank_csv", "bank_pdf"])
+        .eq("status", "parsed")
+        .is_("removed_at", "null")
+        .order("created_at", desc=True)
+        .execute()
+    ).data or []
+
+    seen: dict[str, dict] = {}
+    for doc in docs:
+        provider, label = _infer_bank_provider(doc["file_name"])
+        if provider in seen:
+            continue  # already have a newer statement for this provider
+        rows = (
+            sb.from_("document_transactions")
+            .select("txn_date, raw")
+            .eq("document_id", doc["id"])
+            .order("txn_date", desc=True)
+            .execute()
+        ).data or []
+        for r in rows:
+            bal = _parse_balance(r.get("raw"))
+            if bal is not None:
+                seen[provider] = {
+                    "provider": provider,
+                    "label": label,
+                    "balance_cents": int(bal),
+                    "currency": "USD",
+                    "source": "uploaded_statement",
+                    "as_of": str(r["txn_date"]),
+                }
+                break
+    return list(seen.values())
+
+
+def _accounts_from_connectors(sb, workspace_id: str) -> list[dict]:
+    """Connector-cached balances. provider_keys does not yet store balance fields,
+    so this returns []. When a future migration adds a `cached_balance_cents` /
+    `cached_balance_as_of` pair (or equivalent jsonb on `envelope`), populate from
+    here without changing the response shape.
+    """
+    return []
+
+
+def _projected_bills(sb, workspace_id: str) -> list[dict]:
+    """Group last-30-day routing spend by provider; project monthly. Skip <$10/mo."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    rows = (
+        sb.from_("routing_usage_records")
+        .select("provider, total_cost_cents")
+        .eq("workspace_id", workspace_id)
+        .gte("created_at", cutoff)
+        .execute()
+    ).data or []
+    if not rows:
+        return []
+
+    by_provider: dict[str, int] = {}
+    for r in rows:
+        p = r.get("provider") or "unknown"
+        by_provider[p] = by_provider.get(p, 0) + int(r.get("total_cost_cents") or 0)
+
+    now = datetime.now(timezone.utc)
+    next_month_start = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
+    period = next_month_start.strftime("%Y-%m")
+
+    out: list[dict] = []
+    for provider, total_cents in by_provider.items():
+        # Last 30 days of spend ≈ projected next-month spend (basis: 30d_average).
+        if total_cents < 1000:  # < $10/month — drop noise
+            continue
+        out.append({
+            "provider": provider,
+            "projected_cents": total_cents,
+            "period": period,
+            "basis": "30d_average",
+        })
+    out.sort(key=lambda x: -x["projected_cents"])
+    return out
+
+
+@router.get("/dashboard/account-balances")
+async def account_balances(ctx: WorkspaceContext = Depends(require_role("member"))):
+    """Per-account balances + projected provider bills for treasury insights.
+
+    Accounts come from (1) the most recent parsed bank statement per inferred
+    provider (file-name heuristic) and (2) connector-cached balances when
+    available. Projected bills come from the last 30 days of routing usage,
+    grouped by provider.
+    """
+    sb = sb_service()
+    accounts = _accounts_from_statements(sb, ctx.workspace_id) + _accounts_from_connectors(sb, ctx.workspace_id)
+    projected = _projected_bills(sb, ctx.workspace_id)
+    return {"accounts": accounts, "projected_bills": projected}
