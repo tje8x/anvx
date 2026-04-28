@@ -108,6 +108,10 @@ export async function POST(req: NextRequest) {
         const { id: clerkOrgId, name, created_by } = evt.data
         const slug = name.toLowerCase().replace(/\s+/g, '-')
 
+        if (!created_by) {
+          throw new Error(`organization.created missing created_by for org ${clerkOrgId}`)
+        }
+
         const ownerId = await ensureUserFromClerk(sb, created_by)
 
         const ws = await sb
