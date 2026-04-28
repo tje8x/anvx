@@ -141,7 +141,12 @@ app.add_middleware(RequestContextMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://anvx.io"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://anvx.io",
+        "https://www.anvx.io",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
