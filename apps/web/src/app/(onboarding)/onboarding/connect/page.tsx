@@ -144,6 +144,7 @@ export default function OnboardingConnectStep() {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
+        console.error('[connect] failed', res.status, d)
         const detail = (d.detail ?? '').toString()
         const detailLc = detail.toLowerCase()
         if (
@@ -152,7 +153,7 @@ export default function OnboardingConnectStep() {
           detailLc.includes('not a member') ||
           detailLc.includes('membership')
         ) {
-          setError('Unable to connect — please try signing out and back in, or contact support@anvx.io')
+          setError('Unable to connect — please try signing out and back in.')
         } else if (res.status === 409) {
           setError('This API key is already connected to another workspace. Each key can only be tracked once.')
         } else {
@@ -191,11 +192,16 @@ export default function OnboardingConnectStep() {
     log(action)
     try {
       const h = await authHeaders()
-      await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
+      const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
         method: 'POST', headers: h,
         body: JSON.stringify({ step: 2, action, ms_in_step: Date.now() - startedAt.current }),
       })
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.error('[onboarding] advance step 2 failed', res.status, await res.text().catch(() => ''))
+      }
+    } catch (err) {
+      console.error('[onboarding] advance step 2 errored', err)
+    }
     router.push('/onboarding/insight')
   }
 
@@ -212,6 +218,13 @@ export default function OnboardingConnectStep() {
 
   return (
     <div className="flex flex-col gap-6">
+      <button
+        type="button"
+        onClick={() => router.push('/onboarding/workspace')}
+        className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline self-start"
+      >
+        ← Back
+      </button>
       <div>
         <h1 className="text-[14px] font-bold uppercase tracking-wider font-ui text-anvx-text mb-1">
           Connect your highest-spend providers first.

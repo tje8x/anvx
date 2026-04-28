@@ -117,11 +117,16 @@ export default function OnboardingInsightStep() {
     log(action)
     try {
       const h = await authHeaders()
-      await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
+      const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
         method: 'POST', headers: h,
         body: JSON.stringify({ step: 3, action, ms_in_step: Date.now() - startedAt.current }),
       })
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.error('[onboarding] advance step 3 failed', res.status, await res.text().catch(() => ''))
+      }
+    } catch (err) {
+      console.error('[onboarding] advance step 3 errored', err)
+    }
     router.push(dest)
   }
 
@@ -137,6 +142,13 @@ export default function OnboardingInsightStep() {
   if (phase === 'no-llm') {
     return (
       <div className="flex flex-col gap-4 max-w-md mx-auto">
+        <button
+          type="button"
+          onClick={() => router.push('/onboarding/connect')}
+          className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline self-start"
+        >
+          ← Back
+        </button>
         <h1 className="text-[14px] font-bold uppercase tracking-wider font-ui text-anvx-text">
           We need an LLM connector to generate your insight.
         </h1>
@@ -145,7 +157,7 @@ export default function OnboardingInsightStep() {
         </p>
         <div className="flex justify-between">
           <button
-            onClick={() => advance('skipped', '/dashboard')}
+            onClick={() => advance('skipped', '/onboarding/routing')}
             className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline"
           >
             Skip for now
@@ -160,6 +172,13 @@ export default function OnboardingInsightStep() {
 
   return (
     <div className="flex flex-col gap-5 max-w-xl mx-auto">
+      <button
+        type="button"
+        onClick={() => router.push('/onboarding/connect')}
+        className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline self-start"
+      >
+        ← Back
+      </button>
       <div>
         <h1 className="text-[14px] font-bold uppercase tracking-wider font-ui text-anvx-text mb-1">
           Here&apos;s what we found
@@ -179,7 +198,7 @@ export default function OnboardingInsightStep() {
 
       <div className="flex items-center justify-between">
         <button
-          onClick={() => advance('skipped', '/dashboard')}
+          onClick={() => advance('skipped', '/onboarding/routing')}
           className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline"
         >
           Explore the dashboard first

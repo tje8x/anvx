@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOrganizationList } from '@clerk/nextjs'
+import { useAuth, useOrganizationList } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import MacButton from '@/components/anvx/mac-button'
 import { Input } from '@/components/ui/input'
 import { capture } from '@/lib/analytics/posthog-client'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+
 export default function OnboardingWorkspaceStep() {
   const router = useRouter()
   const { isLoaded, createOrganization, setActive } = useOrganizationList()
+  const { getToken } = useAuth()
 
   const [name, setName] = useState('')
   const [invites, setInvites] = useState('')
@@ -75,8 +78,21 @@ export default function OnboardingWorkspaceStep() {
     }
   }
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     log('skipped')
+    try {
+      const token = await getToken({ template: 'supabase' })
+      const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 1, action: 'skipped', ms_in_step: Date.now() - startedAt.current }),
+      })
+      if (!res.ok) {
+        console.error('[onboarding] advance step 1 failed', res.status, await res.text().catch(() => ''))
+      }
+    } catch (err) {
+      console.error('[onboarding] advance step 1 errored', err)
+    }
     router.push('/onboarding/connect')
   }
 

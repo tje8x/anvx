@@ -107,11 +107,16 @@ export default function OnboardingRoutingStep() {
     log(action)
     try {
       const h = await authHeaders()
-      await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
+      const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
         method: 'POST', headers: h,
         body: JSON.stringify({ step: 4, action, ms_in_step: Date.now() - startedAt.current }),
       })
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.error('[onboarding] advance step 4 failed', res.status, await res.text().catch(() => ''))
+      }
+    } catch (err) {
+      console.error('[onboarding] advance step 4 errored', err)
+    }
     router.push('/onboarding/bank')
   }
 
@@ -157,6 +162,13 @@ const response = await client.chat.completions.create({
 
   return (
     <div className="flex flex-col gap-5">
+      <button
+        type="button"
+        onClick={() => router.push('/onboarding/insight')}
+        className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline self-start"
+      >
+        ← Back
+      </button>
       <div>
         <h1 className="text-[14px] font-bold uppercase tracking-wider font-ui text-anvx-text mb-1">
           Step 4 — Route your AI traffic through ANVX

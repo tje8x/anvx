@@ -66,11 +66,16 @@ export default function OnboardingBankStep() {
     log(action)
     try {
       const h = await authHeaders()
-      await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
+      const res = await fetch(`${API_BASE}/api/v2/onboarding/advance`, {
         method: 'POST', headers: h,
         body: JSON.stringify({ step: 5, action, ms_in_step: Date.now() - startedAt.current }),
       })
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.error('[onboarding] advance step 5 failed', res.status, await res.text().catch(() => ''))
+      }
+    } catch (err) {
+      console.error('[onboarding] advance step 5 errored', err)
+    }
     router.push('/dashboard')
   }
 
@@ -156,6 +161,13 @@ export default function OnboardingBankStep() {
 
   return (
     <div className="flex flex-col gap-5 max-w-xl mx-auto">
+      <button
+        type="button"
+        onClick={() => router.push('/onboarding/routing')}
+        className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline self-start"
+      >
+        ← Back
+      </button>
       <div>
         <h1 className="text-[14px] font-bold uppercase tracking-wider font-ui text-anvx-text mb-1">
           Step 5 — <span className="text-anvx-text-dim">Optional —</span> see your full picture
