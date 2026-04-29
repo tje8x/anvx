@@ -105,6 +105,12 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
   const runway = data?.current_runway_months ?? null
   const alert = data?.runway_alert_months ?? null
   const belowAlert = runway != null && alert != null && runway < alert
+  const hasRunway = runway != null && runway > 0
+
+  const series = data?.series ?? []
+  const cashMax = series.reduce((m, p) => Math.max(m, p.cash_balance_cents ?? 0), 0)
+  const burnMax = series.reduce((m, p) => Math.max(m, p.burn_rate_cents), 0)
+  const hasChartData = cashMax > 0 || burnMax > 0
 
   // 3-month avg comparison (only used to render the % delta in the burn-instability notice)
   let burnDeltaPct: number | null = null
@@ -119,10 +125,16 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
 
   return (
     <div>
-      <div className="flex items-baseline gap-3 mb-2">
-        <span className="text-2xl font-data font-semibold tabular-nums text-anvx-text">
-          {runway == null ? '—' : runway.toFixed(1)} months of runway
-        </span>
+      <div className="flex items-baseline gap-3 mb-1">
+        {hasRunway ? (
+          <span className="text-2xl font-data font-semibold tabular-nums text-anvx-text">
+            {runway!.toFixed(1)} months of runway
+          </span>
+        ) : (
+          <span className="text-[14px] font-ui font-semibold uppercase tracking-wider text-anvx-text-dim">
+            No cash position data yet
+          </span>
+        )}
         {belowAlert && (
           <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider font-ui px-1.5 py-0.5 rounded bg-anvx-warn-light text-anvx-warn">
             ⚠ below {alert}-month alert
@@ -133,6 +145,12 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
         )}
       </div>
 
+      {!hasRunway && !initialLoading && (
+        <p className="text-[11px] font-ui text-anvx-text-dim mb-2 leading-relaxed">
+          Connect a payment processor (Stripe, PayPal) and upload a recent bank statement to see runway.
+        </p>
+      )}
+
       {data?.unstable_burn && burnDeltaPct != null && (
         <p className="text-[11px] font-ui text-anvx-warn mb-2">
           Burn rate {burnDeltaPct >= 0 ? 'up' : 'down'} {Math.abs(burnDeltaPct)}% vs 3-month average
@@ -141,8 +159,15 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
 
       {initialLoading ? (
         <SkeletonChart height={280} />
-      ) : !data || data.series.length === 0 ? (
-        <p className="text-[11px] font-data text-anvx-text-dim py-4">No cash data yet.</p>
+      ) : !hasChartData ? (
+        <div
+          className={`w-full min-w-0 anvx-fade-in ${fadeClass} flex items-center justify-center border border-anvx-bdr rounded-sm bg-anvx-win/40`}
+          style={{ height: 280 }}
+        >
+          <p className="text-[11px] font-data text-anvx-text-dim text-center px-4">
+            No data yet — sync a payment connector or upload a bank statement
+          </p>
+        </div>
       ) : (
         <div className={`w-full min-w-0 anvx-fade-in ${fadeClass}`} style={{ minHeight: 280 }}>
           <ResponsiveContainer width="100%" height={280} minWidth={300}>
@@ -158,6 +183,7 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
                 yAxisId="cash"
                 orientation="left"
                 tickFormatter={formatTickK}
+                domain={[0, Math.ceil(cashMax * 1.2)]}
                 tick={{ fontFamily: "var(--font-data, 'IBM Plex Mono', monospace)", fontSize: 10, fill: 'var(--anvx-info, #1a5276)' }}
                 stroke="var(--anvx-info, #1a5276)"
               />
@@ -165,6 +191,7 @@ export default function CashRunway({ endMonth }: { endMonth?: string }) {
                 yAxisId="burn"
                 orientation="right"
                 tickFormatter={formatTickK}
+                domain={[0, Math.ceil(burnMax * 1.2)]}
                 tick={{ fontFamily: "var(--font-data, 'IBM Plex Mono', monospace)", fontSize: 10, fill: 'var(--anvx-danger, #a33228)' }}
                 stroke="var(--anvx-danger, #a33228)"
               />
