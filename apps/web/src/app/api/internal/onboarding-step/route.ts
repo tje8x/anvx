@@ -15,34 +15,56 @@ export const runtime = 'nodejs'
  */
 export async function GET() {
   const { userId, orgId } = await auth()
+  console.log('[onboarding-step] auth resolved', { userId, orgId })
+
   if (!userId || !orgId) {
-    // No active session/org — fail closed so middleware bounces to onboarding.
+    console.log('[onboarding-step] no session/org — returning step 1', { userId, orgId })
     return NextResponse.json({ step: 1 })
   }
 
   try {
     const sb = getSupabaseServiceRole()
 
-    const { data: ws } = await sb
+    const { data: ws, error: wsErr } = await sb
       .from('workspaces')
       .select('id')
       .eq('clerk_org_id', orgId)
       .maybeSingle()
 
-    if (!ws) return NextResponse.json({ step: 1 })
+    if (wsErr) {
+      console.error('[onboarding-step] workspaces lookup error', { clerk_org_id: orgId, error: wsErr.message })
+      return NextResponse.json({ step: 1 })
+    }
+    if (!ws) {
+      console.log('[onboarding-step] workspace not found — returning step 1', {
+        queried: { table: 'workspaces', clerk_org_id: orgId },
+      })
+      return NextResponse.json({ step: 1 })
+    }
+    console.log('[onboarding-step] workspace found', { workspace_id: ws.id, clerk_org_id: orgId })
 
-    const { data: state } = await sb
+    const { data: state, error: stErr } = await sb
       .from('onboarding_state')
       .select('current_step')
       .eq('workspace_id', ws.id)
       .maybeSingle()
 
-    if (!state) return NextResponse.json({ step: 1 })
+    if (stErr) {
+      console.error('[onboarding-step] onboarding_state lookup error', { workspace_id: ws.id, error: stErr.message })
+      return NextResponse.json({ step: 1 })
+    }
+    if (!state) {
+      console.log('[onboarding-step] onboarding_state not found — returning step 1', {
+        queried: { table: 'onboarding_state', workspace_id: ws.id },
+      })
+      return NextResponse.json({ step: 1 })
+    }
+    console.log('[onboarding-step] onboarding_state found', { workspace_id: ws.id, current_step: state.current_step })
 
-    const step = Number(state.current_step)
-    return NextResponse.json({
-      step: Number.isFinite(step) && step >= 1 && step <= 6 ? step : 1,
-    })
+    const raw = Number(state.current_step)
+    const step = Number.isFinite(raw) && raw >= 1 && raw <= 6 ? raw : 1
+    console.log('[onboarding-step] returning step', { step, raw_current_step: state.current_step })
+    return NextResponse.json({ step })
   } catch (err) {
     console.error('[onboarding-step] lookup failed', err)
     return NextResponse.json({ step: 1 })
