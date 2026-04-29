@@ -72,11 +72,22 @@ export default function OnboardingBankStep() {
       })
       if (!res.ok) {
         console.error('[onboarding] advance step 5 failed', res.status, await res.text().catch(() => ''))
+        setErrorMsg('Could not advance — please retry')
+        return
       }
     } catch (err) {
       console.error('[onboarding] advance step 5 errored', err)
+      setErrorMsg('Could not advance — please retry')
+      return
+    }
+    // Drop the middleware's cached onboarding step so the next request
+    // re-evaluates against the freshly-bumped DB value (otherwise the stale
+    // cookie keeps redirecting back into onboarding).
+    if (typeof document !== 'undefined') {
+      document.cookie = '__anvx_onb=; path=/; max-age=0'
     }
     router.push('/dashboard')
+    router.refresh()
   }
 
   const handleFile = async (file: File) => {
