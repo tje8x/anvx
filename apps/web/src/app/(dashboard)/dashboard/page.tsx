@@ -2,14 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
+import dynamic from 'next/dynamic'
 import SectionTitle from '@/components/anvx/section-title'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
-import IncomeStatement from '@/components/dashboard/income-statement'
-import CashRunway from '@/components/dashboard/cash-runway'
-import TreasuryInsights from '@/components/dashboard/treasury-insights'
 import EmptyState from '@/components/empty-state'
 import { cachedFetch, getCached } from '@/lib/api-cache'
 import { SkeletonChart, SkeletonMetricCardRow } from '@/components/anvx/skeleton'
+
+// Below-the-fold sections — defer to keep first paint snappy. They render their
+// own skeletons while loading, so the user sees the dashboard shell instantly.
+const IncomeStatement = dynamic(() => import('@/components/dashboard/income-statement'), {
+  ssr: false,
+  loading: () => <SkeletonChart height={240} />,
+})
+const CashRunway = dynamic(() => import('@/components/dashboard/cash-runway'), {
+  ssr: false,
+  loading: () => <SkeletonChart height={280} />,
+})
+const TreasuryInsights = dynamic(() => import('@/components/dashboard/treasury-insights'), {
+  ssr: false,
+  loading: () => null,
+})
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 

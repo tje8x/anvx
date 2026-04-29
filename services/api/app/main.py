@@ -175,5 +175,6 @@ app.include_router(onboarding_router.router, prefix="/api/v2")
 
 
 @app.get("/health")
+@app.get("/healthz")
 async def health():
     return {"ok": True}

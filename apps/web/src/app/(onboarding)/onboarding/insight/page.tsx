@@ -8,7 +8,15 @@ import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
-type Connector = { id: string; provider: string; label: string }
+type Connector = {
+  id: string
+  provider: string
+  label: string
+  last_sync_at?: string | null
+  last_used_at?: string | null
+}
+
+const SYNC_FRESHNESS_MS = 60 * 60 * 1000 // 1h — skip sync if fresher than this
 
 type Insight = {
   provider: string
@@ -56,8 +64,17 @@ export default function OnboardingInsightStep() {
           return
         }
 
-        // Fire syncs in parallel; ignore individual failures.
-        await Promise.all(llmConns.map(async (c) => {
+        // Fire syncs in parallel — but only for connectors whose data is stale
+        // (no last_sync_at, or older than SYNC_FRESHNESS_MS). Avoids hammering
+        // Railway on every onboarding step revisit.
+        const now = Date.now()
+        const stale = llmConns.filter((c) => {
+          const ref = c.last_sync_at ?? c.last_used_at
+          if (!ref) return true
+          const t = Date.parse(ref)
+          return Number.isFinite(t) ? now - t > SYNC_FRESHNESS_MS : true
+        })
+        await Promise.all(stale.map(async (c) => {
           try {
             await fetch(`${API_BASE}/api/v2/connectors/${c.id}/sync`, { method: 'POST', headers: h })
           } catch { /* ignore */ }

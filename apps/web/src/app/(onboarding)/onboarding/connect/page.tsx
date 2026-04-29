@@ -77,13 +77,54 @@ const ADDITIONAL_BY_CATEGORY: { label: string; providers: ProviderTile[] }[] = [
   ]},
 ]
 
-type ProviderKeyRow = { id: string; provider: string; label: string; created_at: string; last_used_at: string | null }
+type KeyMetadata = { tier?: string; capabilities?: string[]; warnings?: string[] }
+
+type ProviderKeyRow = {
+  id: string
+  provider: string
+  label: string
+  created_at: string
+  last_used_at: string | null
+  key_metadata?: KeyMetadata | null
+}
+
+type LastConnect = { provider: string; metadata?: KeyMetadata | null } | null
+
+const TIER_AMBER_SET = new Set([
+  'restricted_limited',
+  'iam_no_billing',
+  'sa_no_billing',
+  'drift_limited',
+])
+
+const TIER_GREEN_SET = new Set(['admin', 'iam_with_billing', 'sa_with_billing', 'restricted_full'])
+
+const TIER_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  standard: 'Standard',
+  restricted_full: 'Restricted (full)',
+  restricted_limited: 'Restricted (limited)',
+  iam_with_billing: 'Full',
+  iam_no_billing: 'No billing access',
+  sa_with_billing: 'Full',
+  sa_no_billing: 'No billing access',
+  drift_limited: 'Permissions drift',
+}
+
+const UPGRADE_HINTS: Record<string, string> = {
+  anthropic: 'Create an admin key at console.anthropic.com/settings/admin-keys',
+  openai: 'Create an admin key at platform.openai.com/settings/organization/admin-keys',
+  stripe: 'Increase scope at dashboard.stripe.com/apikeys',
+  aws: 'Add ce:GetCostAndUsage permission to the IAM policy',
+  gcp: 'Grant the BigQuery Data Viewer role on your billing dataset',
+}
 
 export default function OnboardingConnectStep() {
   const router = useRouter()
   const { getToken } = useAuth()
 
   const [keysByProvider, setKeysByProvider] = useState<Record<string, ProviderKeyRow[]>>({})
+  const [lastConnect, setLastConnect] = useState<LastConnect>(null)
   const [open, setOpen] = useState<ProviderTile | null>(null)
   const [modalMode, setModalMode] = useState<'list' | 'form'>('form')
   const [apiKey, setApiKey] = useState('')
@@ -161,9 +202,11 @@ export default function OnboardingConnectStep() {
         }
         return
       }
+      const created = await res.json().catch(() => ({}))
       toast.success(`Connected ${open.display} ✓`)
       capture('connector_connected', { provider: open.id })
       setApiKey(''); setLabel('production')
+      setLastConnect({ provider: open.id, metadata: created?.key_metadata ?? null })
       const hadKeys = (keysByProvider[open.id]?.length ?? 0) > 0
       await refreshConnections()
       // After adding, return to the list view so the user can see/manage all keys.
@@ -305,12 +348,19 @@ export default function OnboardingConnectStep() {
         <DialogContent>
           <DialogHeader><DialogTitle>{modalTitle}</DialogTitle></DialogHeader>
 
+          {lastConnect && open && lastConnect.provider === open.id && lastConnect.metadata && (
+            <ConnectTierBanner provider={open.id} metadata={lastConnect.metadata} />
+          )}
+
           {modalMode === 'list' ? (
             <div className="flex flex-col gap-2 py-2">
               {existingKeysForOpen.map((k) => (
                 <div key={k.id} className="flex items-center justify-between border border-anvx-bdr rounded-sm px-3 py-2">
-                  <div>
-                    <p className="text-[11px] font-bold font-ui text-anvx-text">{k.label}</p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[11px] font-bold font-ui text-anvx-text">{k.label}</p>
+                      <InlineTierPill metadata={k.key_metadata ?? null} />
+                    </div>
                     <p className="text-[10px] font-data text-anvx-text-dim">
                       Added {new Date(k.created_at).toLocaleDateString()}
                       {k.last_used_at ? ` · last used ${new Date(k.last_used_at).toLocaleDateString()}` : ''}
@@ -421,5 +471,51 @@ function ProviderTileCard({
         ) : (provider.oauth ? 'OAuth — soon' : 'API key')}
       </span>
     </button>
+  )
+}
+
+function tierPillClass(tier?: string): string {
+  if (!tier) return 'bg-anvx-bg text-anvx-text-dim border-anvx-bdr'
+  if (TIER_GREEN_SET.has(tier)) return 'bg-anvx-acc-light text-anvx-acc border-anvx-acc'
+  if (TIER_AMBER_SET.has(tier)) return 'bg-anvx-warn-light text-anvx-warn border-anvx-warn'
+  return 'bg-anvx-bg text-anvx-text-dim border-anvx-bdr'
+}
+
+function InlineTierPill({ metadata }: { metadata: KeyMetadata | null }) {
+  if (!metadata?.tier) return null
+  const label = TIER_LABELS[metadata.tier] ?? metadata.tier
+  const isAmber = TIER_AMBER_SET.has(metadata.tier)
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm border text-[9px] font-bold uppercase tracking-wider ${tierPillClass(metadata.tier)}`}>
+      {isAmber && <span aria-hidden>⚠</span>}
+      {label}
+    </span>
+  )
+}
+
+function ConnectTierBanner({ provider, metadata }: { provider: string; metadata: KeyMetadata }) {
+  const tier = metadata.tier ?? 'standard'
+  const isAmber = TIER_AMBER_SET.has(tier)
+  const upgrade = UPGRADE_HINTS[provider]
+  const containerClass = isAmber
+    ? 'border-anvx-warn bg-anvx-warn-light/40'
+    : 'border-anvx-acc bg-anvx-acc-light/40'
+  return (
+    <div className={`border rounded-sm p-3 mb-2 ${containerClass}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <InlineTierPill metadata={metadata} />
+        <span className="text-[11px] font-bold uppercase tracking-wider font-ui text-anvx-text">
+          Connected
+        </span>
+      </div>
+      {(metadata.warnings ?? []).map((w, i) => (
+        <p key={i} className="text-[11px] font-data text-anvx-text leading-snug">{w}</p>
+      ))}
+      {isAmber && upgrade && (
+        <p className="text-[11px] font-data text-anvx-warn mt-1 leading-snug">
+          {upgrade}
+        </p>
+      )}
+    </div>
   )
 }

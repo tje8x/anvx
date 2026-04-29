@@ -69,3 +69,9 @@ REGISTRY = {
     "notion": NotionConnector(),
     "supabase": SupabaseBillingConnector(),
 }
+
+# Capability-aware validation lives in validation.py; imported last so that
+# its `from . import REGISTRY` lookups inside the per-provider validators
+# resolve cleanly (the dispatcher is only invoked at call time, but importing
+# after REGISTRY is constructed avoids any partial-init edge case).
+from .validation import validate_key, ValidationResult  # noqa: E402,F401

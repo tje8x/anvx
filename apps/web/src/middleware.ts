@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/webhooks/(.*)',
   '/api/internal/(.*)',
+  '/api/cron/(.*)',
 ])
 
 // Legacy paths kept routable as 308 permanent redirects so external bookmarks
@@ -91,7 +92,11 @@ export default clerkMiddleware(async (auth, req) => {
   //    Must be the first check so signature verification on webhook payloads
   //    is never disturbed and the internal onboarding lookup can recurse
   //    without being intercepted by the auth/onboarding gates below.
-  if (pathname.startsWith('/api/webhooks/') || pathname.startsWith('/api/internal/')) {
+  if (
+    pathname.startsWith('/api/webhooks/') ||
+    pathname.startsWith('/api/internal/') ||
+    pathname.startsWith('/api/cron/')
+  ) {
     return NextResponse.next()
   }
 

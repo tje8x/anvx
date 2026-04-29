@@ -1,14 +1,39 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import httpx
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from anvx_core import crypto
-from anvx_core.connectors import REGISTRY
+from anvx_core.connectors import REGISTRY, validate_key
 
 from ..auth import WorkspaceContext, require_role
 from ..db import sb_service
+
+_log = structlog.get_logger("anvx.connectors")
+
+
+_HTTP_STATUS_HINT = {
+    401: "insufficient permissions — admin key required",
+    403: "forbidden — check key scopes",
+    404: "endpoint not found — provider may have changed",
+    429: "rate limited — try again later",
+    500: "provider returned 500",
+    502: "provider unreachable",
+    503: "provider unavailable",
+}
+
+
+def _short_sync_error(status: int, body: str | None = None) -> str:
+    hint = _HTTP_STATUS_HINT.get(status)
+    if hint:
+        return f"{status}: {hint}"
+    if body:
+        snippet = body.strip().splitlines()[0][:120]
+        return f"{status}: {snippet}"
+    return f"{status}: sync failed"
 
 router = APIRouter()
 
@@ -141,11 +166,17 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
         }).execute()
 
     else:
-        # api_key path (existing behavior)
-        try:
-            await connector.validate(body.api_key)
-        except Exception as e:
-            raise HTTPException(400, f"Validation failed: {e}")
+        # api_key path with capability-aware validation.
+        validation = await validate_key(body.provider, body.api_key)
+        if not validation.get("valid"):
+            raise HTTPException(400, validation.get("error") or "Validation failed")
+
+        key_metadata = {
+            "tier": validation.get("tier", "standard"),
+            "capabilities": validation.get("capabilities", []),
+        }
+        if validation.get("warnings"):
+            key_metadata["warnings"] = validation["warnings"]
 
         envelope = crypto.encrypt(body.api_key, UUID(ctx.workspace_id))
         result = sb.from_("provider_keys").insert({
@@ -153,6 +184,7 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
             "provider": body.provider,
             "label": body.label,
             "envelope": envelope,
+            "key_metadata": key_metadata,
             "created_by": ctx.user_id,
         }).execute()
 
@@ -160,13 +192,26 @@ async def create_connector(body: ConnectBody, ctx: WorkspaceContext = Depends(re
 
     _audit(sb, ctx.workspace_id, ctx.user_id, "credential:create", "provider_key", row["id"], {"provider": body.provider, "label": body.label, "kind": kind})
 
-    return {"id": row["id"], "provider": row.get("provider", body.provider), "label": row.get("label", body.label), "created_at": row["created_at"]}
+    return {
+        "id": row["id"],
+        "provider": row.get("provider", body.provider),
+        "label": row.get("label", body.label),
+        "created_at": row["created_at"],
+        "key_metadata": row.get("key_metadata", {}),
+    }
 
 
 @router.get("/connectors")
 async def list_connectors(ctx: WorkspaceContext = Depends(require_role("member"))):
     sb = sb_service()
-    result = sb.from_("provider_keys").select("id, provider, label, last_used_at, created_at").eq("workspace_id", ctx.workspace_id).is_("deleted_at", "null").order("created_at", desc=True).execute()
+    result = (
+        sb.from_("provider_keys")
+        .select("id, provider, label, last_used_at, last_sync_at, last_sync_error, key_metadata, created_at")
+        .eq("workspace_id", ctx.workspace_id)
+        .is_("deleted_at", "null")
+        .order("created_at", desc=True)
+        .execute()
+    )
     return result.data
 
 
@@ -209,13 +254,24 @@ async def delete_connector(key_id: str, ctx: WorkspaceContext = Depends(require_
 @router.post("/connectors/{key_id}/sync")
 async def sync_connector(key_id: str, ctx: WorkspaceContext = Depends(require_role("admin"))):
     sb = sb_service()
-    lookup = sb.from_("provider_keys").select("id, provider, envelope").eq("id", key_id).eq("workspace_id", ctx.workspace_id).is_("deleted_at", "null").single().execute()
+    lookup = (
+        sb.from_("provider_keys")
+        .select("id, provider, envelope, key_metadata")
+        .eq("id", key_id)
+        .eq("workspace_id", ctx.workspace_id)
+        .is_("deleted_at", "null")
+        .single()
+        .execute()
+    )
 
     if not lookup.data:
         raise HTTPException(404, "Provider key not found")
 
     provider = lookup.data["provider"]
     envelope = lookup.data["envelope"]
+    key_metadata = lookup.data.get("key_metadata") or {}
+    capabilities = set(key_metadata.get("capabilities") or [])
+    tier = key_metadata.get("tier", "standard")
 
     connector = REGISTRY.get(provider)
     if not connector:
@@ -229,19 +285,80 @@ async def sync_connector(key_id: str, ctx: WorkspaceContext = Depends(require_ro
     # Detect connector type: revenue (Stripe) vs usage (OpenAI, etc.)
     is_revenue = hasattr(connector, "fetch_transactions")
 
-    if is_revenue:
-        records = await connector.fetch_transactions(api_key, since, now)
-        if records:
-            rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
-            sb.from_("transactions").upsert(rows, on_conflict="workspace_id,provider,ts,amount_cents,counterparty").execute()
-    else:
-        records = await connector.fetch_usage(api_key, since, now)
-        if records:
-            rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
-            sb.from_("usage_records").upsert(rows, on_conflict="workspace_id,provider,ts,model").execute()
+    # Capability gate — short-circuit before calling endpoints that would 401/403.
+    needed = "transactions" if is_revenue else "historical_usage"
+    if needed not in capabilities:
+        _log.info(
+            "connector_sync_skipped_no_capability",
+            provider=provider,
+            tier=tier,
+            needed=needed,
+            workspace_id=ctx.workspace_id,
+            key_id=key_id,
+        )
+        sb.from_("provider_keys").update({"last_sync_at": now.isoformat()}).eq("id", key_id).execute()
+        return {
+            "ok": True,
+            "tier": tier,
+            "records_synced": 0,
+            "note": (
+                f"Key tier '{tier}' lacks '{needed}' capability — skipped sync. "
+                f"Connect a higher-tier key to enable historical pulls."
+            ),
+        }
 
-    sb.from_("provider_keys").update({"last_used_at": now.isoformat()}).eq("id", key_id).execute()
+    try:
+        if is_revenue:
+            records = await connector.fetch_transactions(api_key, since, now)
+            if records:
+                rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
+                sb.from_("transactions").upsert(rows, on_conflict="workspace_id,provider,ts,amount_cents,counterparty").execute()
+        else:
+            records = await connector.fetch_usage(api_key, since, now)
+            if records:
+                rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
+                sb.from_("usage_records").upsert(rows, on_conflict="workspace_id,provider,ts,model").execute()
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 0
+        body_text = exc.response.text if exc.response is not None else None
+        msg = _short_sync_error(status_code, body_text)
+        _log.warning(
+            "connector_sync_http_error",
+            provider=provider,
+            status_code=status_code,
+            key_id=key_id,
+            workspace_id=ctx.workspace_id,
+            error=msg,
+        )
+
+        update_payload: dict = {
+            "last_sync_error": msg,
+            "last_sync_at": now.isoformat(),
+        }
+        # If permissions changed since connect (401/403), reflect the drift in
+        # key_metadata so the dashboard surfaces "tier downgraded".
+        if status_code in (401, 403):
+            stripped_caps = [c for c in capabilities if c not in {"historical_usage", "transactions", "billing_data"}]
+            updated_meta = dict(key_metadata)
+            updated_meta["tier"] = "drift_limited"
+            updated_meta["capabilities"] = stripped_caps
+            warnings = list(updated_meta.get("warnings") or [])
+            warnings.append(f"Key returned {status_code} on {needed} read — permissions may have changed.")
+            updated_meta["warnings"] = warnings
+            update_payload["key_metadata"] = updated_meta
+
+        sb.from_("provider_keys").update(update_payload).eq("id", key_id).execute()
+        _audit(sb, ctx.workspace_id, ctx.user_id, "credential:sync_failed", "provider_key", key_id, {
+            "provider": provider, "status_code": status_code, "error": msg,
+        })
+        return {"ok": False, "error": msg, "status": status_code, "tier": tier, "records_synced": 0}
+
+    sb.from_("provider_keys").update({
+        "last_used_at": now.isoformat(),
+        "last_sync_at": now.isoformat(),
+        "last_sync_error": None,
+    }).eq("id", key_id).execute()
 
     _audit(sb, ctx.workspace_id, ctx.user_id, "credential:sync", "provider_key", key_id, {"provider": provider, "records_synced": len(records)})
 
-    return {"ok": True, "records_synced": len(records)}
+    return {"ok": True, "tier": tier, "records_synced": len(records)}

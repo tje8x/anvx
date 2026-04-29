@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/warm-railway",
+      "schedule": "*/4 13-23 * * 1-5"
+    }
+  ]
+}

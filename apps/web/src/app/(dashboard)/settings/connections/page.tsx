@@ -13,12 +13,97 @@ import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
+type KeyMetadata = {
+  tier?: string
+  capabilities?: string[]
+  warnings?: string[]
+}
+
 type ProviderKey = {
   id: string
   provider: string
   label: string
   last_used_at: string | null
+  last_sync_at?: string | null
+  last_sync_error?: string | null
+  key_metadata?: KeyMetadata | null
   created_at: string
+}
+
+const TIER_GREEN = new Set(['admin', 'iam_with_billing', 'sa_with_billing', 'restricted_full'])
+const TIER_GRAY = new Set(['standard'])
+const TIER_AMBER = new Set([
+  'restricted_limited',
+  'iam_no_billing',
+  'sa_no_billing',
+  'drift_limited',
+])
+
+const TIER_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  standard: 'Standard',
+  restricted_full: 'Restricted (full)',
+  restricted_limited: 'Restricted (limited)',
+  iam_with_billing: 'Full',
+  iam_no_billing: 'No billing access',
+  sa_with_billing: 'Full',
+  sa_no_billing: 'No billing access',
+  drift_limited: 'Permissions drift',
+}
+
+const UPGRADE_HINTS: Record<string, string> = {
+  anthropic: 'Create an admin key at console.anthropic.com/settings/admin-keys',
+  openai: 'Create an admin key at platform.openai.com/settings/organization/admin-keys',
+  stripe: 'Increase scope at dashboard.stripe.com/apikeys',
+  aws: 'Add ce:GetCostAndUsage permission to the IAM policy',
+  gcp: 'Grant the BigQuery Data Viewer role on your billing dataset',
+}
+
+function tierColor(tier?: string): 'green' | 'gray' | 'amber' {
+  if (!tier) return 'gray'
+  if (TIER_GREEN.has(tier)) return 'green'
+  if (TIER_AMBER.has(tier)) return 'amber'
+  if (TIER_GRAY.has(tier)) return 'gray'
+  return 'gray'
+}
+
+function TierBadge({ provider, meta }: { provider: string; meta?: KeyMetadata | null }) {
+  const tier = meta?.tier
+  if (!tier) return null
+  const color = tierColor(tier)
+  const label = TIER_LABELS[tier] ?? tier
+  const cls =
+    color === 'green'
+      ? 'bg-anvx-acc-light text-anvx-acc border-anvx-acc'
+      : color === 'amber'
+        ? 'bg-anvx-warn-light text-anvx-warn border-anvx-warn'
+        : 'bg-anvx-bg text-anvx-text-dim border-anvx-bdr'
+  const isLimited = color === 'amber'
+  const upgradeHint = UPGRADE_HINTS[provider]
+  const tooltipParts: string[] = []
+  if (isLimited && upgradeHint) tooltipParts.push(upgradeHint)
+  for (const w of meta?.warnings ?? []) tooltipParts.push(w)
+  const tooltip = tooltipParts.join(' · ')
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm border text-[9px] font-bold uppercase tracking-wider ${cls}`}>
+        {isLimited && <span aria-hidden>⚠</span>}
+        {label}
+      </span>
+      {tooltip && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span aria-label="More info" className="inline-flex w-4 h-4 items-center justify-center rounded-full border border-anvx-bdr text-[9px] text-anvx-text-dim cursor-help">
+                i
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </span>
+  )
 }
 
 type WorkspaceMe = { role: 'owner' | 'admin' | 'member' }
@@ -229,6 +314,7 @@ export default function ConnectorsPage() {
             <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
               <th className="py-1.5 pr-4">Provider</th>
               <th className="py-1.5 pr-4">Type</th>
+              <th className="py-1.5 pr-4">Tier</th>
               <th className="py-1.5 pr-4">Label</th>
               <th className="py-1.5 pr-4">Last used</th>
               <th className="py-1.5 pr-4">Created</th>
@@ -240,6 +326,7 @@ export default function ConnectorsPage() {
               <tr key={k.id} className="border-b border-anvx-bdr/50">
                 <td className="py-2 pr-4 font-data text-anvx-text">{k.provider}</td>
                 <td className="py-2 pr-4"><KindBadge provider={k.provider} /></td>
+                <td className="py-2 pr-4"><TierBadge provider={k.provider} meta={k.key_metadata} /></td>
                 <td className="py-2 pr-4 text-anvx-text">{k.label}</td>
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : '—'}</td>
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(k.created_at).toLocaleDateString()}</td>
