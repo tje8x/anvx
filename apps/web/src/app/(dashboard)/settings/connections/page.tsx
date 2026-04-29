@@ -1,15 +1,31 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { toast } from 'sonner'
+import { ChevronDown } from 'lucide-react'
 import SectionTitle from '@/components/anvx/section-title'
 import MacButton from '@/components/anvx/mac-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { capture } from '@/lib/analytics/posthog-client'
+import {
+  PROVIDER_CATALOG,
+  PROVIDER_CATEGORIES,
+  getProvider,
+  providerInitials,
+  type ProviderEntry,
+} from '@/lib/provider-catalog'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
@@ -108,16 +124,6 @@ function TierBadge({ provider, meta }: { provider: string; meta?: KeyMetadata | 
 
 type WorkspaceMe = { role: 'owner' | 'admin' | 'member' }
 
-const PROVIDER_GROUPS: { label: string; items: { value: string; display: string }[] }[] = [
-  { label: 'LLM Providers', items: [{ value: 'openai', display: 'OpenAI' }, { value: 'anthropic', display: 'Anthropic' }, { value: 'google_ai', display: 'Google AI' }, { value: 'cohere', display: 'Cohere' }, { value: 'replicate', display: 'Replicate' }, { value: 'together', display: 'Together' }, { value: 'fireworks', display: 'Fireworks' }] },
-  { label: 'Cloud', items: [{ value: 'aws', display: 'AWS' }, { value: 'gcp', display: 'Google Cloud' }, { value: 'vercel', display: 'Vercel' }, { value: 'cloudflare', display: 'Cloudflare' }] },
-  { label: 'Payments', items: [{ value: 'stripe', display: 'Stripe' }] },
-  { label: 'Observability', items: [{ value: 'datadog', display: 'Datadog' }, { value: 'langsmith', display: 'LangSmith' }] },
-  { label: 'Utility', items: [{ value: 'twilio', display: 'Twilio' }, { value: 'sendgrid', display: 'SendGrid' }, { value: 'pinecone', display: 'Pinecone' }, { value: 'tavily', display: 'Tavily' }] },
-  { label: 'AI Dev Tools', items: [{ value: 'cursor', display: 'Cursor' }, { value: 'github_copilot', display: 'GitHub Copilot' }, { value: 'replit', display: 'Replit' }, { value: 'lovable', display: 'Lovable' }, { value: 'v0', display: 'v0' }, { value: 'bolt', display: 'Bolt' }] },
-  { label: 'Crypto', items: [{ value: 'ethereum_wallet', display: 'Ethereum Wallet' }, { value: 'solana_wallet', display: 'Solana Wallet' }, { value: 'base_wallet', display: 'Base Wallet' }, { value: 'coinbase', display: 'Coinbase' }, { value: 'binance', display: 'Binance' }] },
-]
-
 const KIND_BADGES: Record<string, { label: string; className: string }> = {
   api_key: { label: 'API', className: 'bg-anvx-acc-light text-anvx-acc' },
   csv_source: { label: 'CSV', className: 'bg-anvx-warn-light text-anvx-warn' },
@@ -159,6 +165,165 @@ function AdminGate({ role, children }: { role: string; children: React.ReactNode
     )
   }
   return <>{children}</>
+}
+
+function ProviderInitialsBadge({ entry }: { entry: ProviderEntry }) {
+  return (
+    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-anvx-bdr bg-anvx-bg text-[9px] font-bold tracking-wider text-anvx-text-dim">
+      {providerInitials(entry)}
+    </span>
+  )
+}
+
+function ProviderCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const selected = useMemo(() => getProvider(value), [value])
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e: MouseEvent) => {
+      if (!containerRef.current) return
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const grouped = useMemo(() => {
+    return PROVIDER_CATEGORIES.map((cat) => ({
+      category: cat,
+      items: PROVIDER_CATALOG.filter((p) => p.category === cat),
+    })).filter((g) => g.items.length > 0)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-anvx-bdr bg-anvx-win px-3 py-2 text-[12px] font-ui text-anvx-text shadow-sm focus:outline-none focus:ring-1 focus:ring-anvx-acc"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {selected ? (
+          <span className="flex items-center gap-2 min-w-0">
+            <ProviderInitialsBadge entry={selected} />
+            <span className="truncate">{selected.display}</span>
+            <KindBadge provider={selected.id} />
+          </span>
+        ) : (
+          <span className="text-anvx-text-dim">Select provider</span>
+        )}
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 shadow-md">
+          <Command
+            shouldFilter={true}
+            filter={(itemValue, search) => {
+              const q = search.trim().toLowerCase()
+              if (!q) return 1
+              return itemValue.toLowerCase().includes(q) ? 1 : 0
+            }}
+          >
+            <CommandInput
+              placeholder="Search providers (try gpt, claude, stripe…)"
+              value={query}
+              onValueChange={setQuery}
+              autoFocus
+            />
+            <CommandList>
+              <CommandEmpty>No providers match.</CommandEmpty>
+              {grouped.map((group) => (
+                <CommandGroup key={group.category} heading={group.category}>
+                  {group.items.map((p) => {
+                    // cmdk filters on `value`. Build a haystack from id + display + aliases + category.
+                    const haystack = [p.id, p.display, p.category, ...p.aliases].join(' ')
+                    return (
+                      <CommandItem
+                        key={p.id}
+                        value={haystack}
+                        disabled={p.comingSoon}
+                        onSelect={() => {
+                          if (p.comingSoon) return
+                          onChange(p.id)
+                          setQuery('')
+                          setOpen(false)
+                        }}
+                      >
+                        <ProviderInitialsBadge entry={p} />
+                        <span className="flex-1 truncate">{p.display}</span>
+                        {p.comingSoon ? (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-anvx-text-dim">
+                            Coming soon
+                          </span>
+                        ) : (
+                          <KindBadge provider={p.id} />
+                        )}
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProviderHelperText({ providerId }: { providerId: string }) {
+  const entry = getProvider(providerId)
+  if (!entry) return null
+  if (entry.keyUrl) {
+    // Render helper with the URL hyperlinked. We split on the keyUrl host to keep
+    // the link inline with the helper sentence.
+    const host = entry.keyUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    if (entry.helper.includes(host)) {
+      const [before, after] = entry.helper.split(host)
+      return (
+        <p className="text-[11px] font-ui text-anvx-text-dim leading-relaxed">
+          {before}
+          <a
+            href={entry.keyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-anvx-acc underline hover:opacity-80"
+          >
+            {host}
+          </a>
+          {after}
+        </p>
+      )
+    }
+    return (
+      <p className="text-[11px] font-ui text-anvx-text-dim leading-relaxed">
+        {entry.helper}{' '}
+        <a
+          href={entry.keyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-anvx-acc underline hover:opacity-80"
+        >
+          Open settings ↗
+        </a>
+      </p>
+    )
+  }
+  return (
+    <p className="text-[11px] font-ui text-anvx-text-dim leading-relaxed">{entry.helper}</p>
+  )
 }
 
 export default function ConnectorsPage() {
@@ -350,21 +515,10 @@ export default function ConnectorsPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Connect provider</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3 py-2">
-            <Select value={connectProvider} onValueChange={(v) => { setConnectProvider(v); setConnectError('') }}>
-              <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-              <SelectContent>
-                {PROVIDER_GROUPS.map((group) => (
-                  <SelectGroup key={group.label}>
-                    <SelectLabel className="text-[10px] uppercase tracking-wider text-anvx-text-dim">{group.label}</SelectLabel>
-                    {group.items.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        <span className="flex items-center gap-2">{item.display} <KindBadge provider={item.value} /></span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProviderCombobox
+              value={connectProvider}
+              onChange={(v) => { setConnectProvider(v); setConnectError('') }}
+            />
 
             <Input placeholder="Label (e.g. production)" value={connectLabel} onChange={(e) => setConnectLabel(e.target.value)} maxLength={64} />
 
@@ -404,6 +558,8 @@ export default function ConnectorsPage() {
                 </div>
               </>
             )}
+
+            <ProviderHelperText providerId={connectProvider} />
 
             {connectError && <p className="text-[11px] text-anvx-danger">{connectError}</p>}
           </div>

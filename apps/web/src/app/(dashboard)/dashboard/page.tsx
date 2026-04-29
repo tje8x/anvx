@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import dynamic from 'next/dynamic'
 import SectionTitle from '@/components/anvx/section-title'
+import MacButton from '@/components/anvx/mac-button'
 import Waterfall, { WaterfallStage } from '@/components/dashboard/waterfall'
 import EmptyState from '@/components/empty-state'
 import { cachedFetch, getCached } from '@/lib/api-cache'
@@ -30,6 +31,16 @@ const STRUCTURAL_LABELS = new Set(['Revenue', 'Gross Profit', 'EBITDA', 'Tax', '
 
 type Metrics = {
   anvx_savings_realized_cents: number
+}
+
+type ConnectorRow = {
+  id: string
+  provider: string
+  label: string
+  last_sync_at: string | null
+  last_used_at: string | null
+  last_sync_error: string | null
+  key_metadata: { tier?: string; capabilities?: string[]; warnings?: string[] } | null
 }
 
 type WaterfallResponse = {
@@ -146,10 +157,52 @@ export default function DashboardPage() {
   const [isRefetching, setIsRefetching] = useState(false)
   const fetchSeq = useRef(0) // guards against out-of-order responses
 
+  const connectorsUrl = `${API_BASE}/api/v2/connectors`
+  const [connectors, setConnectors] = useState<ConnectorRow[] | null>(() => getCached<ConnectorRow[]>(connectorsUrl))
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+
   const authHeaders = useCallback(async () => {
     const token = await getToken()
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }, [getToken])
+
+  // Connector list — drives the empty-state decision and the sync banner.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const h = await authHeaders()
+        const list = await cachedFetch<ConnectorRow[]>(connectorsUrl, { headers: h }, 60_000)
+        if (!cancelled) setConnectors(list)
+      } catch {
+        if (!cancelled) setConnectors((prev) => prev ?? [])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [authHeaders, connectorsUrl])
+
+  const refreshConnectors = useCallback(async () => {
+    try {
+      const h = await authHeaders()
+      const res = await fetch(connectorsUrl, { headers: h, cache: 'no-store' })
+      if (res.ok) {
+        const list: ConnectorRow[] = await res.json()
+        setConnectors(list)
+      }
+    } catch { /* ignore */ }
+  }, [authHeaders, connectorsUrl])
+
+  const syncConnector = useCallback(async (id: string) => {
+    setSyncingId(id)
+    try {
+      const h = await authHeaders()
+      await fetch(`${API_BASE}/api/v2/connectors/${id}/sync`, { method: 'POST', headers: h })
+    } catch { /* ignore */ }
+    finally {
+      setSyncingId(null)
+      await refreshConnectors()
+    }
+  }, [authHeaders, refreshConnectors])
 
   // ANVX Savings: always MTD.
   useEffect(() => {
@@ -207,13 +260,15 @@ export default function DashboardPage() {
     ? Math.round((cur.netIncome / cur.revenue) * 1000) / 10
     : null
 
-  const isBrandNew = cur !== null && cur.revenue === 0 && cur.totalSpend === 0
-  const initialLoading = waterfall === null
+  const initialLoading = waterfall === null || connectors === null
+  const hasConnectors = (connectors?.length ?? 0) > 0
+  const dataIsEmpty = cur !== null && cur.revenue === 0 && cur.totalSpend === 0
 
   // Visual loading hint that does NOT unmount content
   const fadeClass = isRefetching && !initialLoading ? 'opacity-60 transition-opacity' : 'opacity-100 transition-opacity'
 
-  if (!initialLoading && isBrandNew) {
+  // True empty: zero providers connected → onboarding CTA.
+  if (!initialLoading && !hasConnectors) {
     return (
       <EmptyState
         title="Connect your first provider to see your financial picture."
@@ -234,6 +289,27 @@ export default function DashboardPage() {
         />
       )}
 
+      {/* Connector banner — visible whenever connectors exist. */}
+      {hasConnectors && connectors && (
+        <ConnectorBanner
+          connectors={connectors}
+          syncingId={syncingId}
+          onSync={syncConnector}
+        />
+      )}
+
+      {/* Awaiting-data hint — connectors exist but no flows yet. */}
+      {!initialLoading && hasConnectors && dataIsEmpty && (
+        <AwaitingDataNotice
+          connectors={connectors ?? []}
+          syncingId={syncingId}
+          onSyncAll={async () => {
+            for (const c of connectors ?? []) {
+              await syncConnector(c.id)
+            }
+          }}
+        />
+      )}
 
       <section>
         <div className="flex items-center justify-between mb-2">
@@ -317,6 +393,154 @@ export default function DashboardPage() {
       </section>
 
       <TreasuryInsights endMonth={selectedMonth} />
+    </div>
+  )
+}
+
+// ─── Connector banner & awaiting-data notice ────────────────────
+
+const PROVIDER_DISPLAY: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google_ai: 'Google AI',
+  cohere: 'Cohere',
+  replicate: 'Replicate',
+  together: 'Together',
+  fireworks: 'Fireworks',
+  stripe: 'Stripe',
+  aws: 'AWS',
+  gcp: 'Google Cloud',
+  vercel: 'Vercel',
+  cloudflare: 'Cloudflare',
+  datadog: 'Datadog',
+  langsmith: 'LangSmith',
+  twilio: 'Twilio',
+  sendgrid: 'SendGrid',
+  pinecone: 'Pinecone',
+  tavily: 'Tavily',
+  cursor: 'Cursor',
+  github_copilot: 'GitHub Copilot',
+  replit: 'Replit',
+  lovable: 'Lovable',
+  v0: 'v0',
+  bolt: 'Bolt',
+  ethereum_wallet: 'Ethereum Wallet',
+  solana_wallet: 'Solana Wallet',
+  base_wallet: 'Base Wallet',
+  coinbase: 'Coinbase',
+  binance: 'Binance',
+}
+
+const TIER_DISPLAY: Record<string, string> = {
+  admin: 'Admin tier',
+  standard: 'Standard tier (live tracking only)',
+  restricted_full: 'Restricted (full)',
+  restricted_limited: 'Restricted (limited)',
+  iam_with_billing: 'Full access',
+  iam_no_billing: 'No billing access',
+  sa_with_billing: 'Full access',
+  sa_no_billing: 'No billing access',
+  drift_limited: 'Permissions drift',
+}
+
+function providerName(id: string): string {
+  return PROVIDER_DISPLAY[id] ?? id
+}
+
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return 'never'
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return 'never'
+  const seconds = Math.floor((Date.now() - then) / 1000)
+  if (seconds < 5) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+function ConnectorBanner({
+  connectors,
+  syncingId,
+  onSync,
+}: {
+  connectors: ConnectorRow[]
+  syncingId: string | null
+  onSync: (id: string) => void | Promise<void>
+}) {
+  return (
+    <div className="border border-anvx-bdr rounded-sm bg-anvx-win px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider font-ui text-anvx-text-dim mb-1.5">
+        Connected providers
+      </p>
+      <ul className="flex flex-col gap-1">
+        {connectors.map((c) => {
+          const tier = c.key_metadata?.tier
+          const tierLabel = tier ? TIER_DISPLAY[tier] ?? tier : null
+          const synced = formatRelativeTime(c.last_sync_at)
+          const isSyncing = syncingId === c.id
+          return (
+            <li
+              key={c.id}
+              className="flex items-center justify-between gap-3 text-[11px] font-data text-anvx-text"
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                <span className="font-semibold">{providerName(c.provider)}</span>
+                <span className="text-anvx-text-dim">— last synced {synced}</span>
+                {tierLabel && (
+                  <span className="text-anvx-text-dim">• {tierLabel}</span>
+                )}
+                {c.last_sync_error && (
+                  <span className="text-anvx-danger">• sync error</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onSync(c.id)}
+                disabled={isSyncing}
+                className="text-[10px] font-ui text-anvx-acc underline hover:opacity-80 disabled:text-anvx-text-dim disabled:no-underline disabled:cursor-not-allowed shrink-0"
+              >
+                {isSyncing ? 'Syncing…' : 'Sync now'}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function AwaitingDataNotice({
+  connectors,
+  syncingId,
+  onSyncAll,
+}: {
+  connectors: ConnectorRow[]
+  syncingId: string | null
+  onSyncAll: () => void | Promise<void>
+}) {
+  const anySyncing = syncingId !== null
+  const tierLimited = connectors.some((c) => {
+    const t = c.key_metadata?.tier
+    return t === 'standard' || t === 'iam_no_billing' || t === 'sa_no_billing' || t === 'restricted_limited' || t === 'drift_limited'
+  })
+  return (
+    <div className="border border-anvx-info bg-anvx-info-light rounded-sm px-3 py-2 flex items-center justify-between gap-3">
+      <div className="text-[11px] font-data text-anvx-info">
+        <p className="font-semibold">Provider connected — data will populate as transactions flow in.</p>
+        <p className="text-[10px] mt-0.5 opacity-90">
+          {tierLimited
+            ? 'Some keys are tier-limited and will only capture new activity going forward. Sync now to fetch any historical data available at your tier.'
+            : 'Sync now to backfill historical activity.'}
+        </p>
+      </div>
+      <MacButton variant="secondary" disabled={anySyncing} onClick={() => onSyncAll()}>
+        {anySyncing ? 'Syncing…' : 'Sync now'}
+      </MacButton>
     </div>
   )
 }
