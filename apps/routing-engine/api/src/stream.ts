@@ -89,11 +89,25 @@ export async function pipeAndTranslateStream(
   provider: Provider,
   modelHint: string,
   sink: StreamWriteSink,
-  opts?: { onChunkBytes?: (n: number) => void },
+  opts?: {
+    onChunkBytes?: (n: number) => void
+    /**
+     * When true (legacy behavior), the sink is closed in the function's finally
+     * block. When false (default), the caller owns sink lifecycle.
+     *
+     * Why this matters: Vercel's serverless runtime can kill the function once
+     * `res.end()` fires; any DB writes (meter rows, audit log) initiated after
+     * that point may be lost. Callers that need to persist state after the
+     * stream content is piped should pass `endOnFinish: false` and call
+     * `sink.end()` themselves AFTER the writes have awaited.
+     */
+    endOnFinish?: boolean
+  },
 ): Promise<StreamUsage> {
   const usage: StreamUsage = { prompt_tokens: 0, completion_tokens: 0, observed: false }
+  const endOnFinish = opts?.endOnFinish ?? false
   if (!upstream.body) {
-    sink.end()
+    if (endOnFinish) sink.end()
     return usage
   }
 
@@ -290,7 +304,12 @@ export async function pipeAndTranslateStream(
       }
     }
   } finally {
-    try { sink.end() } catch { /* sink already ended */ }
+    // Sink lifecycle is caller-owned by default — see `endOnFinish` doc above.
+    // The legacy auto-close path remains available for callers that don't need
+    // to persist anything after the stream content is fully piped.
+    if (endOnFinish) {
+      try { sink.end() } catch { /* sink already ended */ }
+    }
   }
 
   return usage

@@ -271,24 +271,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         flush: () => { /* node http auto-flushes on write */ },
       }
 
-      // If the client disconnects, abort upstream and write best-effort usage.
+      // If the client disconnects mid-stream, the connection is gone — there's
+      // no point trying to res.end() (it would no-op) and no point keeping the
+      // function alive on the response side. We still want the meter row, so
+      // we record clientAborted and let the success path write usage with the
+      // partial counts before bailing.
       let clientAborted = false
       req.on('close', () => {
         if (!res.writableEnded) clientAborted = true
       })
 
       let usage = { prompt_tokens: 0, completion_tokens: 0, observed: false }
+      let streamFailed = false
       try {
-        usage = await pipeAndTranslateStream(upstreamResp, routedProvider, routedRawModel, sink)
+        // endOnFinish: false — we own the sink lifecycle. The meter row MUST
+        // be written before res.end() because Vercel's serverless runtime can
+        // kill the function once res.end() fires; meter writes after that
+        // point may be lost.
+        usage = await pipeAndTranslateStream(upstreamResp, routedProvider, routedRawModel, sink, { endOnFinish: false })
       } catch (streamErr: any) {
-        // Best effort: try to close the sink cleanly so client-side parsers don't hang.
-        try { sink.end() } catch { /* ignore */ }
+        streamFailed = true
         console.error("ENG_STREAM_ERROR", { request_id, provider: routedProvider, error: streamErr?.message })
         await auditLog(workspaceId, 'upstream_error', request_id)
       } finally {
         cancelStreamTimeout(upstreamResp)
       }
 
+      // Order matters here:
+      //   1. pipe stream content (already done above)
+      //   2. await the meter write
+      //   3. THEN end the response
+      // Reversing 2 and 3 lets Vercel kill the function before the Supabase
+      // insert completes, which is the bug this refactor fixes.
       const totalLatencyMs = Date.now() - startedAt
       await bestEffortUsage({
         ...usageBase,
@@ -297,12 +311,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tokens_out: usage.completion_tokens,
         decision: dec.decision,
         observer_suggestion: dec.observer_suggestion,
-        reasoning: clientAborted ? 'Client aborted stream.' : dec.reasoning,
+        reasoning: clientAborted ? 'Client aborted stream.' : streamFailed ? 'Stream errored mid-flight.' : dec.reasoning,
         policy_triggered: dec.policy_triggered_id,
         upstream_latency_ms: upstreamLatencyMs,
         total_latency_ms: totalLatencyMs,
       })
-      console.log("ENG_6 stream_done", { request_id, provider: routedProvider, tokens_in: usage.prompt_tokens, tokens_out: usage.completion_tokens, observed: usage.observed, aborted: clientAborted })
+
+      console.log("ENG_6 stream_done", { request_id, provider: routedProvider, tokens_in: usage.prompt_tokens, tokens_out: usage.completion_tokens, observed: usage.observed, aborted: clientAborted, failed: streamFailed })
+
+      // Close the response only after the meter row is durable. If the client
+      // already disconnected, res.end() is a no-op and we just return. We
+      // always close the sink (even on error) so any client still listening
+      // sees a clean termination instead of a hung connection.
+      if (!clientAborted) {
+        try { sink.end() } catch { /* sink already ended */ }
+      }
       return
     }
 

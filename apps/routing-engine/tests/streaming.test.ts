@@ -100,7 +100,7 @@ describe('OpenAI streaming pass-through', () => {
     const upstream = makeSseResponse(chunks)
     const rec = makeRecorder()
 
-    const usage = await pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink)
+    const usage = await pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink, { endOnFinish: true })
 
     expect(usage).toEqual({ prompt_tokens: 12, completion_tokens: 4, observed: true })
     expect(rec.closed).toBe(true)
@@ -124,7 +124,7 @@ describe('OpenAI streaming pass-through', () => {
 
     const upstream = makeSseResponse([a1, a2, b1, b2])
     const rec = makeRecorder()
-    const usage = await pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink)
+    const usage = await pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink, { endOnFinish: true })
 
     expect(usage.observed).toBe(true)
     expect(usage.prompt_tokens).toBe(3)
@@ -149,7 +149,7 @@ describe('Anthropic streaming translation', () => {
     const upstream = makeSseResponse(chunks)
     const rec = makeRecorder()
 
-    const usage = await pipeAndTranslateStream(upstream, 'anthropic', 'claude-sonnet-4-5', rec.sink)
+    const usage = await pipeAndTranslateStream(upstream, 'anthropic', 'claude-sonnet-4-5', rec.sink, { endOnFinish: true })
 
     expect(usage).toEqual({ prompt_tokens: 42, completion_tokens: 7, observed: true })
     expect(rec.closed).toBe(true)
@@ -176,7 +176,7 @@ describe('Anthropic streaming translation', () => {
       'event: message_stop\ndata: {"type":"message_stop"}\n\n',
     ]
     const rec = makeRecorder()
-    const usage = await pipeAndTranslateStream(makeSseResponse(chunks), 'anthropic', 'claude-sonnet-4-5', rec.sink)
+    const usage = await pipeAndTranslateStream(makeSseResponse(chunks), 'anthropic', 'claude-sonnet-4-5', rec.sink, { endOnFinish: true })
     expect(usage.completion_tokens).toBe(99)
     expect(rec.chunks.join('')).toContain('"finish_reason":"length"')
   })
@@ -194,7 +194,7 @@ describe('Google streaming translation', () => {
     const upstream = makeSseResponse(chunks)
     const rec = makeRecorder()
 
-    const usage = await pipeAndTranslateStream(upstream, 'google', 'gemini-2.0-flash', rec.sink)
+    const usage = await pipeAndTranslateStream(upstream, 'google', 'gemini-2.0-flash', rec.sink, { endOnFinish: true })
 
     expect(usage.prompt_tokens).toBe(4)
     expect(usage.completion_tokens).toBe(2)
@@ -224,7 +224,7 @@ describe('stream error mid-flight', () => {
     let threw: unknown = null
     let usage: any
     try {
-      usage = await pipeAndTranslateStream(upstream, 'anthropic', 'claude-sonnet-4-5', rec.sink)
+      usage = await pipeAndTranslateStream(upstream, 'anthropic', 'claude-sonnet-4-5', rec.sink, { endOnFinish: true })
     } catch (e) {
       threw = e
     }
@@ -256,7 +256,7 @@ describe('stream timeout', () => {
     const rec = makeRecorder()
 
     // Kick off the pipe; the upstream will never produce more data, then we abort.
-    const promise = pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink)
+    const promise = pipeAndTranslateStream(upstream, 'openai', 'gpt-4o', rec.sink, { endOnFinish: true })
 
     // Simulate the abort by erroring the stream (what AbortController would do).
     setTimeout(() => controllerRef?.error(new Error('AbortError')), 5)
@@ -265,6 +265,49 @@ describe('stream timeout', () => {
     try { await promise } catch (e) { threw = e }
     expect(threw).toBeTruthy()
     expect(rec.closed).toBe(true)
+  })
+})
+
+// ─── default sink ownership (bug-fix path) ─────────────────────────────────
+
+describe('sink ownership', () => {
+  it('defaults to caller-owned sink (does NOT auto-close)', async () => {
+    // This is the production behavior route.ts now relies on: pipe finishes,
+    // sink is left open so the caller can await the meter write before res.end().
+    const chunks = [
+      'data: {"choices":[{"index":0,"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\n',
+      'data: [DONE]\n\n',
+    ]
+    const rec = makeRecorder()
+    await pipeAndTranslateStream(makeSseResponse(chunks), 'openai', 'gpt-4o', rec.sink)
+
+    // Chunks were piped through, but sink is still open.
+    expect(rec.chunks.join('')).toContain('"content":"hi"')
+    expect(rec.closed).toBe(false)
+
+    // Caller closes after their post-stream work.
+    rec.sink.end()
+    expect(rec.closed).toBe(true)
+  })
+
+  it('does NOT auto-close on stream error when endOnFinish is unset', async () => {
+    const chunks = [
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"m","model":"claude-sonnet-4-5","usage":{"input_tokens":1}}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}}\n\n',
+    ]
+    const upstream = makeFailingSseResponse(chunks, 2)
+    const rec = makeRecorder()
+
+    let threw: any = null
+    try {
+      await pipeAndTranslateStream(upstream, 'anthropic', 'claude-sonnet-4-5', rec.sink)
+    } catch (e) { threw = e }
+
+    expect(threw).toBeTruthy()
+    // Sink remains open — the caller's responsibility to close after meter write.
+    expect(rec.closed).toBe(false)
+    expect(rec.chunks.join('')).toContain('"content":"x"')
   })
 })
 
