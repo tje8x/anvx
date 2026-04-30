@@ -1,0 +1,44 @@
+---
+title: Getting Started
+description: What ANVX is and how to get value in five steps.
+group: Getting Started
+order: 1
+---
+
+# Getting Started
+
+ANVX is a financial autopilot for AI-native companies. It connects to the APIs
+and accounts where your AI spend actually happens — OpenAI, Anthropic, Google
+AI, Stripe, your bank — and turns the raw mess into three things finance teams
+care about: **a reconciled monthly close, a real-time spend dashboard, and a
+routing engine that prevents cost disasters before they hit the invoice.**
+
+You point your existing OpenAI client at our endpoint, and ANVX routes each
+request to the cheapest model that meets your quality bar — within budgets,
+caps, and provider-failover rules you control. Every decision is logged with
+the inputs and the dollar delta, so your audit trail is complete by default.
+
+You can start in **Observer mode**, where the engine watches your traffic and
+shows what it *would* change without actually rerouting. When you trust it,
+flip to **Copilot** for human-approved enforcement, then **Autopilot** for
+hands-off optimization within boundaries you set.
+
+## Quickstart (5 steps)
+
+1. **Sign up** at [app.anvx.io](https://app.anvx.io/sign-up) and create your workspace.
+2. **Connect your first provider** at *Settings → Connections*. Start with the
+   provider that bills you the most — usually Anthropic or OpenAI. Use an
+   admin-tier key for richest data; standard keys still work.
+3. **Upload a recent bank statement** at *Statements → Upload* (CSV or PDF).
+   ANVX reconciles it against provider data and surfaces unmatched rows for review.
+4. **Create your first ANVX token** at *Settings → Connections → Create new API key*.
+   Copy it — it's shown once. This is what you'll use to authenticate against
+   the routing engine.
+5. **Point one app at the routing engine.** Replace your OpenAI base URL with
+   `https://anvx.io/v1` and use your ANVX token as the API key. Start in
+   Observer mode — no traffic changes until you flip the switch.
+
+When you finish step 5, your dashboard at [app.anvx.io/dashboard](https://app.anvx.io/dashboard)
+populates within minutes. From there: [routing quickstart](/docs/routing/quickstart),
+[Anthropic connector](/docs/connectors/anthropic), or email
+[support@anvx.io](mailto:support@anvx.io) and we'll walk you through it.

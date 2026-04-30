@@ -1,0 +1,97 @@
+---
+title: Routing Quickstart
+description: Point your OpenAI client at ANVX in three minutes.
+group: Routing
+order: 1
+---
+
+# Routing Quickstart
+
+The ANVX routing engine is OpenAI-compatible. If your code already talks to the
+OpenAI API, you change two things — the **base URL** and the **API key** — and
+your existing requests now flow through ANVX. Your provider keys (OpenAI,
+Anthropic, Google AI, etc.) live in your ANVX workspace; the engine routes each
+request to the cheapest model that meets your policy.
+
+By default new tokens run in **Observer mode**: ANVX records what it *would*
+have routed to but proxies your request to the model you originally asked for.
+Nothing changes in production until you flip the workspace to Copilot or Autopilot.
+
+## 1. Get an ANVX token
+
+1. Sign in at [app.anvx.io](https://app.anvx.io).
+2. Open *Settings → Connections & security*.
+3. Click **Create new API key**, give it a label like `production`, and click **Create**.
+4. Copy the token immediately — it's shown once and never again. Store it
+   alongside your other production secrets (1Password, AWS Secrets Manager, Doppler, etc.).
+
+The token starts with `anvx_` and is ~48 characters long.
+
+## 2. Drop-in: Python (openai SDK)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://anvx.io/v1",
+    api_key="anvx_your_token_here",  # from Settings → Connections
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Hello from ANVX"}],
+)
+
+print(response.choices[0].message.content)
+```
+
+Tested against `openai>=1.40,<2.0`. Works identically with async (`AsyncOpenAI`).
+
+## 3. Drop-in: TypeScript (openai SDK)
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://anvx.io/v1',
+  apiKey: process.env.ANVX_API_KEY!, // anvx_...
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Hello from ANVX' }],
+});
+
+console.log(response.choices[0].message.content);
+```
+
+Tested against `openai@^4.60.0`. Streaming, tool calls, and structured outputs
+all pass through unchanged.
+
+## 4. Drop-in: curl
+
+```bash
+curl https://anvx.io/v1/chat/completions \
+  -H "Authorization: Bearer $ANVX_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello from ANVX"}]
+  }'
+```
+
+Set `ANVX_API_KEY` in your shell first: `export ANVX_API_KEY=anvx_...`.
+
+## What happens next
+
+- Every request is logged with the model you asked for, the model that ran,
+  and the dollar delta. View the log at *Routing → Decisions*.
+- In Observer mode the actual model run is whatever you requested. Flip to
+  **Copilot** under *Settings → Mode* once you're comfortable with the shadow
+  log; that's when ANVX starts enforcing policies (with human approval for
+  major decisions).
+- Bring up provider connectors at *Settings → Connections* so the engine has
+  keys to route to. The [Anthropic walkthrough](/docs/connectors/anthropic) is
+  the cleanest place to start.
+
+Stuck? Email [support@anvx.io](mailto:support@anvx.io) — we read it.

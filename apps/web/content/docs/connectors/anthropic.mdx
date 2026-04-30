@@ -1,0 +1,82 @@
+---
+title: Connect Anthropic
+description: Step-by-step from console.anthropic.com to a live ANVX connection.
+group: Connectors
+order: 1
+---
+
+# Connect Anthropic
+
+ANVX uses your Anthropic key to read usage, model breakdown, and (with an admin
+key) per-workspace cost data. The key is encrypted at rest and only used for
+read calls — ANVX never sends a Claude completion on your behalf without
+explicit routing.
+
+This walkthrough takes ~2 minutes.
+
+## 1. Choose a key tier
+
+Anthropic offers two key tiers and they give ANVX different visibility:
+
+| Tier | What ANVX can show | Where you make it |
+|---|---|---|
+| **Admin key** *(recommended)* | Historical usage, model mix, per-workspace breakdown, full close-pack reconciliation | [console.anthropic.com/settings/admin-keys](https://console.anthropic.com/settings/admin-keys) |
+| **Standard API key** | Live tracking only — usage from this point forward, no historical backfill | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
+
+If you have org-admin access on Anthropic, use an admin key. ANVX will show
+"Admin tier" with a green badge once it validates.
+
+## 2. Create the key in the Anthropic console
+
+1. Go to [console.anthropic.com](https://console.anthropic.com) and sign in.
+2. **For admin key:** click your org avatar → **Settings** → **Admin keys** → **Create admin key**.
+   **For standard key:** click **Settings** → **API keys** → **Create key**.
+3. Name it `anvx-readonly` (so it's clear what it's for if you audit later).
+4. Click **Create**. Copy the full key — it starts with `sk-ant-` and is shown once.
+5. Paste it somewhere temporary (a password manager, not a chat). You'll move it to ANVX next.
+
+## 3. Add the key to ANVX
+
+1. In ANVX, open *Settings → Connections*.
+2. Click **Connect provider**.
+3. In the searchable provider list, type `anthropic` and select **Anthropic**.
+4. Label it (e.g. `production` or `acme-org`).
+5. Paste the key into the **API key** field.
+6. Click **Connect**.
+
+ANVX validates the key against `api.anthropic.com` before saving. You'll see
+one of three results on the connectors list:
+
+- **Admin** (green) — full historical access, all features available.
+- **Standard** (gray) — live tracking from now forward; the dashboard shows
+  a small "live tracking only" hint until enough data accumulates.
+- **Permissions drift** (amber) — the key was created at a higher tier but
+  has been restricted since. The badge tooltip explains what's missing.
+
+## 4. Trigger your first sync
+
+The connector schedules a background sync immediately. To force one:
+
+1. In *Settings → Connections*, find the row you just added.
+2. Click **Sync**. Within ~30 seconds the *Last used* column updates.
+3. Open *Dashboard* — Anthropic spend shows up under the LLM bucket of the
+   waterfall, and historical models show up in the income statement breakdown
+   if you used an admin key.
+
+## Troubleshooting
+
+- **"Invalid API key"** — usually a copy-paste error that grabbed leading whitespace.
+  Recreate the key on Anthropic's side and paste again; do not edit it.
+- **No data after 5 minutes with admin key** — your org has admin keys disabled
+  at the Anthropic plan level. Email [support@anvx.io](mailto:support@anvx.io)
+  and we'll fall back to the standard-key flow without losing your reconciliation.
+- **Standard tier showing on what should be an admin key** — the key was created
+  under *API keys*, not *Admin keys*. They're different pages in the Anthropic
+  console. Recreate at [console.anthropic.com/settings/admin-keys](https://console.anthropic.com/settings/admin-keys).
+
+## What's next
+
+- [Routing quickstart](/docs/routing/quickstart) — point a Python or TypeScript
+  client at ANVX and start logging routing decisions.
+- Connect a payments processor (Stripe) so the dashboard can compare revenue
+  to spend.
