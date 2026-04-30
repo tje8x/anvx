@@ -12,6 +12,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/internal/(.*)',
   '/api/cron/(.*)',
   '/api/health',
+  '/v1/_ping',
 ])
 
 // Legacy paths kept routable as 308 permanent redirects so external bookmarks
