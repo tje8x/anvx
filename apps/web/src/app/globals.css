@@ -99,3 +99,26 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* Retro-Mac themed horizontal scroller for dashboard tables that overflow on
+   narrow viewports. Used on the wrapping div around <table> elements via
+   `.anvx-table-scroll` so we don't ship browser-default chrome on top of the
+   parchment palette. */
+.anvx-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--anvx-bdr, #8e8a7e) transparent;
+}
+.anvx-table-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.anvx-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.anvx-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--anvx-bdr, #8e8a7e);
+  border-radius: 2px;
+}
+.anvx-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--anvx-text-dim, #6b6a64);
+}

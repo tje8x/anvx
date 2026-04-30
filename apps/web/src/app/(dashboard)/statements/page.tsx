@@ -343,15 +343,16 @@ export default function DataPage() {
         <>
           <section>
             <SectionTitle>Uploaded files</SectionTitle>
-            <table className="w-full text-[11px] font-ui">
+            <div className="anvx-table-scroll">
+            <table className="w-full min-w-[720px] text-[11px] font-ui">
               <thead>
                 <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
                   <th className="py-1.5 pr-4">File</th>
                   <th className="py-1.5 pr-4">Type</th>
-                  <th className="py-1.5 pr-4">Size</th>
-                  <th className="py-1.5 pr-4">Rows parsed</th>
+                  <th className="py-1.5 pr-4 hidden md:table-cell">Size</th>
+                  <th className="py-1.5 pr-4 hidden md:table-cell">Rows parsed</th>
                   <th className="py-1.5 pr-4">Status</th>
-                  <th className="py-1.5 pr-4">Uploaded</th>
+                  <th className="py-1.5 pr-4 hidden md:table-cell">Uploaded</th>
                   <th className="py-1.5">Actions</th>
                 </tr>
               </thead>
@@ -360,10 +361,10 @@ export default function DataPage() {
                   <tr key={d.id} className="border-b border-anvx-bdr/50">
                     <td className="py-2 pr-4 font-data text-anvx-text">{d.file_name}</td>
                     <td className="py-2 pr-4"><KindChip kind={d.file_kind} /></td>
-                    <td className="py-2 pr-4 font-data text-anvx-text-dim">{formatBytes(d.file_size_bytes)}</td>
-                    <td className="py-2 pr-4 font-data text-anvx-text-dim">{d.parsed_rows_count ?? ''}</td>
+                    <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{formatBytes(d.file_size_bytes)}</td>
+                    <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{d.parsed_rows_count ?? ''}</td>
                     <td className="py-2 pr-4"><StatusChip status={d.status} errorMessage={d.error_message} /></td>
-                    <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(d.created_at).toLocaleDateString()}</td>
+                    <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{new Date(d.created_at).toLocaleDateString()}</td>
                     <td className="py-2">
                       <AdminGate role={role}>
                         <MacButton
@@ -379,6 +380,7 @@ export default function DataPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
 
           <ReconciliationSection parsedDocuments={documents.filter((d) => d.status === 'parsed')} />

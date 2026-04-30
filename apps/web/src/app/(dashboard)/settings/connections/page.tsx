@@ -505,36 +505,40 @@ export default function ConnectorsPage() {
       {keys.length === 0 ? (
         <p className="text-[11px] font-data text-anvx-text-dim py-4">No providers connected yet. Click &quot;Connect provider&quot; to add your first integration.</p>
       ) : (
-        <table className="w-full text-[11px] font-ui">
-          <thead>
-            <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
-              <th className="py-1.5 pr-4">Provider</th>
-              <th className="py-1.5 pr-4">Type</th>
-              <th className="py-1.5 pr-4">Tier</th>
-              <th className="py-1.5 pr-4">Label</th>
-              <th className="py-1.5 pr-4">Last used</th>
-              <th className="py-1.5 pr-4">Created</th>
-              <th className="py-1.5">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((k) => (
-              <tr key={k.id} className="border-b border-anvx-bdr/50">
-                <td className="py-2 pr-4 font-data text-anvx-text">{k.provider}</td>
-                <td className="py-2 pr-4"><KindBadge provider={k.provider} /></td>
-                <td className="py-2 pr-4"><TierBadge provider={k.provider} meta={k.key_metadata} /></td>
-                <td className="py-2 pr-4 text-anvx-text">{k.label}</td>
-                <td className="py-2 pr-4 font-data text-anvx-text-dim">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : '—'}</td>
-                <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(k.created_at).toLocaleDateString()}</td>
-                <td className="py-2 flex gap-2">
-                  <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin || syncingId === k.id} onClick={() => handleSync(k)}>{syncingId === k.id ? 'Syncing…' : 'Sync'}</MacButton></AdminGate>
-                  <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setRotateId(k.id); setRotateKey(''); setRotateError(''); setRotateOpen(true) }}>Rotate</MacButton></AdminGate>
-                  <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setDeleteId(k.id); setDeleteOpen(true) }}>Delete</MacButton></AdminGate>
-                </td>
+        <div className="anvx-table-scroll">
+          <table className="w-full min-w-[640px] text-[11px] font-ui">
+            <thead>
+              <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
+                <th className="py-1.5 pr-4">Provider</th>
+                <th className="py-1.5 pr-4">Type</th>
+                <th className="py-1.5 pr-4">Tier</th>
+                <th className="py-1.5 pr-4">Label</th>
+                {/* Last-used is the lowest-signal column on narrow screens — hide
+                    until md so SYNC/ROTATE/DELETE never get clipped on laptops. */}
+                <th className="py-1.5 pr-4 hidden md:table-cell">Last used</th>
+                <th className="py-1.5 pr-4">Created</th>
+                <th className="py-1.5">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {keys.map((k) => (
+                <tr key={k.id} className="border-b border-anvx-bdr/50">
+                  <td className="py-2 pr-4 font-data text-anvx-text">{k.provider}</td>
+                  <td className="py-2 pr-4"><KindBadge provider={k.provider} /></td>
+                  <td className="py-2 pr-4"><TierBadge provider={k.provider} meta={k.key_metadata} /></td>
+                  <td className="py-2 pr-4 text-anvx-text">{k.label}</td>
+                  <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : '—'}</td>
+                  <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(k.created_at).toLocaleDateString()}</td>
+                  <td className="py-2 flex gap-2">
+                    <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin || syncingId === k.id} onClick={() => handleSync(k)}>{syncingId === k.id ? 'Syncing…' : 'Sync'}</MacButton></AdminGate>
+                    <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setRotateId(k.id); setRotateKey(''); setRotateError(''); setRotateOpen(true) }}>Rotate</MacButton></AdminGate>
+                    <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setDeleteId(k.id); setDeleteOpen(true) }}>Delete</MacButton></AdminGate>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <AnvxApiKeysSection role={role} />
@@ -713,13 +717,14 @@ function AnvxApiKeysSection({ role }: { role: string }) {
       ) : active.length === 0 ? (
         <p className="text-[11px] font-data text-anvx-text-dim py-4">No active API keys.</p>
       ) : (
-        <table className="w-full text-[11px] font-ui">
+        <div className="anvx-table-scroll">
+        <table className="w-full min-w-[560px] text-[11px] font-ui">
           <thead>
             <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
               <th className="py-1.5 pr-4">Label</th>
               <th className="py-1.5 pr-4">Prefix</th>
               <th className="py-1.5 pr-4">Created</th>
-              <th className="py-1.5 pr-4">Last used</th>
+              <th className="py-1.5 pr-4 hidden md:table-cell">Last used</th>
               <th className="py-1.5"></th>
             </tr>
           </thead>
@@ -729,7 +734,7 @@ function AnvxApiKeysSection({ role }: { role: string }) {
                 <td className="py-2 pr-4 text-anvx-text">{t.label}</td>
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{t.prefix}…</td>
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(t.created_at).toLocaleDateString()}</td>
-                <td className="py-2 pr-4 font-data text-anvx-text-dim">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : '—'}</td>
+                <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : '—'}</td>
                 <td className="py-2 text-right">
                   {isAdmin && (
                     <button onClick={() => handleRevoke(t.id)} className="text-[11px] font-ui text-anvx-danger hover:opacity-80">Revoke</button>
@@ -739,6 +744,7 @@ function AnvxApiKeysSection({ role }: { role: string }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

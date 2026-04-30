@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import PostHogProvider from "./PostHogProvider";
-import { Toaster } from "@/components/ui/sonner";
+// Direct import — the shadcn wrapper at @/components/ui/sonner pulls in
+// next-themes' useTheme(), which silently returns nothing without a
+// <ThemeProvider> mounted ahead of it. We never used next-themes elsewhere,
+// so going direct cuts the dependency and the silent-mount bug with it.
+import { Toaster } from "sonner";
 import localFont from "next/font/local";
 import { Space_Mono, IBM_Plex_Mono } from 'next/font/google'
 import "./globals.css";
@@ -55,6 +59,10 @@ export default function RootLayout({
             position="top-right"
             richColors
             closeButton
+            // Bumped z-index defensively in case any modal/dialog/overlay in
+            // the dashboard tree creates a stacking context that buries the
+            // toaster's default 999999.
+            style={{ zIndex: 2147483600 }}
             toastOptions={{
               style: {
                 fontFamily: 'var(--font-ui)',

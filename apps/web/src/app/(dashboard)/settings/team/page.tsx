@@ -202,12 +202,13 @@ export default function TeamSettingsPage() {
           {isAdmin && <MacButton onClick={() => { setInviteOpen(true); setInviteError('') }}>Invite member</MacButton>}
         </div>
 
-        <table className="w-full text-[11px] font-ui">
+        <div className="anvx-table-scroll">
+        <table className="w-full min-w-[560px] text-[11px] font-ui">
           <thead>
             <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
               <th className="py-1.5 pr-4">Member</th>
               <th className="py-1.5 pr-4">Role</th>
-              <th className="py-1.5 pr-4">Joined</th>
+              <th className="py-1.5 pr-4 hidden md:table-cell">Joined</th>
               <th className="py-1.5"></th>
             </tr>
           </thead>
@@ -238,7 +239,7 @@ export default function TeamSettingsPage() {
                     </Select>
                   )}
                 </td>
-                <td className="py-2 pr-4 font-data text-anvx-text-dim">
+                <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">
                   {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
                 </td>
                 <td className="py-2 text-right">
@@ -255,18 +256,20 @@ export default function TeamSettingsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
 
       {pendingInvites.length > 0 && (
         <section>
           <SectionTitle>Pending invitations</SectionTitle>
-          <table className="w-full text-[11px] font-ui">
+          <div className="anvx-table-scroll">
+          <table className="w-full min-w-[640px] text-[11px] font-ui">
             <thead>
               <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
                 <th className="py-1.5 pr-4">Email</th>
                 <th className="py-1.5 pr-4">Role</th>
-                <th className="py-1.5 pr-4">Sent</th>
-                <th className="py-1.5 pr-4">Expires</th>
+                <th className="py-1.5 pr-4 hidden md:table-cell">Sent</th>
+                <th className="py-1.5 pr-4 hidden md:table-cell">Expires</th>
                 <th className="py-1.5"></th>
               </tr>
             </thead>
@@ -275,8 +278,8 @@ export default function TeamSettingsPage() {
                 <tr key={i.id} className="border-b border-anvx-bdr/50">
                   <td className="py-2 pr-4 font-data text-anvx-text">{i.email}</td>
                   <td className="py-2 pr-4 font-data text-anvx-text-dim">{ROLE_LABEL[i.role]}</td>
-                  <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(i.created_at).toLocaleDateString()}</td>
-                  <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(i.expires_at).toLocaleDateString()}</td>
+                  <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{new Date(i.created_at).toLocaleDateString()}</td>
+                  <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{new Date(i.expires_at).toLocaleDateString()}</td>
                   <td className="py-2 text-right">
                     {isAdmin && (
                       <button onClick={() => handleRevokeInvite(i.id)} className="text-[11px] font-ui text-anvx-danger hover:opacity-80">Revoke</button>
@@ -286,6 +289,7 @@ export default function TeamSettingsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       )}
 

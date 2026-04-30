@@ -155,12 +155,13 @@ export default function BillingSettingsPage() {
         {packs.length === 0 ? (
           <p className="text-[11px] font-data text-anvx-text-dim py-4">No packs yet.</p>
         ) : (
-          <table className="w-full text-[11px] font-ui">
+          <div className="anvx-table-scroll">
+          <table className="w-full min-w-[640px] text-[11px] font-ui">
             <thead>
               <tr className="border-b border-anvx-bdr text-anvx-text-dim uppercase tracking-wider text-left">
                 <th className="py-1.5 pr-4">Date</th>
                 <th className="py-1.5 pr-4">Kind</th>
-                <th className="py-1.5 pr-4">Period</th>
+                <th className="py-1.5 pr-4 hidden md:table-cell">Period</th>
                 <th className="py-1.5 pr-4">Amount</th>
                 <th className="py-1.5 pr-4">Status</th>
                 <th className="py-1.5"></th>
@@ -171,7 +172,7 @@ export default function BillingSettingsPage() {
                 <tr key={p.id} className="border-b border-anvx-bdr/50">
                   <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(p.created_at).toLocaleDateString()}</td>
                   <td className="py-2 pr-4 text-anvx-text">{PACK_LABEL[p.kind]}</td>
-                  <td className="py-2 pr-4 font-data text-anvx-text-dim">{formatPeriod(p.period_start, p.period_end)}</td>
+                  <td className="py-2 pr-4 font-data text-anvx-text-dim hidden md:table-cell">{formatPeriod(p.period_start, p.period_end)}</td>
                   <td className="py-2 pr-4 font-data text-anvx-text">{p.price_cents === 0 ? 'Free' : formatDollars(p.price_cents)}</td>
                   <td className="py-2 pr-4 font-data text-anvx-text-dim">{p.status}</td>
                   <td className="py-2">
@@ -183,6 +184,7 @@ export default function BillingSettingsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
