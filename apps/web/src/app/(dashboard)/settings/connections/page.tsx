@@ -801,7 +801,7 @@ function RoutingEndpointPanel() {
           <MacButton variant="secondary" onClick={() => copy(url)}>Copy</MacButton>
         </div>
         <div>
-          <p className="text-[10px] font-ui text-anvx-text-dim mb-1">Drop-in replacement for the OpenAI base URL:</p>
+          <p className="text-[10px] font-ui text-anvx-text-dim mb-1">Drop-in replacement using the OpenAI-compatible API standard. Works with the OpenAI SDK in any language, regardless of which LLM provider you&apos;re routing to (Claude, GPT, Gemini, etc.).</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-[11px] font-data bg-anvx-bg border border-anvx-bdr rounded-sm px-3 py-2 select-all">{example}</code>
             <MacButton variant="secondary" onClick={() => copy(example)}>Copy</MacButton>
