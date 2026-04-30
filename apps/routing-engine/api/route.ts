@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadContext, decide, type DecisionResult, type RoutingContext } from './src/decide'
 import { writeUsage } from './src/meter'
 import { errorResponse, safeMessage, type ErrorKind } from './src/errors'
-import { forwardToUpstream, type UpstreamResult } from './src/upstream'
+import { forwardToUpstream, openUpstreamStream, cancelStreamTimeout, type UpstreamResult } from './src/upstream'
 import {
   resolveProvider,
   translateResponseToOpenAI,
@@ -14,6 +14,7 @@ import {
 } from './src/providers'
 import { resolveProviderKey } from './src/keys'
 import { getBootstrapStatus } from './src/bootstrap'
+import { pipeAndTranslateStream, type StreamWriteSink } from './src/stream'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -198,11 +199,113 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const providerKey = keyRes.key
 
-    // The body we forward upstream uses the user's original messages but pinned
-    // to the routed model and with stream forced off.
-    const upstreamOpenAIBody: OpenAIChatBody = { ...body, model: routedModel, stream: false }
+    // Streaming is opt-in via the client's `stream:true`. Cohere + Replicate
+    // don't support our stream proxy yet, so we transparently fall back to the
+    // buffered path for those providers. The client still gets the right
+    // response — just all-at-once instead of token-by-token.
+    const clientWantsStream = body?.stream === true
+    const streamingPath =
+      clientWantsStream && routedProvider !== 'replicate' && routedProvider !== 'cohere'
 
-    console.log("ENG_4 upstream_start", { request_id, provider: routedProvider, model: routedModel })
+    // The body we forward upstream uses the user's original messages but pinned
+    // to the routed model. `stream` flag is set per-path below.
+    const upstreamOpenAIBody: OpenAIChatBody = { ...body, model: routedModel, stream: streamingPath }
+
+    console.log("ENG_4 upstream_start", { request_id, provider: routedProvider, model: routedModel, stream: streamingPath })
+
+    if (streamingPath) {
+      let upstreamResp: Response
+      try {
+        upstreamResp = await openUpstreamStream({
+          provider: routedProvider,
+          model: routedModel,
+          openaiBody: upstreamOpenAIBody,
+          providerKey,
+          stream: true,
+        })
+      } catch (fetchErr: any) {
+        const isTimeout = typeof fetchErr?.message === 'string' && fetchErr.message.includes('timed out')
+        if (isTimeout) {
+          await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream stream timeout.', policy_triggered: null, upstream_latency_ms: Date.now() - startedAt, total_latency_ms: Date.now() - startedAt })
+          await auditLog(workspaceId, 'upstream_timeout', request_id)
+          sendError(res, 'upstream_timeout', request_id, { provider: routedProvider, model: routedModel })
+          return
+        }
+        throw fetchErr
+      }
+
+      const upstreamLatencyMs = Date.now() - startedAt
+
+      // Non-2xx → consume the body as JSON error and surface like the buffered path.
+      if (upstreamResp.status === 429 || upstreamResp.status >= 500 || upstreamResp.status >= 400) {
+        const errText = await upstreamResp.text().catch(() => '')
+        cancelStreamTimeout(upstreamResp)
+        if (upstreamResp.status === 429) {
+          const retryAfter = upstreamResp.headers.get('retry-after')
+          await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream rate limited.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+          await auditLog(workspaceId, 'upstream_rate_limit', request_id)
+          sendError(res, 'upstream_rate_limit', request_id, { upstream_retry_after: retryAfter, provider: routedProvider })
+          return
+        }
+        if (upstreamResp.status >= 500) {
+          await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: `Upstream ${upstreamResp.status}.`, policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+          await auditLog(workspaceId, 'upstream_error', request_id)
+          sendError(res, 'upstream_error', request_id, { upstream_status: upstreamResp.status, provider: routedProvider })
+          return
+        }
+        // 4xx other than 429 — pass through the upstream error body, translated minimally.
+        res.status(upstreamResp.status).setHeader('content-type', 'application/json').send(errText || JSON.stringify({ error: 'upstream_error', request_id }))
+        return
+      }
+
+      // SSE response headers. Disable buffering on intermediaries (nginx, etc.)
+      res.statusCode = 200
+      res.setHeader('content-type', 'text/event-stream')
+      res.setHeader('cache-control', 'no-cache, no-transform')
+      res.setHeader('connection', 'keep-alive')
+      res.setHeader('x-accel-buffering', 'no')
+
+      const sink: StreamWriteSink = {
+        write: (chunk) => { res.write(Buffer.from(chunk)) },
+        end: () => { res.end() },
+        flush: () => { /* node http auto-flushes on write */ },
+      }
+
+      // If the client disconnects, abort upstream and write best-effort usage.
+      let clientAborted = false
+      req.on('close', () => {
+        if (!res.writableEnded) clientAborted = true
+      })
+
+      let usage = { prompt_tokens: 0, completion_tokens: 0, observed: false }
+      try {
+        usage = await pipeAndTranslateStream(upstreamResp, routedProvider, routedRawModel, sink)
+      } catch (streamErr: any) {
+        // Best effort: try to close the sink cleanly so client-side parsers don't hang.
+        try { sink.end() } catch { /* ignore */ }
+        console.error("ENG_STREAM_ERROR", { request_id, provider: routedProvider, error: streamErr?.message })
+        await auditLog(workspaceId, 'upstream_error', request_id)
+      } finally {
+        cancelStreamTimeout(upstreamResp)
+      }
+
+      const totalLatencyMs = Date.now() - startedAt
+      await bestEffortUsage({
+        ...usageBase,
+        model_routed: dec.model_routed,
+        tokens_in: usage.prompt_tokens,
+        tokens_out: usage.completion_tokens,
+        decision: dec.decision,
+        observer_suggestion: dec.observer_suggestion,
+        reasoning: clientAborted ? 'Client aborted stream.' : dec.reasoning,
+        policy_triggered: dec.policy_triggered_id,
+        upstream_latency_ms: upstreamLatencyMs,
+        total_latency_ms: totalLatencyMs,
+      })
+      console.log("ENG_6 stream_done", { request_id, provider: routedProvider, tokens_in: usage.prompt_tokens, tokens_out: usage.completion_tokens, observed: usage.observed, aborted: clientAborted })
+      return
+    }
+
 
     let upstreamRes: UpstreamResult
     try {

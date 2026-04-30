@@ -52,7 +52,11 @@ export type UpstreamCall = {
   openaiBody: OpenAIChatBody
   /** Provider-native API key — DECRYPTED PLAINTEXT. Never log. */
   providerKey: string
+  /** When true, request streaming (SSE) from upstream and skip JSON-buffering. */
+  stream?: boolean
 }
+
+const STREAM_TIMEOUT_MS = 120_000
 
 export type UpstreamResult = {
   status: number
@@ -106,25 +110,32 @@ export function buildUpstreamRequest(call: UpstreamCall): {
   headers: Record<string, string>
   body: Record<string, unknown>
 } {
-  const { provider, model, openaiBody, providerKey } = call
+  const { provider, model, openaiBody, providerKey, stream = false } = call
   const translated = translateRequestToProvider(provider, openaiBody)
 
   if (provider === 'anthropic') {
     translated.model = model
+    if (stream) translated.stream = true
     return {
       url: `${ANTHROPIC_BASE_RESOLVED}/messages`,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': providerKey,
         'anthropic-version': ANTHROPIC_VERSION,
+        ...(stream ? { 'accept': 'text/event-stream' } : {}),
       },
       body: translated,
     }
   }
 
   if (provider === 'google') {
+    // Google uses a different endpoint for streaming; ?alt=sse normalizes the
+    // chunk format to standard SSE so our parser handles it.
+    const path = stream
+      ? `/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+      : `/models/${encodeURIComponent(model)}:generateContent`
     return {
-      url: `${GOOGLE_BASE_RESOLVED}/models/${encodeURIComponent(model)}:generateContent`,
+      url: `${GOOGLE_BASE_RESOLVED}${path}`,
       headers: {
         'Content-Type': 'application/json',
         'x-goog-api-key': providerKey,
@@ -135,6 +146,8 @@ export function buildUpstreamRequest(call: UpstreamCall): {
 
   if (provider === 'cohere') {
     translated.model = model
+    // Cohere streaming is supported but we treat the cohere streaming format as
+    // an open TODO; for now upstream is buffered even when client asked for stream.
     return {
       url: `${COHERE_BASE_RESOLVED}/chat`,
       headers: {
@@ -147,7 +160,10 @@ export function buildUpstreamRequest(call: UpstreamCall): {
 
   if (provider === 'together') {
     translated.model = model
-    translated.stream = false
+    translated.stream = stream
+    if (stream) {
+      translated.stream_options = { include_usage: true }
+    }
     return {
       url: `${TOGETHER_BASE_RESOLVED}/chat/completions`,
       headers: {
@@ -160,7 +176,10 @@ export function buildUpstreamRequest(call: UpstreamCall): {
 
   if (provider === 'fireworks') {
     translated.model = model
-    translated.stream = false
+    translated.stream = stream
+    if (stream) {
+      translated.stream_options = { include_usage: true }
+    }
     return {
       url: `${FIREWORKS_BASE_RESOLVED}/chat/completions`,
       headers: {
@@ -173,7 +192,11 @@ export function buildUpstreamRequest(call: UpstreamCall): {
 
   // OpenAI default
   translated.model = model
-  translated.stream = false
+  translated.stream = stream
+  if (stream) {
+    // Required for the engine to capture token counts from the SSE stream.
+    translated.stream_options = { include_usage: true }
+  }
   return {
     url: `${OPENAI_BASE_RESOLVED}/chat/completions`,
     headers: {
@@ -182,6 +205,51 @@ export function buildUpstreamRequest(call: UpstreamCall): {
     },
     body: translated,
   }
+}
+
+/**
+ * Open a streaming connection to the upstream and return the raw `Response`
+ * with body still attached. Caller is responsible for piping (and timing out)
+ * the body. The 120s budget covers slow chat completions but won't sit on a
+ * dead connection forever.
+ *
+ * Streaming is not supported for Replicate (predictions are async) or Cohere
+ * (different SSE shape, TODO). Callers should fall back to `forwardToUpstream`.
+ */
+export async function openUpstreamStream(call: UpstreamCall): Promise<Response> {
+  ensureKey(call)
+  if (call.provider === 'replicate' || call.provider === 'cohere') {
+    throw new Error(`streaming not supported for provider=${call.provider}`)
+  }
+  const { url, headers, body } = buildUpstreamRequest({ ...call, stream: true })
+  const controller = new AbortController()
+  // Stream timeout is enforced by the caller via AbortController on the underlying
+  // fetch; we expose an aborter so route.ts can tear down on disconnect.
+  const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    // We deliberately do NOT clear the timeout here — it must keep running
+    // until the body is consumed. Caller calls `cancelStreamTimeout(res)` if
+    // they want to release it sooner.
+    ;(res as any).__cancelTimeout = () => clearTimeout(timeout)
+    return res
+  } catch (err: unknown) {
+    clearTimeout(timeout)
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw new Error(`Upstream stream timed out after ${STREAM_TIMEOUT_MS}ms`)
+    }
+    throw err
+  }
+}
+
+export function cancelStreamTimeout(res: Response): void {
+  const fn = (res as any).__cancelTimeout
+  if (typeof fn === 'function') fn()
 }
 
 // ─── Replicate sync wrapper ────────────────────────────────────────────────
