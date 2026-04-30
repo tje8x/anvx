@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import SectionTitle from '@/components/anvx/section-title'
@@ -58,6 +59,7 @@ function coverageLine(c: RoutingCoverage): string {
 
 export default function OptimizationPage() {
   const { getToken } = useAuth()
+  const router = useRouter()
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [insights, setInsights] = useState<Insight[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,7 +80,7 @@ export default function OptimizationPage() {
     ;(async () => {
       try {
         const h = await authHeaders()
-        const meRes = await fetch(`${API_BASE}/api/v2/workspace/me`, { headers: h })
+        const meRes = await fetch(`${API_BASE}/api/v2/workspace/me`, { headers: h, cache: 'no-store' })
         if (!meRes.ok) throw new Error(`workspace/me failed: ${meRes.status}`)
         const me: WorkspaceMe = await meRes.json()
         if (cancelled) return
@@ -88,7 +90,7 @@ export default function OptimizationPage() {
         }
         setWorkspaceId(wsId)
 
-        const insRes = await fetch(`${API_BASE}/api/v2/workspaces/${wsId}/optimization-insights`, { headers: h })
+        const insRes = await fetch(`${API_BASE}/api/v2/workspaces/${wsId}/optimization-insights`, { headers: h, cache: 'no-store' })
         if (!insRes.ok) throw new Error(`optimization-insights failed: ${insRes.status}`)
         const data: { insights: Insight[] } = await insRes.json()
         if (cancelled) return
@@ -126,12 +128,16 @@ export default function OptimizationPage() {
       const h = await authHeaders()
       const res = await fetch(
         `${API_BASE}/api/v2/workspaces/${workspaceId}/optimization-insights/refresh`,
-        { method: 'POST', headers: h },
+        { method: 'POST', headers: h, cache: 'no-store' },
       )
       if (!res.ok) throw new Error(`refresh failed: ${res.status}`)
       const data: { insights: Insight[] } = await res.json()
       setInsights(data.insights ?? [])
       setTrackedShown(false) // re-fire shown events for the new set
+      // router.refresh() invalidates any server-component data above this page
+      // (e.g. the dashboard layout's connector banner). The local state above
+      // already updated; this is belt-and-suspenders for SSR-rendered siblings.
+      router.refresh()
       toast.success('Insights refreshed')
     } catch (err) {
       console.error(err)
@@ -139,7 +145,7 @@ export default function OptimizationPage() {
     } finally {
       setRefreshing(false)
     }
-  }, [workspaceId, insights, authHeaders])
+  }, [workspaceId, insights, authHeaders, router])
 
   const activeCount = insights?.length ?? 0
   const generated30d = activeCount // server doesn't yet expose dismissed/expired separately

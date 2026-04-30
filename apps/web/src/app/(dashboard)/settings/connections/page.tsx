@@ -421,15 +421,46 @@ export default function ConnectorsPage() {
     finally { setConnectLoading(false) }
   }
 
-  const handleSync = async (id: string) => {
-    setSyncingId(id)
+  const handleSync = async (key: ProviderKey) => {
+    // Visual feedback: button gets "Syncing…" + disabled (50% opacity from
+    // MacButton's disabled state). Toast on success/failure surfaces the
+    // upstream error message when the API caught one — far more useful than
+    // a generic "Sync failed".
+    setSyncingId(key.id)
+    const providerName = key.provider
     try {
       const h = await authHeaders()
-      const res = await fetch(`${API_BASE}/api/v2/connectors/${id}/sync`, { method: 'POST', headers: h })
-      if (res.ok) { const data = await res.json(); toast.success(`Synced ${data.records_synced} records`); await fetchKeys() }
-      else toast.error('Sync failed')
-    } catch { toast.error('Sync failed') }
-    finally { setSyncingId(null) }
+      const res = await fetch(`${API_BASE}/api/v2/connectors/${key.id}/sync`, { method: 'POST', headers: h })
+      // The API may return:
+      //   200 { ok: true, tier, records_synced, note? }     — full success or capability-skip
+      //   200 { ok: false, error, status, ... }             — caught HTTPStatusError from upstream
+      //   non-200                                            — uncaught server-side failure
+      let body: { ok?: boolean; error?: string; records_synced?: number; note?: string } = {}
+      try { body = await res.json() } catch { /* non-json failure body */ }
+
+      if (res.ok && body.ok !== false) {
+        const n = body.records_synced
+        if (typeof n === 'number' && n > 0) {
+          toast.success(`Synced ${providerName} — ${n} records updated`)
+        } else if (body.note) {
+          // Capability skip path — note carries the "key tier 'standard' lacks…" hint.
+          toast.success(`Synced ${providerName} — ${body.note}`)
+        } else {
+          toast.success(`Synced ${providerName}`)
+        }
+      } else {
+        const msg = body.error ?? `HTTP ${res.status}`
+        toast.error(`Failed to sync ${providerName}: ${msg}`)
+      }
+      // Refresh the row regardless so last_sync_at + last_sync_error update
+      // in place without a hard reload.
+      await fetchKeys()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unknown error'
+      toast.error(`Failed to sync ${providerName}: ${msg}`)
+    } finally {
+      setSyncingId(null)
+    }
   }
 
   const handleRotate = async () => {
@@ -496,7 +527,7 @@ export default function ConnectorsPage() {
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : '—'}</td>
                 <td className="py-2 pr-4 font-data text-anvx-text-dim">{new Date(k.created_at).toLocaleDateString()}</td>
                 <td className="py-2 flex gap-2">
-                  <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin || syncingId === k.id} onClick={() => handleSync(k.id)}>{syncingId === k.id ? '...' : 'Sync'}</MacButton></AdminGate>
+                  <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin || syncingId === k.id} onClick={() => handleSync(k)}>{syncingId === k.id ? 'Syncing…' : 'Sync'}</MacButton></AdminGate>
                   <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setRotateId(k.id); setRotateKey(''); setRotateError(''); setRotateOpen(true) }}>Rotate</MacButton></AdminGate>
                   <AdminGate role={role}><MacButton variant="secondary" disabled={!isAdmin} onClick={() => { setDeleteId(k.id); setDeleteOpen(true) }}>Delete</MacButton></AdminGate>
                 </td>

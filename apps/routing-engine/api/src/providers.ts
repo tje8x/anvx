@@ -156,6 +156,21 @@ export function translateFromAnthropic(
   resp: Record<string, unknown>,
   modelHint: string,
 ): Record<string, unknown> {
+  // Anthropic error bodies look like:
+  //   { type: 'error', error: { type: 'invalid_request_error', message: '...' } }
+  // Surface them in OpenAI's error envelope instead of fabricating a 200-shape
+  // body with empty choices, which is how naive translation produced "successful"
+  // responses paired with HTTP 4xx status codes.
+  if (resp && resp.type === 'error' && resp.error && typeof resp.error === 'object') {
+    const err = resp.error as Record<string, unknown>
+    return {
+      error: {
+        message: typeof err.message === 'string' ? err.message : 'Upstream error',
+        type: 'upstream_error',
+        code: typeof err.type === 'string' ? err.type : null,
+      },
+    }
+  }
   const content = Array.isArray(resp.content) ? (resp.content as Array<Record<string, unknown>>) : []
   const text = content
     .filter((c) => c && c.type === 'text' && typeof c.text === 'string')
@@ -231,6 +246,21 @@ export function translateFromGoogle(
   resp: Record<string, unknown>,
   modelHint: string,
 ): Record<string, unknown> {
+  // Google error bodies look like:
+  //   { error: { code: 404, message: 'models/foo is not found...', status: 'NOT_FOUND' } }
+  // Without this guard the rest of the translator returns choices=[{content:""}]
+  // because there's no `candidates` array, which produced an HTTP 4xx response
+  // with a 200-shaped body — confusing for clients.
+  if (resp && resp.error && typeof resp.error === 'object') {
+    const err = resp.error as Record<string, unknown>
+    return {
+      error: {
+        message: typeof err.message === 'string' ? err.message : 'Upstream error',
+        type: 'upstream_error',
+        code: typeof err.code === 'number' ? err.code : (typeof err.status === 'string' ? err.status : null),
+      },
+    }
+  }
   const candidates = Array.isArray(resp.candidates) ? (resp.candidates as Array<Record<string, unknown>>) : []
   const first = candidates[0] ?? {}
   const content = (first.content as Record<string, unknown> | undefined) ?? {}

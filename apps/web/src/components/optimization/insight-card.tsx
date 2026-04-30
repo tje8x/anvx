@@ -78,7 +78,7 @@ export default function InsightCard({ insight, workspaceId }: { insight: Insight
     const h = await authHeaders()
     return fetch(
       `${API_BASE}/api/v2/workspaces/${workspaceId}/optimization-insights/${insight.id}/${path}`,
-      { method: 'POST', headers: h },
+      { method: 'POST', headers: h, cache: 'no-store' },
     )
   }
 
@@ -89,6 +89,9 @@ export default function InsightCard({ insight, workspaceId }: { insight: Insight
     try {
       const res = await postAction('dismiss')
       if (!res.ok) throw new Error(`dismiss failed: ${res.status}`)
+      // Brief confirmation so the user knows the action took effect; the row
+      // is already hidden optimistically.
+      toast.success('Insight dismissed')
       router.refresh()
     } catch (err) {
       setHidden(false)
@@ -106,6 +109,7 @@ export default function InsightCard({ insight, workspaceId }: { insight: Insight
       const res = await postAction('add-to-pack')
       if (!res.ok) throw new Error(`add-to-pack failed: ${res.status}`)
       toast.success('Added to next close pack')
+      router.refresh()
     } catch (err) {
       toast.error('Could not add — try again')
       console.error(err)
