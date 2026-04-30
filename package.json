@@ -3,6 +3,7 @@
     "supabase": "^2.93.0"
   },
   "dependencies": {
+    "next-mdx-remote": "^6.0.0",
     "posthog-js": "^1.372.1",
     "posthog-node": "^5.30.4"
   }
