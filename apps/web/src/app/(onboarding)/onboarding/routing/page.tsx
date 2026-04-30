@@ -8,7 +8,7 @@ import MacButton from '@/components/anvx/mac-button'
 import { capture } from '@/lib/analytics/posthog-client'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
-const ANVX_BASE_URL = 'https://anvx.io/v1'
+const ANVX_BASE_URL = 'https://api.anvx.io/v1'
 
 type Tab = 'python' | 'typescript' | 'curl'
 type Connector = { id: string; provider: string; label: string }

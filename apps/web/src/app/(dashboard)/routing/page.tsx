@@ -282,7 +282,7 @@ export default function RoutingPage() {
   if (spend.day_cents === 0 && spend.month_cents === 0 && recs.length === 0 && approvals.length === 0) {
     return (
       <EmptyState
-        title="Point your application to anvx.io/v1 to start seeing routing recommendations."
+        title="Point your application to api.anvx.io/v1 to start seeing routing recommendations."
         description="Observer mode runs first — no risk, just observation."
         cta={{ label: 'Setup instructions', href: '/onboarding/routing' }}
       />

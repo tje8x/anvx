@@ -106,7 +106,7 @@ export default function LandingPage() {
               One line of code. Full financial control.
             </h2>
             <p className="font-data text-[14px] md:text-[16px] text-[var(--anvx-text-dim)] mt-3 max-w-2xl mx-auto leading-snug">
-              Point your applications at <code className="font-data text-[var(--anvx-text)] bg-[var(--anvx-bg)] border border-[var(--anvx-bdr)] rounded-sm px-1.5 py-0.5">anvx.io/v1</code> instead of calling providers directly. Every API request flows through ANVX, where the routing brain optimizes cost within your quality boundaries — informed by your complete financial position.
+              Point your applications at <code className="font-data text-[var(--anvx-text)] bg-[var(--anvx-bg)] border border-[var(--anvx-bdr)] rounded-sm px-1.5 py-0.5">api.anvx.io/v1</code> instead of calling providers directly. Every API request flows through ANVX, where the routing brain optimizes cost within your quality boundaries — informed by your complete financial position.
             </p>
           </div>
 
@@ -126,7 +126,7 @@ export default function LandingPage() {
               </p>
               <p className="mt-4 text-[var(--anvx-acc)] font-bold"># After</p>
               <p className="text-[var(--anvx-acc)] font-bold">
-                OPENAI_BASE_URL=<span className="underline underline-offset-2">https://anvx.io/v1</span>
+                OPENAI_BASE_URL=<span className="underline underline-offset-2">https://api.anvx.io/v1</span>
               </p>
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function LandingPage() {
 
               <div className="border-2 border-[var(--anvx-acc)] bg-[var(--anvx-acc-light)] rounded-sm p-4 shadow-[3px_3px_0_var(--anvx-acc)]">
                 <p className="font-ui text-[10px] uppercase tracking-wider text-[var(--anvx-acc)] font-bold mb-3">
-                  Traffic routed through anvx.io/v1
+                  Traffic routed through api.anvx.io/v1
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {ROUTING_PROVIDERS.map((p) => (

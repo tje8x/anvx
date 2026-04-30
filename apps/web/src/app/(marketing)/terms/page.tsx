@@ -23,7 +23,7 @@ export default function TermsPage() {
             <p>
               ANVX provides financial data organization, LLM routing, and reporting tooling for AI-native companies.
               The service is delivered as a hosted web application and an API endpoint at{" "}
-              <code className="bg-[var(--anvx-bg)] border border-[var(--anvx-bdr)] rounded-sm px-1.5 py-0.5">anvx.io/v1</code>.
+              <code className="bg-[var(--anvx-bg)] border border-[var(--anvx-bdr)] rounded-sm px-1.5 py-0.5">api.anvx.io/v1</code>.
             </p>
           </Section>
 

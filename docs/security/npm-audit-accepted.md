@@ -16,7 +16,7 @@ Exposure analysis:
   optimization handled at platform layer).
 - next/image disk cache growth: N/A. Vercel serverless FS is ephemeral.
 - HTTP smuggling in rewrites: N/A. We do not use Next rewrites as a proxy;
-  the routing engine is a separate Hono service at anvx.io/v1.
+  the routing engine is a separate Hono service at api.anvx.io/v1.
 - RSC HTTP deserialization DoS: fixed in 14.2.35
   (GHSA-5j59-xgg2-r9c4 fix list).
 - DoS with Server Components: fixed in 14.2.35.

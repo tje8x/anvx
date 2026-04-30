@@ -782,7 +782,7 @@ function AnvxApiKeysSection({ role }: { role: string }) {
 
 
 function RoutingEndpointPanel() {
-  const url = 'https://anvx.io/v1'
+  const url = 'https://api.anvx.io/v1'
   const example = `OPENAI_BASE_URL=${url}`
 
   const copy = async (text: string) => {

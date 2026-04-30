@@ -135,7 +135,7 @@ v2 is structured around the routing engine as the core execution layer, supporte
 
 #### Purpose
 
-The routing engine is the core of Product 1 (Brain + Routing). Users point their applications to `anvx.io/v1` instead of calling LLM providers directly. Every subsequent request flows through ANVX, where the routing brain selects the optimal provider within user-defined model groups, enforces budget policies, and detects anomalies — all informed by the user's complete financial state.
+The routing engine is the core of Product 1 (Brain + Routing). Users point their applications to `api.anvx.io/v1` instead of calling LLM providers directly. Every subsequent request flows through ANVX, where the routing brain selects the optimal provider within user-defined model groups, enforces budget policies, and detects anomalies — all informed by the user's complete financial state.
 
 #### Trust sequencing: shadow mode first
 
@@ -371,7 +371,7 @@ ANVX monetizes through two revenue streams, both implemented via Stripe.
 
 #### Revenue stream 1: Routing markup
 
-Every LLM request routed through `anvx.io/v1` is metered. ANVX applies a small percentage markup on the provider cost (testing 1-3% during design-partner phase). The user pays the provider cost plus the ANVX markup. Metering is continuous — Stripe usage records are created per routing event and aggregated into monthly invoices.
+Every LLM request routed through `api.anvx.io/v1` is metered. ANVX applies a small percentage markup on the provider cost (testing 1-3% during design-partner phase). The user pays the provider cost plus the ANVX markup. Metering is continuous — Stripe usage records are created per routing event and aggregated into monthly invoices.
 
 Implementation:
 - Stripe usage-based billing with metered billing items per workspace
@@ -414,7 +414,7 @@ The onboarding flow is designed to reach the "first insight" moment as quickly a
 
 **Step 3: First insight** — as soon as one LLM provider is connected, the dashboard populates with spend data. The first insight might be: "You spent $3,200 on Anthropic last month, with 40% going to Sonnet for tasks that Haiku could handle." This should appear within minutes of connecting, not hours.
 
-**Step 4: Shadow mode activation** — prompt the user to point one application or workflow at `anvx.io/v1`. Provide a one-line code change example. Shadow mode activates immediately and begins generating recommendations.
+**Step 4: Shadow mode activation** — prompt the user to point one application or workflow at `api.anvx.io/v1`. Provide a one-line code change example. Shadow mode activates immediately and begins generating recommendations.
 
 **Step 5: Upload a bank statement** — optional but encouraged. "Upload your last bank statement to see your complete financial picture." Reconciliation runs automatically.
 
@@ -422,7 +422,7 @@ The onboarding flow is designed to reach the "first insight" moment as quickly a
 
 Every screen has a purposeful empty state that guides the user toward the next action:
 - Dashboard with no connectors: "Connect your first provider to see your financial picture."
-- Routing with no traffic: "Point your application to anvx.io/v1 to start seeing routing recommendations."
+- Routing with no traffic: "Point your application to api.anvx.io/v1 to start seeing routing recommendations."
 - Reports with no data: "Connect providers and route traffic to generate your first close pack."
 - Data with no uploads: "Upload a bank statement to reconcile against your provider data."
 
@@ -437,7 +437,7 @@ Every screen has a purposeful empty state that guides the user toward the next a
 - **Database:** Supabase Postgres with row-level security for workspace isolation.
 - **Object storage:** Supabase Storage for uploaded documents. Per-workspace bucket isolation. Encrypted at rest.
 - **Authentication:** Clerk (email/password, OAuth, team management).
-- **Routing engine deployment:** Vercel Edge Functions initially (Hono-based, OpenAI-compatible at `anvx.io/v1`). Migration path to Cloudflare Workers or dedicated infrastructure at scale.
+- **Routing engine deployment:** Vercel Edge Functions initially (Hono-based, OpenAI-compatible at `api.anvx.io/v1`). Migration path to Cloudflare Workers or dedicated infrastructure at scale.
 - **Secrets:** User API keys encrypted at rest using AES-256-GCM with per-workspace encryption keys. Never logged or displayed after entry.
 - **LLM for extraction:** Claude for document parsing assistance and narrative generation in close packs.
 - **Analytics:** PostHog (product analytics), Sentry (errors), Grafana + Prometheus (routing engine operations).

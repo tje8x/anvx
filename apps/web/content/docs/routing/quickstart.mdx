@@ -33,7 +33,7 @@ The token starts with `anvx_` and is ~48 characters long.
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://anvx.io/v1",
+    base_url="https://api.anvx.io/v1",
     api_key="anvx_your_token_here",  # from Settings → Connections
 )
 
@@ -53,7 +53,7 @@ Tested against `openai>=1.40,<2.0`. Works identically with async (`AsyncOpenAI`)
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  baseURL: 'https://anvx.io/v1',
+  baseURL: 'https://api.anvx.io/v1',
   apiKey: process.env.ANVX_API_KEY!, // anvx_...
 });
 
@@ -71,7 +71,7 @@ all pass through unchanged.
 ## 4. Drop-in: curl
 
 ```bash
-curl https://anvx.io/v1/chat/completions \
+curl https://api.anvx.io/v1/chat/completions \
   -H "Authorization: Bearer $ANVX_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
