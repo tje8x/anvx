@@ -92,6 +92,16 @@
     margin-top: 24px;
   }
   .empty { color: #888; font-style: italic; }
+  .callout {
+    background: #f3f5f8;
+    border-left: 3px solid #2d5a27;
+    padding: 10px 14px;
+    margin: 12px 0 16px;
+    font-size: 10pt;
+  }
+  .callout strong { display: block; margin-bottom: 6px; }
+  .callout ul { margin: 0; padding-left: 18px; }
+  .callout li { margin: 2px 0; }
 </style>
 </head>
 <body>
@@ -179,6 +189,38 @@
   </tbody>
 </table>
 {% else %}<p class="empty">No anomalies recorded for this period.</p>{% endif %}
+
+<h2>Optimization Insights</h2>
+<p>{{ optimization.summary }}</p>
+
+{% if optimization.insight_rows %}
+<table>
+  <thead><tr><th>Type</th><th>Insight</th><th>Estimated impact</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for r in optimization.insight_rows %}
+    <tr>
+      <td>{{ r.type_label }}</td>
+      <td>{{ r.title }}</td>
+      <td>{{ r.impact }}</td>
+      <td>{{ r.status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="empty">No optimization insights generated during this period.</p>{% endif %}
+
+{% if optimization.coverage_box %}
+<div class="callout">
+  <strong>Routing coverage this period:</strong>
+  <ul>
+    <li>{{ optimization.coverage_box.routed_pct }}% of LLM spend ({{ optimization.coverage_box.routed_money }}) flowed through the ANVX routing engine.</li>
+    <li>{{ optimization.coverage_box.gap_pct }}% ({{ optimization.coverage_box.gap_money }}) flowed directly to providers without cost optimization.</li>
+    <li>Routing engine savings this period: {{ optimization.coverage_box.engine_savings_money }}.</li>
+  </ul>
+</div>
+{% elif optimization.no_admin_blurb %}
+<p class="empty">{{ optimization.no_admin_blurb }}</p>
+{% endif %}
 
 <div class="disclaimer">
   <strong>Disclaimer.</strong> This report is informational and not a substitute for licensed accounting, legal, or tax advice. Please review with your accountant or legal professional before filing.

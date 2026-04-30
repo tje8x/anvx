@@ -161,19 +161,15 @@ export default function InsightCard({ insight, workspaceId }: { insight: Insight
             {primaryLabel}
           </button>
         )}
+        <MacButton variant="secondary" onClick={handleAddToPack} disabled={busy !== null}>
+          {busy === 'pack' ? 'Adding…' : 'Add to close pack'}
+        </MacButton>
         <button
           onClick={handleDismiss}
           disabled={busy !== null}
           className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline disabled:opacity-50"
         >
           {busy === 'dismiss' ? 'Dismissing…' : 'Dismiss'}
-        </button>
-        <button
-          onClick={handleAddToPack}
-          disabled={busy !== null}
-          className="text-[11px] font-ui text-anvx-text-dim hover:text-anvx-text underline disabled:opacity-50"
-        >
-          {busy === 'pack' ? 'Adding…' : 'Add to close pack'}
         </button>
       </div>
     </div>

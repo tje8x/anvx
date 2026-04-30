@@ -314,6 +314,7 @@ def _routing_gap_insight(
         low = int(gap_total * 0.05)
         high = int(gap_total * 0.15)
         provider_pretty = (biggest_gap_provider or "").title()
+        coverage_pct = max(0, min(100, 100 - gap_pct))
         return OptimizationInsight(
             id=_new_id(),
             type="routing_gap",
@@ -329,26 +330,36 @@ def _routing_gap_insight(
             provider=biggest_gap_provider,
             action_type="link_to_settings",
             action_label="Open routing setup",
-            action_payload={"target": "/settings/routing"},
+            # `coverage_pct` is read by the Optimization tab UI to render the
+            # "Routing coverage: X% of LLM activity flows through ANVX." line
+            # without having to regex-parse the title.
+            action_payload={
+                "target": "/settings/routing",
+                "coverage_pct": coverage_pct,
+                "connector_total_cents": connector_total,
+                "routed_cents": connector_total - gap_total,
+                "gap_cents": gap_total,
+            },
         )
 
     # No connector visibility — softer framing aimed at workspaces still ramping.
+    # Total routed in cents; rounds-to-zero edge case is handled below.
     routed_total = sum(routing_by_provider.values())
     # Tier the framing so the copy never reads "$0 routed" when there's actual
-    # traffic that just rounds to less than a dollar:
-    #   * 0 cents → "haven't routed any traffic yet"
-    #   * 1–99 cents → fractional dollars + request count, since "$0 so far"
-    #     is misleading when there are real requests on file
-    #   * ≥ $1 → original whole-dollar framing
+    # traffic that just rounds to less than a dollar.
     if routed_total == 0:
-        volume_phrase = "You haven't routed any traffic yet"
+        volume_phrase = "You haven't routed any traffic yet."
     elif routed_total < 100:
+        # 1–99 cents: show the request count + fractional dollars to 2 decimals.
         volume_phrase = (
-            f"You've routed {routing_request_count} request{'s' if routing_request_count != 1 else ''} "
-            f"so far (~${routed_total / 100:.2f} in spend)"
+            f"You've routed {routing_request_count} request"
+            f"{'s' if routing_request_count != 1 else ''} so far "
+            f"(about ${routed_total / 100:.2f} in spend)."
         )
     else:
-        volume_phrase = f"You've routed {_format_dollars(routed_total)} so far"
+        # ≥ $1: whole-dollar framing with thousands separators (already in
+        # _format_dollars).
+        volume_phrase = f"You've routed {_format_dollars(routed_total)} so far."
     return OptimizationInsight(
         id=_new_id(),
         type="routing_gap",
@@ -357,14 +368,23 @@ def _routing_gap_insight(
         impact_cents=0,
         description=(
             "We can only optimize the LLM traffic that flows through ANVX routing. "
-            f"{volume_phrase} — to get a full optimization picture, "
+            f"{volume_phrase} To get a full optimization picture, "
             "point more of your application code at anvx.io/v1, or connect an admin-tier provider key "
             "so we can compare what's routed vs what isn't."
         ),
         provider=None,
         action_type="link_to_settings",
         action_label="Open routing setup",
-        action_payload={"target": "/settings/routing"},
+        # No admin connector → we have no comparison denominator. By definition
+        # 100% of *detected* LLM traffic comes through routing (we only see what
+        # we route). The UI uses `has_connector_visibility=False` to render
+        # "100% of detected LLM traffic" rather than an apples-to-oranges %.
+        action_payload={
+            "target": "/settings/routing",
+            "coverage_pct": 100 if routed_total > 0 else None,
+            "has_connector_visibility": False,
+            "routed_cents": routed_total,
+        },
     )
 
 

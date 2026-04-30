@@ -60,6 +60,176 @@ def _coa_lookup(sb, workspace_id: str) -> dict[str, dict]:
     return by_id
 
 
+# ─── Optimization Insights section ─────────────────────────────
+
+
+_INSIGHT_TYPE_LABELS = {
+    "model_tier": "Model Optimization",
+    "seat_utilization": "Seat Utilization",
+    "provider_comparison": "Provider Comparison",
+    "routing_gap": "Routing Coverage",
+    "cost_trajectory": "Cost Alert",
+}
+
+
+def _insight_status(row: dict, period_start: date, period_end: date) -> str:
+    payload = row.get("action_payload") or {}
+    if isinstance(payload, dict) and payload.get("acted_at"):
+        return f"Acted on {str(payload['acted_at'])[:10]}"
+    if row.get("added_to_pack_at"):
+        return "Added by user"
+    if row.get("dismissed_at"):
+        return "Dismissed"
+    return "Pending review"
+
+
+def _within(period_start: date, period_end: date, ts_str: str | None) -> bool:
+    if not ts_str:
+        return False
+    try:
+        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return False
+    return period_start <= ts.date() < period_end
+
+
+def get_optimization_section(workspace_id: str, period_start: date, period_end: date) -> dict[str, Any]:
+    """Build the Optimization Insights section payload for the close pack PDF.
+
+    Includes any insight whose `generated_at` (active rows), `added_to_pack_at`,
+    or `dismissed_at` falls within [period_start, period_end). Dismissed
+    insights still get logged so the pack reflects what the user evaluated
+    during the period — closure is a record, not just a snapshot of pending.
+    """
+    sb = sb_service()
+    start_iso = datetime.combine(period_start, datetime.min.time(), tzinfo=timezone.utc).isoformat()
+    end_iso = datetime.combine(period_end, datetime.min.time(), tzinfo=timezone.utc).isoformat()
+    period_close_iso = end_iso
+
+    # Connected provider keys at the close date (deleted_at is null OR was set
+    # after the close date — i.e. deletion happens after the period we're
+    # reporting on, so the key was live during).
+    keys_rows = (
+        sb.from_("provider_keys")
+        .select("provider, key_metadata, deleted_at, created_at")
+        .eq("workspace_id", workspace_id)
+        .execute()
+    ).data or []
+    connected_keys = []
+    has_admin_connector = False
+    admin_connector_providers: list[str] = []
+    for k in keys_rows:
+        deleted = k.get("deleted_at")
+        created = k.get("created_at")
+        if deleted and deleted < period_close_iso:
+            continue  # was already gone before the close
+        if created and created > period_close_iso:
+            continue  # connected after the close — not relevant to this pack
+        connected_keys.append(k)
+        meta = k.get("key_metadata") or {}
+        caps = set(meta.get("capabilities") or [])
+        if "historical_usage" in caps:
+            has_admin_connector = True
+            admin_connector_providers.append(k["provider"])
+    n_providers = len(connected_keys)
+
+    # Insights that overlap the period in any of three ways. We pull all
+    # workspace insights and filter in Python because the postgrest OR builder
+    # is awkward and the row count per workspace is small (≤ 10s of rows).
+    all_rows = (
+        sb.from_("optimization_insights")
+        .select("*")
+        .eq("workspace_id", workspace_id)
+        .execute()
+    ).data or []
+
+    relevant: list[dict] = []
+    for row in all_rows:
+        if (
+            _within(period_start, period_end, row.get("generated_at"))
+            or _within(period_start, period_end, row.get("added_to_pack_at"))
+            or _within(period_start, period_end, row.get("dismissed_at"))
+        ):
+            relevant.append(row)
+
+    # Sort highest-impact first; ties broken by status priority so acted/added
+    # rows surface above pending and dismissed.
+    status_priority = {"Acted on": 0, "Added by user": 1, "Pending review": 2, "Dismissed": 3}
+    insight_rows = []
+    for r in relevant:
+        status = _insight_status(r, period_start, period_end)
+        status_key = status.split(" ")[0] + " " + status.split(" ")[1] if status.startswith("Acted on") else status
+        priority_bucket = "Acted on" if status.startswith("Acted on") else status
+        insight_rows.append({
+            "type_label": _INSIGHT_TYPE_LABELS.get(r.get("type") or "", r.get("type") or "—"),
+            "title": r.get("title") or "",
+            "impact": r.get("impact") or "",
+            "status": status,
+            "_sort_priority": status_priority.get(priority_bucket, 99),
+            "_impact_cents": int(r.get("impact_cents") or 0),
+        })
+    insight_rows.sort(key=lambda x: (x["_sort_priority"], -x["_impact_cents"]))
+    insight_count_in_period = sum(1 for r in relevant if _within(period_start, period_end, r.get("generated_at")))
+
+    # Routing coverage box — populated only when admin connector data lets us
+    # compute the un-routed remainder.
+    coverage_box: dict[str, Any] | None = None
+    no_admin_blurb: str | None = None
+    if has_admin_connector:
+        # Look up the most recent routing_gap insight in the period; its
+        # action_payload carries the connector_total / routed / gap cents we
+        # already computed.
+        gap_row: dict | None = None
+        for r in relevant:
+            if r.get("type") == "routing_gap":
+                payload = r.get("action_payload") or {}
+                if isinstance(payload, dict) and "connector_total_cents" in payload:
+                    if gap_row is None or (r.get("generated_at") or "") > (gap_row.get("generated_at") or ""):
+                        gap_row = r
+        if gap_row:
+            payload = gap_row.get("action_payload") or {}
+            connector_total = int(payload.get("connector_total_cents") or 0)
+            routed_cents = int(payload.get("routed_cents") or 0)
+            gap_cents = int(payload.get("gap_cents") or max(0, connector_total - routed_cents))
+            cov_pct = int(payload.get("coverage_pct") or 0)
+            gap_pct = max(0, 100 - cov_pct)
+            # Engine savings = the midpoint impact of the most recent gap insight.
+            engine_savings = int(gap_row.get("impact_cents") or 0)
+            coverage_box = {
+                "routed_pct": cov_pct,
+                "routed_cents": routed_cents,
+                "routed_money": _fmt_money(routed_cents),
+                "gap_pct": gap_pct,
+                "gap_cents": gap_cents,
+                "gap_money": _fmt_money(gap_cents),
+                "engine_savings_money": _fmt_money(engine_savings),
+            }
+    else:
+        no_admin_blurb = (
+            "Routing coverage analysis requires an admin-tier provider key to compute spend that "
+            "didn't flow through ANVX. Connect one to enable this section in future packs."
+        )
+
+    summary = (
+        f"ANVX analyzed {n_providers} connected provider"
+        f"{'s' if n_providers != 1 else ''} and identified {insight_count_in_period} optimization "
+        f"opportunit{'ies' if insight_count_in_period != 1 else 'y'} during this period."
+    )
+
+    return {
+        "summary": summary,
+        "n_providers": n_providers,
+        "n_insights_in_period": insight_count_in_period,
+        "insight_rows": [
+            # Strip private sort keys before sending to the template.
+            {k: v for k, v in r.items() if not k.startswith("_")}
+            for r in insight_rows
+        ],
+        "coverage_box": coverage_box,
+        "no_admin_blurb": no_admin_blurb,
+    }
+
+
 # ─── data assembly ─────────────────────────────────────────────
 
 
@@ -270,6 +440,8 @@ def assemble_close_pack_data(workspace_id: str, period_start: date, period_end: 
         flagged_line,
     ]
 
+    optimization = get_optimization_section(workspace_id, period_start, period_end)
+
     return {
         "workspace_name": workspace_name,
         "period_start": period_start.isoformat(),
@@ -287,6 +459,7 @@ def assemble_close_pack_data(workspace_id: str, period_start: date, period_end: 
             "flagged": flagged_count,
         },
         "anomalies": anomalies_view,
+        "optimization": optimization,
         # Raw data for CSV exports
         "_raw": {
             "routing_rows": routing_rows,

@@ -155,6 +155,218 @@ async def test_compute_insights_routing_only_emits_soft_routing_gap():
     assert "anvx.io/v1" in gap[0].description
 
 
+@pytest.mark.asyncio
+async def test_routing_gap_sub_dollar_volume_uses_request_count_phrasing():
+    """0 < routed_total < 100 cents → "X requests, ~$X.XX" phrasing, not "$0 routed"."""
+    from app.optimization import compute_insights
+
+    # Three requests totaling 47 cents — below the rounded-to-zero threshold.
+    routing = [
+        _routing_row("openai", "gpt-4o-mini", 15, tokens_in=80, tokens_out=20),
+        _routing_row("openai", "gpt-4o-mini", 16, tokens_in=80, tokens_out=20),
+        _routing_row("openai", "gpt-4o-mini", 16, tokens_in=80, tokens_out=20),
+    ]
+    sb = _stub_sb(routing_rows=routing, connector_rows=[], key_rows=[])
+
+    with patch("app.optimization.sb_service", return_value=sb):
+        insights = await compute_insights(WS)
+
+    gap = next(i for i in insights if i.type == "routing_gap")
+    # The misleading "$0 routed" copy must NOT appear at any sub-dollar volume.
+    assert "$0 so far" not in gap.description
+    assert "$0 routed" not in gap.description
+    # Required phrasing: request count + 2-decimal dollars.
+    assert "3 requests so far" in gap.description
+    assert "about $0.47 in spend" in gap.description
+
+
+def test_pack_optimization_section_for_mixed_status_workspace():
+    """`get_optimization_section` returns the right shape for a workspace with
+    a mix of pending / dismissed / added-to-pack insights, plus an admin connector
+    so the routing-coverage box is populated."""
+    from datetime import date, timedelta
+    from app.packs.close_pack import get_optimization_section
+
+    period_start = date(2026, 4, 1)
+    period_end = date(2026, 5, 1)
+
+    in_period = (NOW.replace(year=2026, month=4, day=15)).isoformat()
+
+    insight_rows = [
+        # Active model_tier — pending review.
+        {
+            "id": "ins-1",
+            "workspace_id": WS,
+            "type": "model_tier",
+            "title": "Anthropic: 70% on top tier",
+            "impact": "$300-$500/mo potential savings",
+            "impact_cents": 40_000,
+            "description": "x",
+            "provider": "anthropic",
+            "action_type": "create_routing_rule",
+            "action_label": None,
+            "action_payload": None,
+            "dismissed_at": None,
+            "added_to_pack_at": None,
+            "generated_at": in_period,
+            "expires_at": (NOW + timedelta(days=10)).isoformat(),
+        },
+        # Added by user.
+        {
+            "id": "ins-2",
+            "workspace_id": WS,
+            "type": "provider_comparison",
+            "title": "Short prompts on gpt-4o → claude-haiku-4-5",
+            "impact": "$50-$80/mo potential savings",
+            "impact_cents": 6_500,
+            "description": "y",
+            "provider": "openai",
+            "action_type": "create_routing_rule",
+            "action_label": None,
+            "action_payload": None,
+            "dismissed_at": None,
+            "added_to_pack_at": in_period,
+            "generated_at": in_period,
+            "expires_at": (NOW + timedelta(days=10)).isoformat(),
+        },
+        # Dismissed.
+        {
+            "id": "ins-3",
+            "workspace_id": WS,
+            "type": "cost_trajectory",
+            "title": "Spend up 30% week-over-week",
+            "impact": "~$5,000 annualized",
+            "impact_cents": 500_000,
+            "description": "z",
+            "provider": None,
+            "action_type": "link_to_settings",
+            "action_label": None,
+            "action_payload": None,
+            "dismissed_at": in_period,
+            "added_to_pack_at": None,
+            "generated_at": in_period,
+            "expires_at": (NOW + timedelta(days=10)).isoformat(),
+        },
+        # Routing gap with admin-connector payload — drives the coverage box.
+        {
+            "id": "ins-4",
+            "workspace_id": WS,
+            "type": "routing_gap",
+            "title": "82% of LLM spend isn't going through ANVX yet",
+            "impact": "$200-$600/mo potential savings",
+            "impact_cents": 40_000,
+            "description": "w",
+            "provider": "anthropic",
+            "action_type": "link_to_settings",
+            "action_label": "Open routing setup",
+            "action_payload": {
+                "target": "/settings/routing",
+                "coverage_pct": 18,
+                "connector_total_cents": 500_000,
+                "routed_cents": 90_000,
+                "gap_cents": 410_000,
+            },
+            "dismissed_at": None,
+            "added_to_pack_at": None,
+            "generated_at": in_period,
+            "expires_at": (NOW + timedelta(days=10)).isoformat(),
+        },
+    ]
+
+    keys_rows = [
+        # Admin-tier Anthropic key — drives has_admin_connector=True.
+        {
+            "provider": "anthropic",
+            "key_metadata": {"tier": "admin", "capabilities": ["historical_usage"]},
+            "deleted_at": None,
+            "created_at": "2025-01-01T00:00:00+00:00",
+        },
+    ]
+
+    def from_side(table):
+        chain = MagicMock()
+        chain.select.return_value = chain
+        chain.eq.return_value = chain
+        chain.is_.return_value = chain
+        chain.gte.return_value = chain
+        chain.lt.return_value = chain
+        chain.order.return_value = chain
+        chain.limit.return_value = chain
+        if table == "optimization_insights":
+            chain.execute.return_value = MagicMock(data=insight_rows)
+        elif table == "provider_keys":
+            chain.execute.return_value = MagicMock(data=keys_rows)
+        else:
+            chain.execute.return_value = MagicMock(data=[])
+        return chain
+
+    sb = MagicMock()
+    sb.from_.side_effect = from_side
+
+    with patch("app.packs.close_pack.sb_service", return_value=sb):
+        section = get_optimization_section(WS, period_start, period_end)
+
+    assert section["n_providers"] == 1
+    assert section["n_insights_in_period"] == 4
+    assert section["summary"].startswith("ANVX analyzed 1 connected provider")
+    assert "4 optimization opportunities" in section["summary"]
+
+    statuses = {r["status"] for r in section["insight_rows"]}
+    assert "Pending review" in statuses
+    assert "Added by user" in statuses
+    assert "Dismissed" in statuses
+
+    # Coverage box populated from the routing_gap payload.
+    assert section["coverage_box"] is not None
+    assert section["coverage_box"]["routed_pct"] == 18
+    assert section["coverage_box"]["gap_pct"] == 82
+    assert section["no_admin_blurb"] is None
+
+
+def test_pack_optimization_section_no_admin_emits_blurb():
+    """No admin-tier connector → coverage_box is None and the upsell blurb is set."""
+    from datetime import date
+    from app.packs.close_pack import get_optimization_section
+
+    period_start = date(2026, 4, 1)
+    period_end = date(2026, 5, 1)
+
+    keys_rows = [
+        # Standard tier — no historical_usage capability, so not an admin connector.
+        {
+            "provider": "openai",
+            "key_metadata": {"tier": "standard", "capabilities": ["live_tracking"]},
+            "deleted_at": None,
+            "created_at": "2025-01-01T00:00:00+00:00",
+        },
+    ]
+
+    def from_side(table):
+        chain = MagicMock()
+        chain.select.return_value = chain
+        chain.eq.return_value = chain
+        chain.is_.return_value = chain
+        chain.gte.return_value = chain
+        chain.lt.return_value = chain
+        chain.order.return_value = chain
+        chain.limit.return_value = chain
+        if table == "provider_keys":
+            chain.execute.return_value = MagicMock(data=keys_rows)
+        else:
+            chain.execute.return_value = MagicMock(data=[])
+        return chain
+
+    sb = MagicMock()
+    sb.from_.side_effect = from_side
+
+    with patch("app.packs.close_pack.sb_service", return_value=sb):
+        section = get_optimization_section(WS, period_start, period_end)
+
+    assert section["coverage_box"] is None
+    assert section["no_admin_blurb"] is not None
+    assert "admin-tier provider key" in section["no_admin_blurb"]
+
+
 # ─── dismiss endpoint ──────────────────────────────────────────────────────
 
 

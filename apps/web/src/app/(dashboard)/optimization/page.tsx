@@ -27,17 +27,33 @@ function MetricCard({ label, value, subtitle }: { label: string; value: string; 
   )
 }
 
-function pctFromRoutingGap(insights: Insight[]): number | null {
+type RoutingCoverage =
+  | { kind: 'no_activity' }
+  | { kind: 'detected'; pct: number }   // soft-framed (routing only, no connector visibility)
+  | { kind: 'comparable'; pct: number } // connector data exists; pct is real coverage
+
+function coverageFromInsights(insights: Insight[] | null): RoutingCoverage {
+  if (!insights || insights.length === 0) return { kind: 'no_activity' }
   const gap = insights.find((i) => i.type === 'routing_gap')
-  if (!gap) return null
-  // The title carries the gap percentage; derive coverage = 100 - gap_pct.
-  // When the soft-framed routing_gap (no connector data) is the one we got,
-  // the title doesn't include a percent and we show "—".
-  const m = gap.title.match(/(\d+)%/)
-  if (!m) return null
-  const gapPct = Number(m[1])
-  if (!Number.isFinite(gapPct)) return null
-  return Math.max(0, Math.min(100, 100 - gapPct))
+  if (!gap) {
+    // Other insights exist (model_tier etc.) so there *is* activity, but no
+    // routing_gap means routing coverage isn't computable here.
+    return { kind: 'no_activity' }
+  }
+  const payload = (gap.action_payload ?? {}) as Record<string, unknown>
+  const pctRaw = payload['coverage_pct']
+  const hasConnector = payload['has_connector_visibility']
+  const pct = typeof pctRaw === 'number' ? Math.max(0, Math.min(100, Math.round(pctRaw))) : null
+
+  if (pct === null) return { kind: 'no_activity' }
+  if (hasConnector === false) return { kind: 'detected', pct }
+  return { kind: 'comparable', pct }
+}
+
+function coverageLine(c: RoutingCoverage): string {
+  if (c.kind === 'no_activity') return 'Routing coverage: no activity yet.'
+  if (c.kind === 'detected') return `Routing coverage: ${c.pct}% of detected LLM traffic.`
+  return `Routing coverage: ${c.pct}% of LLM activity flows through ANVX.`
 }
 
 export default function OptimizationPage() {
@@ -133,7 +149,7 @@ export default function OptimizationPage() {
     .reduce((acc, i) => acc + i.impact_cents, 0)
   const pending = activeCount
 
-  const coveragePct = insights ? pctFromRoutingGap(insights) : null
+  const coverage = coverageFromInsights(insights)
 
   return (
     <div className="flex flex-col gap-6">
@@ -186,12 +202,12 @@ export default function OptimizationPage() {
         <SectionTitle>This Month&apos;s Optimization</SectionTitle>
         <div className="grid grid-cols-4 gap-3 mb-3">
           <MetricCard label="Insights generated" value={String(generated30d)} />
-          <MetricCard label="Acted on" value={String(actedOn)} subtitle="Tracked once acted_at column lands" />
+          <MetricCard label="Acted on" value={String(actedOn)} />
           <MetricCard label="Estimated savings" value={`$${(estimatedSavings / 100).toLocaleString()}`} />
           <MetricCard label="Pending" value={String(pending)} />
         </div>
         <p className="text-[11px] font-data text-anvx-text-dim">
-          Routing coverage: {coveragePct !== null ? `${coveragePct}%` : '—'} of LLM activity flows through ANVX.
+          {coverageLine(coverage)}
         </p>
       </section>
     </div>
