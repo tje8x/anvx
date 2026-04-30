@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import PostHogProvider from "./PostHogProvider";
+import { Toaster } from "@/components/ui/sonner";
 import localFont from "next/font/local";
 import { Space_Mono, IBM_Plex_Mono } from 'next/font/google'
 import "./globals.css";
@@ -46,6 +47,25 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <PostHogProvider>{children}</PostHogProvider>
+          {/* Mounted at the root so toasts work in (dashboard), (onboarding),
+              and (marketing) without mounting one Toaster per layout. Style
+              overrides match the retro-Mac tokens (parchment background,
+              Space Mono UI font, accent border). */}
+          <Toaster
+            position="top-right"
+            richColors
+            closeButton
+            toastOptions={{
+              style: {
+                fontFamily: 'var(--font-ui)',
+                fontSize: '12px',
+                background: 'var(--anvx-win, #f5f3ed)',
+                color: 'var(--anvx-text, #1a1a1a)',
+                border: '1px solid var(--anvx-bdr, #8e8a7e)',
+                borderRadius: '2px',
+              },
+            }}
+          />
         </body>
       </html>
     </ClerkProvider>
