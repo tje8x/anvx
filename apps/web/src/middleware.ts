@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks/(.*)',
   '/api/internal/(.*)',
   '/api/cron/(.*)',
+  '/api/health',
 ])
 
 // Legacy paths kept routable as 308 permanent redirects so external bookmarks

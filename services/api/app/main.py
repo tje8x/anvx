@@ -83,6 +83,7 @@ from .routers import connectors as connectors_router
 from .routers import copilot as copilot_router
 from .routers import dashboard as dashboard_router
 from .routers import documents as documents_router
+from .routers import health as health_router
 from .routers import incidents as incidents_router
 from .routers import reconcile as reconcile_router
 from .routers import insights as insights_router
@@ -172,6 +173,7 @@ app.include_router(packs_router.router, prefix="/api/v2")
 app.include_router(billing_router.router, prefix="/api/v2")
 app.include_router(notifications_router.router, prefix="/api/v2")
 app.include_router(onboarding_router.router, prefix="/api/v2")
+app.include_router(health_router.router)
 
 
 @app.get("/health")
