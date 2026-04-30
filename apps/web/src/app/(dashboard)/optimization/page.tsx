@@ -10,7 +10,12 @@ import InsightCard, { type Insight } from '@/components/optimization/insight-car
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
 
-type WorkspaceMe = { id: string; role: string; routing_mode: string }
+// /api/v2/workspace/me returns the workspace identifier under `workspace_id`,
+// NOT `id` (the DB row's `id` is intentionally stripped server-side — see
+// services/api/app/routers/workspace.py:120). Reading the wrong field gave us
+// `undefined` here, which template-strung into "/workspaces/undefined/..."
+// and 403'd every request.
+type WorkspaceMe = { workspace_id: string; role: string; routing_mode: string }
 
 function MetricCard({ label, value, subtitle }: { label: string; value: string; subtitle?: string }) {
   return (
@@ -50,7 +55,8 @@ export default function OptimizationPage() {
 
   // Resolve the active workspace_id from /api/v2/workspace/me, then fetch
   // optimization insights for it. Two round-trips; cached client-side once
-  // the page is up.
+  // the page is up. We DO NOT fire the second fetch until we have a real UUID —
+  // otherwise the URL becomes "/workspaces/undefined/..." and 403's.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -60,9 +66,13 @@ export default function OptimizationPage() {
         if (!meRes.ok) throw new Error(`workspace/me failed: ${meRes.status}`)
         const me: WorkspaceMe = await meRes.json()
         if (cancelled) return
-        setWorkspaceId(me.id)
+        const wsId = me.workspace_id
+        if (!wsId || typeof wsId !== 'string') {
+          throw new Error('workspace/me did not return workspace_id')
+        }
+        setWorkspaceId(wsId)
 
-        const insRes = await fetch(`${API_BASE}/api/v2/workspaces/${me.id}/optimization-insights`, { headers: h })
+        const insRes = await fetch(`${API_BASE}/api/v2/workspaces/${wsId}/optimization-insights`, { headers: h })
         if (!insRes.ok) throw new Error(`optimization-insights failed: ${insRes.status}`)
         const data: { insights: Insight[] } = await insRes.json()
         if (cancelled) return
