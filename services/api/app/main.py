@@ -91,6 +91,7 @@ from .routers import model_usage as model_usage_router
 from .routers import models as models_router
 from .routers import notifications as notifications_router
 from .routers import onboarding as onboarding_router
+from .routers import optimization as optimization_router
 from .routers import packs as packs_router
 from .routers import policies as policies_router
 from .routers import routing as routing_router
@@ -175,6 +176,7 @@ app.include_router(packs_router.router, prefix="/api/v2")
 app.include_router(billing_router.router, prefix="/api/v2")
 app.include_router(notifications_router.router, prefix="/api/v2")
 app.include_router(onboarding_router.router, prefix="/api/v2")
+app.include_router(optimization_router.router, prefix="/api/v2")
 app.include_router(health_router.router)
 
 
