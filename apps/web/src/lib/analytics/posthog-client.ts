@@ -25,6 +25,12 @@ export type AnalyticsEvent =
   | { name: 'treasury_insights_shown'; props: { count: number } }
   | { name: 'treasury_insight_interest_click'; props: { insight_type: string; insight_id: string; projected_runway_impact: number } }
   | { name: 'treasury_insight_dismissed'; props: { insight_type: string; insight_id: string } }
+  | { name: 'optimization_tab_viewed'; props: { workspace_id: string; insights_count: number } }
+  | { name: 'optimization_insight_shown'; props: { workspace_id: string; insight_type: string; insight_id: string; estimated_savings_cents: number } }
+  | { name: 'optimization_insight_applied'; props: { workspace_id: string; insight_type: string; insight_id: string; estimated_savings_cents: number } }
+  | { name: 'optimization_insight_dismissed'; props: { workspace_id: string; insight_type: string; insight_id: string; estimated_savings_cents: number } }
+  | { name: 'optimization_insight_added_to_pack'; props: { workspace_id: string; insight_type: string; insight_id: string; estimated_savings_cents: number } }
+  | { name: 'optimization_refresh_clicked'; props: { workspace_id: string; insights_count: number } }
 
 export function capture<E extends AnalyticsEvent>(event: E['name'], props: E['props']): void {
   if (typeof window === 'undefined') return

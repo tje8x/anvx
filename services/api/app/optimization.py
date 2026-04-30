@@ -277,6 +277,7 @@ def _routing_gap_insight(
     connected_providers: set[str],
     has_any_routing: bool,
     has_any_connector: bool,
+    routing_request_count: int = 0,
 ) -> OptimizationInsight | None:
     """Always emitted when there's any LLM activity. The framing changes based
     on whether the workspace has admin connectors that give us comparison data.
@@ -333,6 +334,21 @@ def _routing_gap_insight(
 
     # No connector visibility — softer framing aimed at workspaces still ramping.
     routed_total = sum(routing_by_provider.values())
+    # Tier the framing so the copy never reads "$0 routed" when there's actual
+    # traffic that just rounds to less than a dollar:
+    #   * 0 cents → "haven't routed any traffic yet"
+    #   * 1–99 cents → fractional dollars + request count, since "$0 so far"
+    #     is misleading when there are real requests on file
+    #   * ≥ $1 → original whole-dollar framing
+    if routed_total == 0:
+        volume_phrase = "You haven't routed any traffic yet"
+    elif routed_total < 100:
+        volume_phrase = (
+            f"You've routed {routing_request_count} request{'s' if routing_request_count != 1 else ''} "
+            f"so far (~${routed_total / 100:.2f} in spend)"
+        )
+    else:
+        volume_phrase = f"You've routed {_format_dollars(routed_total)} so far"
     return OptimizationInsight(
         id=_new_id(),
         type="routing_gap",
@@ -341,7 +357,7 @@ def _routing_gap_insight(
         impact_cents=0,
         description=(
             "We can only optimize the LLM traffic that flows through ANVX routing. "
-            f"You've routed {_format_dollars(routed_total)} so far — to get a full optimization picture, "
+            f"{volume_phrase} — to get a full optimization picture, "
             "point more of your application code at anvx.io/v1, or connect an admin-tier provider key "
             "so we can compare what's routed vs what isn't."
         ),
@@ -534,6 +550,7 @@ async def compute_insights(workspace_id: str) -> list[OptimizationInsight]:
         connected_providers=connected_providers,
         has_any_routing=bool(routing_rows),
         has_any_connector=bool(connector_rows),
+        routing_request_count=len(routing_rows),
     )
     if routing_gap:
         insights.append(routing_gap)

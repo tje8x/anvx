@@ -8,6 +8,7 @@ import { Settings as SettingsIcon } from 'lucide-react'
 const tabs = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Routing', href: '/routing' },
+  { label: 'Optimization', href: '/optimization' },
   { label: 'Reports', href: '/reports' },
   { label: 'Statements', href: '/statements' },
 ] as const
