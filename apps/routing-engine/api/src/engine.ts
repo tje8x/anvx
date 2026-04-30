@@ -4,6 +4,7 @@ import { authMiddleware, type TokenInfo } from './auth'
 import { loadRoutingContext } from './context'
 import { decide } from './decide'
 import { forwardToUpstream } from './upstream'
+import { resolveProvider, type OpenAIChatBody } from './providers'
 import { writeUsage } from './meter'
 import { decryptProviderKey } from './crypto'
 
@@ -59,7 +60,13 @@ engine.post('/chat/completions', async (c) => {
     // Forward to upstream
     console.log("ENG_4 upstream_start", { request_id, stream: isStream })
     const upstreamStart = Date.now()
-    const upstreamRes = await forwardToUpstream(body, providerKey)
+    const { provider, model } = resolveProvider(requestedModel)
+    const upstreamRes = await forwardToUpstream({
+      provider,
+      model,
+      openaiBody: body as OpenAIChatBody,
+      providerKey,
+    })
     const upstreamLatencyMs = Date.now() - upstreamStart
     console.log("ENG_5 upstream_done", { request_id, status: upstreamRes.status, upstream_ms: upstreamLatencyMs })
 
@@ -89,23 +96,15 @@ engine.post('/chat/completions', async (c) => {
       user_hint: c.req.header('x-anvx-user') ?? null,
     }).catch(() => {})
 
+    // Streaming path is not supported here yet — upstream is always buffered.
+    // Hono's `c.body` will write the buffered text as the response body.
     if (isStream) {
-      // B: Use c.body() instead of raw Response for streaming
-      if (!upstreamRes.body) {
-        console.log("ENG_6 stream_no_body", { request_id })
-        return c.json({ error: 'upstream', message: 'Upstream returned no body' }, 502)
-      }
-      console.log("ENG_6 stream_response", { request_id })
-      return c.body(upstreamRes.body, upstreamRes.status as any, {
-        'content-type': 'text/event-stream',
-        'cache-control': 'no-cache',
-      })
+      console.log("ENG_6 stream_unsupported", { request_id })
+      return c.json({ error: 'unsupported', message: 'Streaming temporarily disabled in this engine path.' }, 501)
     }
 
-    // Non-streaming: buffer and return via c.json/c.body
-    const responseBody = await upstreamRes.text()
-    console.log("ENG_6 non_stream_response", { request_id, bodyLen: responseBody.length })
-    return c.body(responseBody, upstreamRes.status as any, {
+    console.log("ENG_6 non_stream_response", { request_id, bodyLen: upstreamRes.rawText.length })
+    return c.body(upstreamRes.rawText, upstreamRes.status as any, {
       'content-type': 'application/json',
     })
   } catch (err: any) {

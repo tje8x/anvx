@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import type { Provider } from './providers'
 
 let _sb: SupabaseClient | null = null
 function sb(): SupabaseClient {
@@ -12,12 +13,21 @@ function sb(): SupabaseClient {
   return _sb
 }
 
+/**
+ * Map of provider → encrypted envelope (base64 ciphertext, AES-256-GCM with
+ * an HKDF-derived per-workspace DEK). NEVER decrypt at this layer — the engine
+ * decrypts on demand right before forwarding upstream so plaintext only lives
+ * in the request scope.
+ */
+export type ProviderKeyEnvelopes = Partial<Record<Provider, string | null>>
+
 export type RoutingContext = {
   routing_mode: 'observer' | 'copilot' | 'autopilot'
   policies: any[]
   rules: any[]
   period_spend: { day_cents: number; month_cents: number; hourly_baseline_cents: number }
-  active_incidents: any[]
+  active_incidents?: any[]
+  providerKeys?: ProviderKeyEnvelopes
 }
 
 export type DecisionResult = {
@@ -32,15 +42,42 @@ export type DecisionResult = {
 }
 
 const ctxCache = new Map<string, { ctx: RoutingContext; expiresAt: number }>()
+const CONTEXT_CACHE_TTL_MS = 30_000
 
 export async function loadContext(workspace_id: string): Promise<RoutingContext | null> {
   const hit = ctxCache.get(workspace_id)
   if (hit && Date.now() < hit.expiresAt) return hit.ctx
-  const { data, error } = await sb().rpc('workspace_routing_context', { p_workspace_id: workspace_id })
-  if (error || !data) return null
-  const ctx = data as RoutingContext
-  ctxCache.set(workspace_id, { ctx, expiresAt: Date.now() + 5000 })
+
+  // Fan out the RPC + provider-keys query in parallel so we don't pay two
+  // serial round-trips for context load.
+  const [rpcResult, keysResult] = await Promise.all([
+    sb().rpc('workspace_routing_context', { p_workspace_id: workspace_id }),
+    sb()
+      .from('provider_keys')
+      .select('provider, envelope')
+      .eq('workspace_id', workspace_id)
+      .is('deleted_at', null),
+  ])
+
+  if (rpcResult.error || !rpcResult.data) return null
+
+  const providerKeys: ProviderKeyEnvelopes = {}
+  if (!keysResult.error && Array.isArray(keysResult.data)) {
+    for (const row of keysResult.data as Array<{ provider: string; envelope: string }>) {
+      // We trust the DB to only contain providers we know about. Unknown providers
+      // are silently dropped from the map — they can't be routed to anyway.
+      providerKeys[row.provider as Provider] = row.envelope
+    }
+  }
+
+  const ctx = { ...(rpcResult.data as RoutingContext), providerKeys }
+  ctxCache.set(workspace_id, { ctx, expiresAt: Date.now() + CONTEXT_CACHE_TTL_MS })
   return ctx
+}
+
+/** Test-only: drop the in-memory context cache so tests can reset state. */
+export function _clearContextCache() {
+  ctxCache.clear()
 }
 
 function estimateRequestCents(

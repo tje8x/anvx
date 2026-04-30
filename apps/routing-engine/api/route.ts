@@ -6,14 +6,20 @@ import { createClient } from '@supabase/supabase-js'
 import { loadContext, decide, type DecisionResult, type RoutingContext } from './src/decide'
 import { writeUsage } from './src/meter'
 import { errorResponse, safeMessage, type ErrorKind } from './src/errors'
+import { forwardToUpstream, type UpstreamResult } from './src/upstream'
+import {
+  resolveProvider,
+  translateResponseToOpenAI,
+  type OpenAIChatBody,
+} from './src/providers'
+import { resolveProviderKey } from './src/keys'
+import { getBootstrapStatus } from './src/bootstrap'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const OPENAI_BASE = 'https://api.openai.com/v1'
-const UPSTREAM_TIMEOUT_MS = 25_000
 const CONTEXT_TIMEOUT_MS = 2_000
 
 function sendError(res: VercelResponse, kind: ErrorKind, request_id: string, detail?: Record<string, unknown>) {
@@ -31,6 +37,7 @@ async function bestEffortUsage(fields: Parameters<typeof writeUsage>[0]) {
   try { await writeUsage(fields) } catch (err) { console.error("WRITE_USAGE_FAILED", JSON.stringify(err)) }
 }
 
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const request_id = crypto.randomUUID()
   const startedAt = Date.now()
@@ -39,6 +46,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     console.log("ENG_0 handler_entry", { request_id, method: req.method, url: req.url })
+
+    // Bootstrap check — refuse to handle requests if the master encryption key
+    // isn't usable. We can't decrypt provider keys without it, so every request
+    // would fail anyway; failing fast with a clear status keeps the symptom honest.
+    const boot = getBootstrapStatus()
+    if (!boot.ok) {
+      sendError(res, 'anvx_unavailable', request_id, { error_stage: 'bootstrap', reason: boot.reason })
+      return
+    }
 
     // Auth
     const authHeader = (req.headers['authorization'] ?? '') as string
@@ -72,24 +88,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log("ENG_1 auth_complete", { request_id, workspaceId })
 
     // Parse body
-    let body: Record<string, unknown>
+    let body: OpenAIChatBody
     try {
-      body = req.body as Record<string, unknown>
-      if (body === null || body === undefined || typeof body !== 'object' || Array.isArray(body)) throw new Error('not an object')
+      const raw = req.body
+      if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('not an object')
+      body = raw as OpenAIChatBody
     } catch {
       sendError(res, 'malformed_request', request_id)
       await auditLog(workspaceId, 'malformed_request', request_id)
       return
     }
 
-    const requestedModel = (body?.model as string) ?? 'gpt-4o'
+    const requestedRawModel = (body?.model as string) ?? 'gpt-4o'
     const projectTag = (req.headers['x-anvx-project'] as string) ?? undefined
     const userHint = (req.headers['x-anvx-user'] as string) ?? undefined
+
+    // Resolve provider from the model name. Done up-front so usage rows record
+    // the right provider even when context-load or upstream fails.
+    const requestedResolution = resolveProvider(requestedRawModel)
+    const requestedProvider = requestedResolution.provider
 
     // Load routing context with 2s timeout
     let ctx: RoutingContext | null = null
     let dec: DecisionResult
-    const usageBase = { request_id, workspace_id: workspaceId, token_id: tokenId, model_requested: requestedModel, provider: 'openai', project_tag: projectTag ?? null, user_hint: userHint ?? null }
+    const usageBase = {
+      request_id,
+      workspace_id: workspaceId,
+      token_id: tokenId,
+      model_requested: requestedRawModel,
+      provider: requestedProvider,
+      project_tag: projectTag ?? null,
+      user_hint: userHint ?? null,
+    }
 
     try {
       ctx = await Promise.race([
@@ -103,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { data: closedRow } = await supabase.from('budget_policies').select('id').eq('workspace_id', workspaceId).eq('fail_mode', 'closed').eq('enabled', true).limit(1).single()
 
       if (closedRow) {
-        await bestEffortUsage({ ...usageBase, model_routed: requestedModel, tokens_in: 0, tokens_out: 0, decision: 'failed_closed', observer_suggestion: null, reasoning: 'Context load failed — fail-closed policy active.', policy_triggered: null, upstream_latency_ms: 0, total_latency_ms: Date.now() - startedAt })
+        await bestEffortUsage({ ...usageBase, model_routed: requestedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_closed', observer_suggestion: null, reasoning: 'Context load failed — fail-closed policy active.', policy_triggered: null, upstream_latency_ms: 0, total_latency_ms: Date.now() - startedAt })
         await auditLog(workspaceId, 'anvx_unavailable', request_id)
         sendError(res, 'anvx_unavailable', request_id, { error_stage: 'context_load' })
         return
@@ -114,14 +144,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!ctx) {
-      dec = { decision: 'failed_open', model_routed: requestedModel, provider_routed: 'openai', reasoning: 'Context load failed — failed open.', policy_triggered_id: null, observer_suggestion: null }
+      dec = { decision: 'failed_open', model_routed: requestedRawModel, provider_routed: requestedProvider, reasoning: 'Context load failed — failed open.', policy_triggered_id: null, observer_suggestion: null }
     } else {
       console.log("ENG_2 context_loaded", { request_id, routing_mode: ctx.routing_mode })
       const messagesStr = body?.messages ? JSON.stringify(body.messages) : ''
       const tokensInEstimate = Math.ceil(messagesStr.length / 4)
       const maxTokens = (body?.max_tokens as number) ?? 1024
 
-      dec = await decide(ctx, { workspace_id: workspaceId, model_requested: requestedModel, tokens_in_estimate: tokensInEstimate, max_tokens: maxTokens, project_tag: projectTag, user_hint: userHint }, {})
+      dec = await decide(ctx, { workspace_id: workspaceId, model_requested: requestedRawModel, tokens_in_estimate: tokensInEstimate, max_tokens: maxTokens, project_tag: projectTag, user_hint: userHint }, {})
     }
 
     console.log("ENG_3 decision", { request_id, decision: dec.decision, model_routed: dec.model_routed, policy: dec.policy_triggered_id })
@@ -141,77 +171,104 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    // Upstream
-    const upstreamModel = dec.decision === 'downgraded' ? dec.model_routed : requestedModel
-    const upstreamBody = { ...body, model: upstreamModel, stream: false }
+    // Resolve provider for the *routed* model — a downgrade may switch providers
+    // (e.g. claude-opus-4 → claude-haiku-4-5 stays Anthropic; gpt-4o → claude-haiku
+    // would cross provider boundaries).
+    const routedRawModel = dec.decision === 'downgraded' ? dec.model_routed : requestedRawModel
+    const routedResolution = resolveProvider(routedRawModel)
+    const routedProvider = routedResolution.provider
+    const routedModel = routedResolution.model
 
-    const providerKey = process.env.ANVX_DEV_OPENAI_KEY ?? ''
-    if (!providerKey) {
-      sendError(res, 'anvx_unavailable', request_id, { error_stage: 'no_provider_key' })
+    const keyRes = resolveProviderKey(routedProvider, ctx, workspaceId)
+    if (!keyRes.ok) {
+      // No workspace-connected key for this provider, no dev-fallback either —
+      // surface a 400 with a clear remediation path. This must be a 4xx (the
+      // request is well-formed; it's the workspace config that's incomplete),
+      // not a 5xx, so client retry logic doesn't loop on it.
+      const totalLatencyMs = Date.now() - startedAt
+      await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'No provider key connected for routed provider.', policy_triggered: null, upstream_latency_ms: 0, total_latency_ms: totalLatencyMs })
+      await auditLog(workspaceId, 'no_provider_key_connected', request_id)
+      const body = {
+        error: 'no_provider_key_connected',
+        message: `No ${routedProvider} API key connected for this workspace. Connect at https://anvx.io/settings/connections.`,
+        request_id,
+      }
+      res.status(400).setHeader('content-type', 'application/json').send(JSON.stringify(body))
       return
     }
+    const providerKey = keyRes.key
 
-    console.log("ENG_4 upstream_start", { request_id, model: upstreamModel })
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
+    // The body we forward upstream uses the user's original messages but pinned
+    // to the routed model and with stream forced off.
+    const upstreamOpenAIBody: OpenAIChatBody = { ...body, model: routedModel, stream: false }
 
-    let upstreamRes: Response
+    console.log("ENG_4 upstream_start", { request_id, provider: routedProvider, model: routedModel })
+
+    let upstreamRes: UpstreamResult
     try {
-      upstreamRes = await fetch(`${OPENAI_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${providerKey}` },
-        body: JSON.stringify(upstreamBody),
-        signal: controller.signal,
+      upstreamRes = await forwardToUpstream({
+        provider: routedProvider,
+        model: routedModel,
+        openaiBody: upstreamOpenAIBody,
+        providerKey,
       })
     } catch (fetchErr: any) {
-      clearTimeout(timeout)
-      if (fetchErr?.name === 'AbortError') {
-        console.error("ENG_ERR upstream_timeout", { request_id })
-        await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream timeout.', policy_triggered: null, upstream_latency_ms: UPSTREAM_TIMEOUT_MS, total_latency_ms: Date.now() - startedAt })
+      const isTimeout = typeof fetchErr?.message === 'string' && fetchErr.message.includes('timed out')
+      if (isTimeout) {
+        console.error("ENG_ERR upstream_timeout", { request_id, provider: routedProvider })
+        await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream timeout.', policy_triggered: null, upstream_latency_ms: Date.now() - startedAt, total_latency_ms: Date.now() - startedAt })
         await auditLog(workspaceId, 'upstream_timeout', request_id)
-        sendError(res, 'upstream_timeout', request_id, { provider: 'openai', model: upstreamModel })
+        sendError(res, 'upstream_timeout', request_id, { provider: routedProvider, model: routedModel })
         return
       }
       throw fetchErr
     }
-    clearTimeout(timeout)
 
     const upstreamLatencyMs = Date.now() - startedAt
     console.log("ENG_5 upstream_done", { request_id, status: upstreamRes.status, upstream_ms: upstreamLatencyMs })
 
-    // Upstream error mapping
+    // Upstream error mapping (status codes are reasonably consistent across providers)
     if (upstreamRes.status === 429) {
       const retryAfter = upstreamRes.headers.get('retry-after')
-      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream rate limited.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+      await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream rate limited.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
       await auditLog(workspaceId, 'upstream_rate_limit', request_id)
-      sendError(res, 'upstream_rate_limit', request_id, { upstream_retry_after: retryAfter })
+      sendError(res, 'upstream_rate_limit', request_id, { upstream_retry_after: retryAfter, provider: routedProvider })
       return
     }
 
     if (upstreamRes.status >= 500) {
-      await bestEffortUsage({ ...usageBase, model_routed: upstreamModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: `Upstream ${upstreamRes.status}.`, policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+      await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: `Upstream ${upstreamRes.status}.`, policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
       await auditLog(workspaceId, 'upstream_error', request_id)
-      sendError(res, 'upstream_error', request_id, { upstream_status: upstreamRes.status })
+      sendError(res, 'upstream_error', request_id, { upstream_status: upstreamRes.status, provider: routedProvider })
       return
     }
 
-    // Success path
-    const upstreamText = await upstreamRes.text()
-    console.log("ENG_6 response_ready", { request_id, bodyLen: upstreamText.length })
-
+    // Success path — translate provider-native response to OpenAI format so
+    // the client SDK works unchanged.
+    let translated: Record<string, unknown>
     let tokensIn = 0
     let tokensOut = 0
     try {
-      const p = JSON.parse(upstreamText)
-      tokensIn = p?.usage?.prompt_tokens ?? 0
-      tokensOut = p?.usage?.completion_tokens ?? 0
-    } catch {}
-    console.log("PARSED_USAGE", { request_id, tokensIn, tokensOut })
+      const parsed = JSON.parse(upstreamRes.rawText) as Record<string, unknown>
+      translated = translateResponseToOpenAI(routedProvider, routedRawModel, parsed)
+      const usage = (translated.usage as Record<string, unknown> | undefined) ?? {}
+      tokensIn = Number(usage.prompt_tokens ?? 0) || 0
+      tokensOut = Number(usage.completion_tokens ?? 0) || 0
+    } catch (parseErr) {
+      console.error("ENG_TRANSLATE_FAIL", { request_id, provider: routedProvider, error: (parseErr as Error)?.message })
+      // If we can't parse a successful upstream body something is genuinely
+      // wrong — surface as a 5xx rather than feeding garbage to the client.
+      await bestEffortUsage({ ...usageBase, model_routed: routedRawModel, tokens_in: 0, tokens_out: 0, decision: 'failed_open', observer_suggestion: null, reasoning: 'Upstream response not parseable.', policy_triggered: null, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: Date.now() - startedAt })
+      sendError(res, 'upstream_error', request_id, { upstream_status: upstreamRes.status, provider: routedProvider, reason: 'parse_failed' })
+      return
+    }
+
+    console.log("PARSED_USAGE", { request_id, tokensIn, tokensOut, provider: routedProvider })
 
     const totalLatencyMs = Date.now() - startedAt
     await bestEffortUsage({ ...usageBase, model_routed: dec.model_routed, tokens_in: tokensIn, tokens_out: tokensOut, decision: dec.decision, observer_suggestion: dec.observer_suggestion, reasoning: dec.reasoning, policy_triggered: dec.policy_triggered_id, upstream_latency_ms: upstreamLatencyMs, total_latency_ms: totalLatencyMs })
 
-    res.status(upstreamRes.status).setHeader('content-type', 'application/json').send(upstreamText)
+    res.status(upstreamRes.status).setHeader('content-type', 'application/json').send(JSON.stringify(translated))
   } catch (err: any) {
     console.error("ENG_CRASH", { request_id, error: err?.message, stack: err?.stack })
     if (workspaceId) await auditLog(workspaceId, 'anvx_unavailable', request_id)
