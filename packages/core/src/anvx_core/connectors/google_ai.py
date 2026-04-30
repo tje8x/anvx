@@ -17,7 +17,9 @@ def _is_retryable(resp: httpx.Response) -> bool:
 
 
 class GoogleAIConnector:
-    provider = "google_ai"
+    # Internal provider id matches the routing engine's `Provider` union
+    # (`google`). UI display label is "Google AI" — set in the provider catalog.
+    provider = "google"
     kind = "api_key"
 
     async def validate(self, api_key: str) -> None:

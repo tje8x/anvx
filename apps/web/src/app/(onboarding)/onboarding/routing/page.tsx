@@ -54,7 +54,7 @@ response = client.chat.completions.create(
 )
 print(response.choices[0].message.content)`,
   },
-  google_ai: {
+  google: {
     display: 'Google Gemini',
     modelExample: 'gemini-2.0-flash',
     notes: 'Gemini’s native Python SDK doesn’t expose a base_url override. Use the OpenAI SDK above with a Gemini model name — ANVX accepts the OpenAI wire format and routes to Gemini.',

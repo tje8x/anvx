@@ -48,6 +48,12 @@ class AnthropicConnector:
                 model = entry.get("model")
                 input_tokens = entry.get("input_tokens")
                 output_tokens = entry.get("output_tokens")
+                # Anthropic admin usage_report exposes prompt-cache token counts
+                # when group_by[]=model is set. They're optional — older reports
+                # omit them; treat missing as 0.
+                cache_write = entry.get("cache_creation_input_tokens") or 0
+                cache_read = entry.get("cache_read_input_tokens") or 0
+                num_requests = entry.get("num_requests") or entry.get("num_model_requests")
                 amount = entry.get("amount", 0)
                 cost_cents = round(amount * 100)
                 ts_str = entry.get("timestamp", since.isoformat())
@@ -65,6 +71,9 @@ class AnthropicConnector:
                     currency="USD",
                     ts=ts,
                     raw=entry,
+                    cache_read_tokens=cache_read,
+                    cache_write_tokens=cache_write,
+                    num_requests=num_requests,
                 ))
 
         return records
@@ -72,11 +81,17 @@ class AnthropicConnector:
     @staticmethod
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), retry=retry_if_result(_is_retryable))
     async def _fetch_report(client: httpx.AsyncClient, headers: dict, since: datetime, until: datetime) -> httpx.Response:
+        # group_by[]=model is the difference between an aggregate spend total
+        # and a per-model breakdown. Without it the `data` array collapses across
+        # models and we can't drive the Optimization tab. Standard sk-ant-*
+        # keys 401 on this endpoint regardless of group_by; admin keys
+        # (sk-ant-admin-*) are required.
         return await client.get(
             f"{_BASE}/organizations/usage_report/messages",
             headers=headers,
-            params={
-                "starting_at": since.isoformat(),
-                "ending_at": until.isoformat(),
-            },
+            params=[
+                ("starting_at", since.isoformat()),
+                ("ending_at", until.isoformat()),
+                ("group_by[]", "model"),
+            ],
         )

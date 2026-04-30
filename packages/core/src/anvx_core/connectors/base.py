@@ -14,8 +14,17 @@ class UsageRecord:
     currency: str
     ts: datetime
     raw: dict[str, Any]
+    # Optional fields for richer breakdown — populated when the upstream report
+    # exposes them (Anthropic admin keys + OpenAI org admin). Connectors that
+    # don't have these leave them as None / 0.
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    num_requests: int | None = None
 
     def as_insert_row(self, workspace_id: str, provider_key_id: str) -> dict:
+        # `usage_records` schema is unchanged — keep the row shape the same so
+        # the upsert continues to work. The richer fields land on
+        # `provider_model_usage` via a separate roll-up at sync time.
         return {
             "workspace_id": workspace_id,
             "provider": self.provider,

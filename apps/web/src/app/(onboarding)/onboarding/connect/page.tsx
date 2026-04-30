@@ -29,7 +29,7 @@ const SECONDARY: ProviderTile[] = [
   { id: 'cloudflare', display: 'Cloudflare' },
   { id: 'cursor', display: 'Cursor' },
   { id: 'github', display: 'GitHub', oauth: true },
-  { id: 'google_ai', display: 'Google AI' },
+  { id: 'google', display: 'Google AI' },
   { id: 'cohere', display: 'Cohere' },
   { id: 'replicate', display: 'Replicate' },
 ]

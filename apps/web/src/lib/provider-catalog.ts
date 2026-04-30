@@ -37,7 +37,7 @@ export const PROVIDER_CATALOG: ProviderEntry[] = [
     keyUrl: 'https://console.anthropic.com/settings/keys',
   },
   {
-    id: 'google_ai',
+    id: 'google',
     display: 'Google AI',
     category: 'LLM Providers',
     aliases: ['gemini', 'palm', 'bard'],

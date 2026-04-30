@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from anvx_core import crypto
 from anvx_core.connectors import REGISTRY, validate_key
+from anvx_core.connectors.pricing import estimate_cost_cents
 
 from ..auth import WorkspaceContext, require_role
 from ..db import sb_service
@@ -38,7 +39,7 @@ def _short_sync_error(status: int, body: str | None = None) -> str:
 router = APIRouter()
 
 _CATEGORIES = {
-    "openai": "llm", "anthropic": "llm", "google_ai": "llm",
+    "openai": "llm", "anthropic": "llm", "google": "llm",
     "cohere": "llm", "replicate": "llm", "together": "llm", "fireworks": "llm",
     "aws": "cloud", "gcp": "cloud", "vercel": "cloud", "cloudflare": "cloud",
     "stripe": "payments",
@@ -54,7 +55,7 @@ _CATEGORIES = {
 _TIERS = {
     "openai": "core", "anthropic": "core", "stripe": "core",
     "aws": "core", "gcp": "core", "vercel": "core", "cloudflare": "core",
-    "google_ai": "core", "cohere": "extended", "replicate": "extended",
+    "google": "core", "cohere": "extended", "replicate": "extended",
     "together": "extended", "fireworks": "extended",
     "twilio": "extended", "sendgrid": "extended",
     "datadog": "extended", "langsmith": "extended",
@@ -318,6 +319,53 @@ async def sync_connector(key_id: str, ctx: WorkspaceContext = Depends(require_ro
             if records:
                 rows = [r.as_insert_row(ctx.workspace_id, key_id) for r in records]
                 sb.from_("usage_records").upsert(rows, on_conflict="workspace_id,provider,ts,model").execute()
+
+                # Roll up to per-(workspace, provider, model, day) for the
+                # Optimization tab. We bucket by ts.date() so the same model on
+                # the same day collapses into a single row regardless of how
+                # the upstream report chunked it.
+                model_buckets: dict[tuple[str, str], dict] = {}
+                for rec in records:
+                    if not rec.model:
+                        continue
+                    bucket_date = rec.ts.date()
+                    key = (rec.model, bucket_date.isoformat())
+                    bucket = model_buckets.setdefault(key, {
+                        "workspace_id": ctx.workspace_id,
+                        "provider": rec.provider,
+                        "model": rec.model,
+                        "period_start": bucket_date.isoformat(),
+                        "period_end": bucket_date.isoformat(),
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                        "num_requests": 0,
+                        "cost_cents": 0,
+                    })
+                    bucket["input_tokens"] += rec.input_tokens or 0
+                    bucket["output_tokens"] += rec.output_tokens or 0
+                    bucket["cache_read_tokens"] += rec.cache_read_tokens or 0
+                    bucket["cache_write_tokens"] += rec.cache_write_tokens or 0
+                    bucket["num_requests"] += rec.num_requests or 0
+                    # Prefer the upstream-reported amount when it's non-zero;
+                    # otherwise fall back to our local pricing table.
+                    if rec.total_cost_cents_usd > 0:
+                        bucket["cost_cents"] += rec.total_cost_cents_usd
+                    else:
+                        bucket["cost_cents"] += estimate_cost_cents(
+                            rec.model,
+                            rec.input_tokens or 0,
+                            rec.output_tokens or 0,
+                            rec.cache_read_tokens or 0,
+                            rec.cache_write_tokens or 0,
+                        )
+
+                if model_buckets:
+                    sb.from_("provider_model_usage").upsert(
+                        list(model_buckets.values()),
+                        on_conflict="workspace_id,provider,model,period_start",
+                    ).execute()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code if exc.response is not None else 0
         body_text = exc.response.text if exc.response is not None else None

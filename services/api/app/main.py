@@ -87,6 +87,7 @@ from .routers import health as health_router
 from .routers import incidents as incidents_router
 from .routers import reconcile as reconcile_router
 from .routers import insights as insights_router
+from .routers import model_usage as model_usage_router
 from .routers import models as models_router
 from .routers import notifications as notifications_router
 from .routers import onboarding as onboarding_router
@@ -160,6 +161,7 @@ app.include_router(tokens_router.router, prefix="/api/v2")
 app.include_router(observer_router.router, prefix="/api/v2")
 app.include_router(routing_rules_router.router, prefix="/api/v2")
 app.include_router(models_router.router, prefix="/api/v2")
+app.include_router(model_usage_router.router, prefix="/api/v2")
 app.include_router(policies_router.router, prefix="/api/v2")
 app.include_router(routing_router.router, prefix="/api/v2")
 app.include_router(anomalies_router.router, prefix="/api/v2")

@@ -25,7 +25,7 @@ type Insight = {
   detail: string
 }
 
-const LLM_PROVIDERS = new Set(['anthropic', 'openai', 'google_ai', 'cohere', 'replicate', 'together', 'fireworks'])
+const LLM_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'cohere', 'replicate', 'together', 'fireworks'])
 
 export default function OnboardingInsightStep() {
   const router = useRouter()

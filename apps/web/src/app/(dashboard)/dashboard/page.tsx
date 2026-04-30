@@ -402,7 +402,7 @@ export default function DashboardPage() {
 const PROVIDER_DISPLAY: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
-  google_ai: 'Google AI',
+  google: 'Google AI',
   cohere: 'Cohere',
   replicate: 'Replicate',
   together: 'Together',

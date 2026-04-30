@@ -255,7 +255,7 @@ async def _validate_generic(provider: str, api_key: str) -> ValidationResult:
 
     # Most non-LLM/non-cloud providers expose historical usage by default.
     # LLM providers without admin tiers get live_tracking only.
-    llm_no_history = {"google_ai", "cohere", "replicate", "together", "fireworks"}
+    llm_no_history = {"google", "cohere", "replicate", "together", "fireworks"}
     if provider in llm_no_history:
         return _ok("standard", ["live_tracking", "account_metadata"])
     return _ok("standard", ["historical_usage", "account_metadata"])

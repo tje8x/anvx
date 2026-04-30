@@ -36,7 +36,7 @@ from .supabase_billing import SupabaseBillingConnector
 REGISTRY = {
     "openai": OpenAIConnector(),
     "anthropic": AnthropicConnector(),
-    "google_ai": GoogleAIConnector(),
+    "google": GoogleAIConnector(),
     "cohere": CohereConnector(),
     "replicate": ReplicateConnector(),
     "together": TogetherConnector(),

@@ -55,6 +55,11 @@ class OpenAIConnector:
                         model = result.get("model")
                         input_tokens = result.get("input_tokens")
                         output_tokens = result.get("output_tokens")
+                        # OpenAI's grouped completions usage exposes per-model
+                        # request counts and (for cached prompts) cached input
+                        # tokens. Treat missing fields as None / 0.
+                        num_requests = result.get("num_model_requests")
+                        cache_read = result.get("input_cached_tokens") or 0
                         amount = result.get("amount", 0)
                         cost_cents = round(amount * 100)
 
@@ -67,6 +72,8 @@ class OpenAIConnector:
                             currency="USD",
                             ts=bucket_ts,
                             raw=result,
+                            cache_read_tokens=cache_read,
+                            num_requests=num_requests,
                         ))
 
                 page = data.get("next_page")
