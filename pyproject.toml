@@ -25,7 +25,7 @@ where = ["packages/core/src"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["packages/core/src/anvx_core/testing"]
+testpaths = ["packages/core/tests"]
 
 [tool.uv.workspace]
 members = [
